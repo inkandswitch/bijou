@@ -168,20 +168,20 @@
             ${bench-charts}/bin/bench-charts "$@"
           '';
 
-          "test:props" = cmd "Run property tests with many iterations" ''
+          "test:props" = cmd "Run property tests with 1M iterations" ''
             set -e
-            echo "Running property tests with 100,000 iterations each..."
-            export BOLERO_RANDOM_ITERATIONS=100000
-            ${pkgs.cargo}/bin/cargo test --all-features proptests -- --nocapture
+            echo "Running property tests with 1,000,000 iterations each..."
+            export BOLERO_RANDOM_ITERATIONS=1000000
+            ${pkgs.cargo}/bin/cargo test --release --workspace --features bolero --lib tests::property -- --nocapture
             echo ""
             echo "✓ All property tests passed"
           '';
 
-          "test:props:intense" = cmd "Run property tests with 1M iterations" ''
+          "test:props:intense" = cmd "Run property tests with 100M iterations (~10 min)" ''
             set -e
-            echo "Running property tests with 1,000,000 iterations each..."
-            export BOLERO_RANDOM_ITERATIONS=1000000
-            ${pkgs.cargo}/bin/cargo test --all-features proptests -- --nocapture
+            echo "Running property tests with 100,000,000 iterations each..."
+            export BOLERO_RANDOM_ITERATIONS=100000000
+            ${pkgs.cargo}/bin/cargo test --release --workspace --features bolero --lib tests::property -- --nocapture
           '';
 
           "test:no_std" = cmd "Check no_std build for bijou64" ''

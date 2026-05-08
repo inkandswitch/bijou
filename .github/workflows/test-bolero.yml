@@ -19,14 +19,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Every PR: quick smoke test of the property suite.
           - os: ubuntu-latest
-            iterations: 100
+            iterations: 1000000     # 1M
             label: "Quick"
+          # Every PR: thorough run that still finishes under a minute.
           - os: ubuntu-latest
-            iterations: 1000
+            iterations: 10000000    # 10M
             label: "Thorough"
+          # Cross-platform sanity check.
           - os: macos-latest
-            iterations: 100
+            iterations: 1000000     # 1M
             label: "Quick"
 
     runs-on: ${{ matrix.os }}
@@ -43,4 +46,26 @@ jobs:
         env:
           BOLERO_RANDOM_ITERATIONS: ${{ matrix.iterations }}
           RUST_BACKTRACE: "1"
-        run: cargo test --workspace --features bolero --lib
+        # --release: bolero iterations are CPU-bound, debug builds are ~10x slower.
+        # tests::property: filter to the property-test module so we don't re-run
+        # the deterministic unit tests for every matrix entry.
+        run: cargo test --release --workspace --features bolero --lib tests::property
+
+  property-tests-intense:
+    # Push-to-main only: runs ~10 minutes but exercises the full state space.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Run property tests (Intense — 100M iterations)
+        env:
+          BOLERO_RANDOM_ITERATIONS: 100000000
+          RUST_BACKTRACE: "1"
+        run: cargo test --release --workspace --features bolero --lib tests::property
