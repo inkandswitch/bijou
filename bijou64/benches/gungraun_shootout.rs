@@ -21,6 +21,10 @@
     unreachable_pub,
     clippy::doc_markdown,
     clippy::indexing_slicing,
+    // gungraun's `#[benches::dist(expr, ...)]` passes owned `Vec`s from the
+    // setup expressions; the bench fns iterate by reference internally but
+    // must accept by value to match the macro's call shape.
+    clippy::needless_pass_by_value,
     clippy::unwrap_used
 )]
 
