@@ -1,0 +1,23 @@
+[files]
+extend-exclude = [
+  # Generated benchmark charts: SVG and HTML contain large base64-encoded
+  # plotly payloads that trigger many false positives.
+  "**/charts/**/*.html",
+  "**/charts/**/*.svg",
+
+  # Cargo / Nix lockfiles: hashes and crate names sometimes look like typos.
+  "Cargo.lock",
+  "flake.lock",
+]
+
+[default]
+# Project-specific terms that look like typos but aren't. Keys are the
+# "typo" form; setting the value equal to the key marks them always-valid.
+extend-ignore-identifiers-re = [
+  # IPA pronunciation glyphs in our README ("biːʒuː", "sɪksti", "fɔːr")
+  "[bsfːʒɪɔ]+",
+]
+
+[default.extend-words]
+# Project-specific words.
+bijou = "bijou"
