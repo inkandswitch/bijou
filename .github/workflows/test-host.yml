@@ -1,0 +1,39 @@
+name: Test Default Features on Host
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Test default features
+        run: cargo test --workspace
+
+      - name: Test arbitrary feature
+        run: cargo test --workspace --features arbitrary
+
+      - name: Run doc tests
+        run: cargo test --doc --workspace

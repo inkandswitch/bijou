@@ -1,0 +1,46 @@
+name: Bolero Property Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  property-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            iterations: 100
+            label: "Quick"
+          - os: ubuntu-latest
+            iterations: 1000
+            label: "Thorough"
+          - os: macos-latest
+            iterations: 100
+            label: "Quick"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Run property tests (${{ matrix.label }} — ${{ matrix.iterations }} iterations)
+        env:
+          BOLERO_RANDOM_ITERATIONS: ${{ matrix.iterations }}
+          RUST_BACKTRACE: "1"
+        run: cargo test --workspace --features bolero --lib

@@ -1,0 +1,40 @@
+name: Test All Features + no_std + wasm32
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-all-features:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          target: wasm32-unknown-unknown
+
+      - name: Test all features (host)
+        run: cargo test --workspace --all-features
+
+      - name: Check no_std (bijou64)
+        run: cargo check --package bijou64 --no-default-features
+
+      - name: Check wasm32 (workspace)
+        run: cargo check --workspace --target wasm32-unknown-unknown
