@@ -20,20 +20,20 @@
 | Seed | `0xBEEF_CAFE_DEAD_F00D` (fixed for reproducibility) |
 | Profile | `bench` (`opt-level = 3`, `lto = "thin"`, `debug = true`) |
 
-### Instruction-Count Benchmarks (iai-callgrind)
+### Instruction-Count Benchmarks (gungraun)
 
 Deterministic benchmarks via Valgrind's Callgrind. Reports CPU instructions, cache misses, and branch mispredictions. Unaffected by system load or scheduling noise -- ideal for CI regression detection.
 
 | Setting | Value |
 |---------|-------|
-| Framework | [iai-callgrind 0.16](https://github.com/iai-callgrind/iai-callgrind) |
+| Framework | [gungraun 0.18](https://github.com/gungraun/gungraun) (formerly `iai-callgrind`) |
 | Platform | Linux only (requires Valgrind) |
-| CI | `.github/workflows/iai-bench.yml` |
+| CI | `.github/workflows/gungraun-bench.yml` |
 
 Run locally (Linux only):
 ```bash
-cargo install iai-callgrind-runner
-cargo bench -p bijou64 --bench iai_shootout
+cargo install gungraun-runner
+cargo bench -p bijou64 --bench gungraun_shootout
 ```
 
 ### Chart Generation

@@ -24,7 +24,7 @@ bijou64 = { path = ".", features = ["bolero"] }
 bolero = { workspace = true, features = ["arbitrary"] }
 criterion = { workspace = true }
 criterion_pprof = { workspace = true }
-iai-callgrind = "0.16"
+gungraun = "0.18"
 leb128 = "0.2"
 rand = { workspace = true, features = ["small_rng"] }
 testresult = { workspace = true }
@@ -37,7 +37,7 @@ name = "shootout"
 harness = false
 
 [[bench]]
-name = "iai_shootout"
+name = "gungraun_shootout"
 harness = false
 
 [features]

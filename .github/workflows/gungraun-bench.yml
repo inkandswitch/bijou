@@ -1,4 +1,4 @@
-name: iai-callgrind Benchmarks
+name: Gungraun Benchmarks
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - main
     paths:
       - "bijou64/**"
-      - ".github/workflows/iai-bench.yml"
+      - ".github/workflows/gungraun-bench.yml"
   pull_request:
     paths:
       - "bijou64/**"
-      - ".github/workflows/iai-bench.yml"
+      - ".github/workflows/gungraun-bench.yml"
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +21,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  iai-callgrind:
+  gungraun:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,18 +37,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y valgrind
 
-      - name: Install iai-callgrind-runner
+      - name: Install gungraun-runner
         run: |
           version=$(cargo metadata --format-version=1 --no-deps \
-            | jq -r '.packages[] | select(.name == "bijou64") | .dependencies[] | select(.name == "iai-callgrind") | .req')
-          cargo install iai-callgrind-runner --version "${version}"
+            | jq -r '.packages[] | select(.name == "bijou64") | .dependencies[] | select(.name == "gungraun") | .req')
+          cargo install gungraun-runner --version "${version}"
 
-      - name: Run iai-callgrind benchmarks
-        run: cargo bench -p bijou64 --bench iai_shootout
+      - name: Run gungraun benchmarks
+        run: cargo bench -p bijou64 --bench gungraun_shootout
 
-      - name: Upload iai results
+      - name: Upload gungraun results
         uses: actions/upload-artifact@v4
         with:
-          name: iai-callgrind-results-${{ github.sha }}
-          path: target/iai/
+          name: gungraun-results-${{ github.sha }}
+          path: target/gungraun/
           retention-days: 90

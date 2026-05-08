@@ -160,8 +160,8 @@
             ${pkgs.cargo}/bin/cargo bench --package bijou64 --bench shootout
           '';
 
-          "bench:iai" = cmd "Run the bijou64 iai-callgrind benchmark" ''
-            ${pkgs.cargo}/bin/cargo bench --package bijou64 --bench iai_shootout
+          "bench:gungraun" = cmd "Run the bijou64 gungraun instruction-count benchmark" ''
+            ${pkgs.cargo}/bin/cargo bench --package bijou64 --bench gungraun_shootout
           '';
 
           "bench:charts" = cmd "Generate benchmark comparison charts (requires bench results in target/criterion)" ''
@@ -269,7 +269,7 @@
               pkgs.nodejs
               pkgs.nodePackages.pnpm
               pkgs.rust-analyzer
-              pkgs.valgrind # required by iai-callgrind
+              pkgs.valgrind # required by gungraun
               pkgs.wasm-pack
               wasm-bodge
             ]

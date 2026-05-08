@@ -1,4 +1,5 @@
-//! Deterministic instruction-count benchmarks using iai-callgrind.
+//! Deterministic instruction-count benchmarks using [gungraun] (formerly
+//! `iai-callgrind`).
 //!
 //! Measures CPU instructions, cache misses, and branch mispredictions via
 //! Valgrind's Callgrind. Unlike wall-clock benchmarks, results are
@@ -8,10 +9,12 @@
 //! **Requires Linux with Valgrind installed.** Will not run on macOS or Windows.
 //!
 //! Run:
-//!   cargo bench -p bijou64 --bench iai_shootout
+//!   cargo bench -p bijou64 --bench gungraun_shootout
 //!
 //! Install runner (one-time):
-//!   cargo install iai-callgrind-runner
+//!   cargo install gungraun-runner
+//!
+//! [gungraun]: https://github.com/gungraun/gungraun
 
 #![allow(
     missing_docs,
@@ -23,7 +26,7 @@
 
 use std::hint::black_box;
 
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+use gungraun::{library_benchmark, library_benchmark_group, main};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 // ---------------------------------------------------------------------------

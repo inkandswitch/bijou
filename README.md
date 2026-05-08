@@ -45,7 +45,7 @@ build                # cargo build --workspace
 test                 # cargo test --workspace
 ci                   # fmt + clippy + test + no_std + wasm32
 bench:shootout       # criterion shootout vs other varints
-bench:iai            # iai-callgrind instruction counts
+bench:gungraun       # gungraun instruction-count benchmarks
 ```
 
 Without Nix:
