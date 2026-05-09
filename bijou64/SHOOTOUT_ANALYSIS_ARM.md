@@ -1,10 +1,20 @@
 # bijou64 Benchmark Shootout (ARM)
 
+> [!WARNING]
+> **STALE — these numbers are from an earlier version of the
+> implementation and do not reflect the current code.** The decode
+> wins on x86 (now 6/6) are not visible here.
+>
+> **TODO**: re-run `cargo bench -p bijou64 --bench shootout` on a
+> current Apple Silicon machine and regenerate the charts via
+> `nix run .#bench-charts`. Until then, the tables and conclusions
+> below are a historical snapshot only.
+
 > Criterion benchmarks comparing bijou64 against varu64, vu64, vu128, and leb128 across six value distributions over batches of 4096 values.
 >
 > Run: `cargo bench -p bijou64 --bench shootout`
 >
-> See also: [x86 results (AMD Ryzen 5 5600X)](SHOOTOUT_ANALYSIS_X86.md)
+> See also: [x86 results (AMD Ryzen AI 9 HX 370 / Zen 5)](SHOOTOUT_ANALYSIS_X86.md) — _current code_
 
 ## Methodology
 
