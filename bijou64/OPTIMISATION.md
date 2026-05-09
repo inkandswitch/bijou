@@ -404,6 +404,8 @@ The earlier "1.04–1.30×" improvement claim came from comparing across two cha
 
 After all of this — `#[inline]` on `decode` and `encoded_len` plus the shift trick on `encode_array` — the shootout matrix on Zen 5 stands at:
 
+### Zen 5 (AMD Ryzen AI 9 HX 370)
+
 | Operation        | bijou64 wins (was → now) |
 |------------------|--------------------------|
 | encode           | 5/6 → 5/6                |
@@ -414,11 +416,25 @@ After all of this — `#[inline]` on `decode` and `encoded_len` plus the shift t
 | canonical_decode | 5/6 → **6/6**            |
 | **Total**        | **17/36 → 24/36**        |
 
+### Apple M2 Pro
+
+| Operation        | bijou64 wins (was → now) |
+|------------------|--------------------------|
+| encode           | 1/6 → **5/6**            |
+| decode           | 3/6 → **6/6**            |
+| encode_array     | 1/6 → 1/6                |
+| encoded_size     | 0/6 → 0/6                |
+| stream_decode    | 3/6 → **6/6**            |
+| canonical_decode | 4/6 → **6/6**            |
+| **Total**        | **12/36 → 24/36**        |
+
+The improvements transfer cleanly across microarchitectures. On ARM the encode gains are even more dramatic (1/6 → 5/6) because the old if-chain was particularly costly on M2's in-order front-end for multi-byte tiers.
+
 The two most consequential wins (decode and encode-side speedups) compound: stream_decode and canonical_decode share decode's hot loop, and encode-side improvements affect every Vec-encode path.
 
 ### Outstanding Losers
 
-- `encode/small` vs leb128 — 1.27× behind (was 1.61×). Algorithmic; leb128's 2-byte-write loop still wins at this size on Zen 5.
-- `encode_array` non-tiny — ~1.85× behind vu64. Format-bound: vu64's power-of-2 boundaries skip the correction step bijou64 must do.
-- `encoded_size` non-tiny — ~2.4× behind vu64. Same format constraint.
-- `encoded_size/tiny` — 1.008× behind varu64 (statistical tie).
+- `encode/small` vs leb128 — 1.23–1.25× behind. Algorithmic; leb128's 2-byte-write loop wins at this size on both Zen 5 and M2.
+- `encode_array` non-tiny — ~1.4–1.9× behind vu64. Format-bound: vu64's power-of-2 boundaries skip the correction step bijou64 must do.
+- `encoded_size` non-tiny — ~2.4–2.9× behind vu64. Same format constraint.
+- `encoded_size/tiny` — statistical tie with varu64 on both platforms.
