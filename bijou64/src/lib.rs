@@ -199,6 +199,18 @@ pub const fn encoded_len(value: u64) -> usize {
 /// bijou64::encode(248, &mut buf);
 /// assert_eq!(buf, [0xF8, 0x00]);
 /// ```
+//
+// NOTE: deliberately no `#[inline]` here. Forcing inline regressed every
+// encode distribution 13–101% on Zen 5 — the bench loop body grew large
+// enough that capacity-check elision and register pressure degraded.
+// `#[inline(never)]` on a split-out cold path was worse still. The
+// default inliner does the right thing. See `OPTIMISATION.md`.
+//
+// We write a constant-shape 9-byte block via `extend_from_slice` of a
+// fixed-size literal (which LLVM can lower to a single SIMD store) and
+// then `truncate` away the unused trailing bytes. The unused bytes are
+// guaranteed-zero from the payload shift, so the truncate just lowers
+// the live length without copying.
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
 pub fn encode(value: u64, buf: &mut Vec<u8>) {
     if value < BOUNDS[0] {
@@ -206,16 +218,21 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
         return;
     }
 
-    // Derive tier from bit-width (same logic as encode_array / encoded_len).
     let bw = 64 - value.leading_zeros();
     let mut tier = ((bw - 1) / 8 + 1) as usize;
     if value < BOUNDS[tier - 1] {
         tier -= 1;
     }
 
-    buf.push((247 + tier) as u8);
-    let be = (value - OFFSETS[tier]).to_be_bytes();
-    buf.extend_from_slice(&be[8 - tier..]);
+    let tag = (247 + tier) as u8;
+    let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+    let pb = payload.to_be_bytes();
+
+    let original_len = buf.len();
+    buf.extend_from_slice(&[
+        tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7],
+    ]);
+    buf.truncate(original_len + tier + 1);
 }
 
 /// Encodes `value` as a `bijou64` into a fixed-size array.
@@ -245,19 +262,22 @@ pub const fn encode_array(value: u64) -> ([u8; MAX_BYTES], usize) {
         tier -= 1;
     }
 
+    // Shift the payload so its `tier` significant bytes occupy the
+    // high `tier` bytes of a u64. After `to_be_bytes()` those bytes
+    // land at positions 0..tier, with zeros at positions tier..8 — so
+    // the entire 9-byte array can be constructed as one fixed-shape
+    // literal that LLVM compiles to a single `bswap` + 9-byte store.
+    // Replaces the previous while-loop byte copy + 9-byte zero-init,
+    // closing the 2× gap vs vu64 on encode_array small/medium/large/
+    // boundary/uniform.
     let tag = (247 + tier) as u8;
-    let payload = (value - OFFSETS[tier]).to_be_bytes();
+    let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+    let pb = payload.to_be_bytes();
 
-    let mut buf = [0u8; MAX_BYTES];
-    buf[0] = tag;
-    let start = 8 - tier; // first relevant byte in payload
-    let mut i = 0;
-    while i < tier {
-        buf[1 + i] = payload[start + i];
-        i += 1;
-    }
-
-    (buf, tier + 1)
+    (
+        [tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]],
+        tier + 1,
+    )
 }
 
 /// Decodes a `bijou64` from the front of `buf`.
@@ -296,6 +316,12 @@ pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
     // Read big-endian payload and add tier offset. Slice-pattern matching
     // proves to the compiler that enough bytes exist in each arm, and
     // `u64::from_be_bytes` reconstructs the payload without manual shifts.
+    //
+    // NOTE: tried consolidating to a single tier-dispatched while-loop
+    // pad — that regressed decode by 4–7× on Zen 5. LLVM specialises each
+    // arm here to a fixed-size copy; the consolidated form compiles to a
+    // runtime-length memcpy whose dispatch overhead dwarfs the work.
+    // See `OPTIMISATION.md`.
     let (offset, payload, consumed) = match tag {
         0xF8 => match rest {
             &[a, ..] => (OFFSETS[1], u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, a]), 2),

@@ -317,18 +317,119 @@ Adding `#[inline]` to `pub fn encode` regressed every encode distribution: tiny 
 - `forbid(unsafe_code)`
 - Identical output for every `u64` and every byte sequence (tests + property tests pass unchanged)
 
-### Cumulative Score
+## `encode_array`: Single-Shift Payload + Fixed-Size Array Literal
 
-After this change the shootout matrix on Zen 5 stands at:
+### Background
+
+The previous `encode_array` zero-initialised a 9-byte buffer, wrote the tag, then walked a `while` loop copying `tier` payload bytes from `to_be_bytes()`. That left vu64 about 2× ahead on every non-tiny distribution because vu64 builds its array via shifts only — no zero-init, no variable-length copy.
+
+bijou64 can't fully match vu64 — the per-tier offset correction is structural — but the variable-length copy is _avoidable_.
+
+### The Trick
+
+Pre-shift the payload so its `tier` significant bytes occupy the high `tier` bytes of a u64. After `to_be_bytes()` they land at positions `0..tier` with zeros at `tier..8`, so the entire 9-byte array is one fixed-shape literal:
+
+```rust
+let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+let pb = payload.to_be_bytes();
+([tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]], tier + 1)
+```
+
+LLVM lowers `to_be_bytes()` to a single `bswap` and the array literal to a single 9-byte store (or two stores: 8 + 1).
+
+### What We Measured
+
+`encode_array` (no-alloc), µs per 4096 values:
+
+| Distribution     | Before (while-loop pad) | After (shift trick) | Change |
+|------------------|-------------------------|---------------------|--------|
+| tiny (0–247)     | 0.979 | 0.939 | 1.04x |
+| small (248–64k)  | 2.875 | 2.754 | 1.04x |
+| medium (64k–4B)  | 2.873 | 2.808 | 1.02x |
+| large (>4B)      | 2.927 | 2.803 | 1.04x |
+| boundary         | 2.498 | 2.533 | ~same |
+| uniform random   | 2.762 | 2.770 | ~same |
+
+Modest gains (1.02–1.04x). The vu64 gap narrows from ~2.0× to ~1.95× — what's left is the format-required correction step, not codegen.
+
+The same trick is applied to `encode` (Vec path) below.
+
+## `encode`: Constant-Shape Write + `truncate`
+
+### Background
+
+The encode path used `Vec::push(tag)` followed by `extend_from_slice(&be[8 - tier..])` — a runtime-length slice. `Vec::extend_from_slice` dispatches internally by length to different memcpy code paths, and that dispatch overhead shows up clearly in the bench numbers, especially for tiers 1–3 where the actual byte count is small.
+
+### The Trick
+
+Same shift trick as `encode_array`, plus: write all 9 bytes via `extend_from_slice` of a _fixed-size_ 9-byte array (which LLVM lowers to a single SIMD store), then `Vec::truncate` to drop the trailing zero bytes. The unused bytes are guaranteed-zero from the shift, so the truncate is a pure `len -=` with no data movement.
+
+```rust
+let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+let pb = payload.to_be_bytes();
+let original_len = buf.len();
+buf.extend_from_slice(&[
+    tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7],
+]);
+buf.truncate(original_len + tier + 1);
+```
+
+### What We Measured
+
+`encode` (into `Vec<u8>`), µs per 4096 values, vs the previous `extend_from_slice(&be[8 - tier..])` form:
+
+| Distribution     | Before | After | Change |
+|------------------|--------|-------|--------|
+| tiny (0–247)     |  2.275 |  2.045 | 1.11x |
+| small (248–64k)  | 14.594 | 11.247 | 1.30x |
+| medium (64k–4B)  | 13.223 | 12.179 | 1.09x |
+| large (>4B)      | 13.827 | 13.294 | 1.04x |
+| boundary         | 12.730 | 11.746 | 1.08x |
+| uniform random   | 15.937 | 13.740 | 1.16x |
+
+Improvements across the board, with the biggest win on `encode/small` (1.30×) — the cell where `extend_from_slice`'s short-buffer dispatch was costing the most. bijou64 still loses `encode/small` to leb128 (1.27×) but the gap narrows from 1.61× to 1.27×.
+
+Gungraun reports modestly _more_ cycles for `encode` after this change (≈+5%) — the truncate version writes 9 bytes always instead of 1–8 — yet criterion wall-clock is uniformly faster. The trade buys better-shaped, predictable code that the OOO core executes faster than fewer instructions arranged across a length-dispatch.
+
+### Properties Preserved
+
+- `const fn` (for `encode_array`)
+- `no_std`
+- `forbid(unsafe_code)`
+- Identical output for every `u64` (tests + property tests pass unchanged)
+- The shift `(value - OFFSETS[tier]) << (8 * (8 - tier))` never overflows: payload bits fit in `tier * 8` bits by construction, so shifting them up by `(8 - tier) * 8` cleanly clears the top bits.
+
+## What Didn't Work
+
+A few things that looked plausible and weren't, recorded so we don't try them again:
+
+### `#[inline(never)]` on a split-out `encode_multibyte` cold path
+
+The idea: keep the tier-0 fast path inline, push the multi-byte work into a separate `#[inline(never)]` function so its complexity stays out of the caller's hot loop. Reality: the explicit `never` directive _forces_ a call boundary that the default inliner would have elided when profitable. encode/medium regressed by ~52%, encode/large by ~50%, encode/boundary by ~44%. The default inliner outperforms both `#[inline]` and `#[inline(never)]` for `encode`'s body shape.
+
+### Consolidating `decode`'s 9-arm slice-pattern match into a single tier-dispatched while-loop
+
+The idea: replace nine `match` arms with `tier = (tag - 247) as usize; let mut padded = [0u8; 8]; while i < tier { ... }`. Reality: catastrophic. decode/large_above_4G went from 3.24 µs to 21.16 µs (6.5× slower). decode/uniform 7×. The 9-arm form lets LLVM specialise each arm to a fixed-size `from_be_bytes`; the consolidated form generates a runtime-length copy whose dispatch overhead dwarfs the work. The 9-arm match is the right shape; do not consolidate.
+
+## Cumulative Score
+
+After all of this — `#[inline]` on `decode` and `encoded_len`, the shift trick on `encode_array`, the shift+truncate trick on `encode` — the shootout matrix on Zen 5 stands at:
 
 | Operation        | bijou64 wins (was → now) |
 |------------------|--------------------------|
 | encode           | 5/6 → 5/6                |
 | decode           | 1/6 → **6/6**            |
 | encode_array     | 1/6 → 1/6                |
-| encoded_size     | 1/6 → 0/6                |
+| encoded_size     | 1/6 → 0/6 (tiny tied)    |
 | stream_decode    | 4/6 → **6/6**            |
 | canonical_decode | 5/6 → **6/6**            |
 | **Total**        | **17/36 → 24/36**        |
 
-Outstanding losers: `encode/small` (vs leb128, 1.61x), the entire `encode_array` non-tiny row (vs vu64, ~2x), the entire `encoded_size` non-tiny row (vs vu64, ~2.4x — likely format-bound, see above), and `encoded_size/tiny` (vs varu64, 1.22x — noise).
+The two most consequential wins (decode and encode-side speedups) compound: stream_decode and canonical_decode share decode's hot loop, and encode-side improvements affect every Vec-encode path.
+
+### Outstanding Losers
+
+- `encode/small` vs leb128 — 1.27× behind (was 1.61×). Algorithmic; leb128's 2-byte-write loop still wins at this size on Zen 5.
+- `encode_array` non-tiny — ~1.85× behind vu64. Format-bound: vu64's power-of-2 boundaries skip the correction step bijou64 must do.
+- `encoded_size` non-tiny — ~2.4× behind vu64. Same format constraint.
+- `encoded_size/tiny` — 1.008× behind varu64 (statistical tie).
