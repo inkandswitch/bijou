@@ -46,36 +46,39 @@ bijou64/charts/<arch>/
 
 ## Results by Architecture
 
-| Architecture | CPU                            | Results                                            |
-|--------------|--------------------------------|----------------------------------------------------|
+| Architecture | CPU                            | Results                                              |
+|--------------|--------------------------------|------------------------------------------------------|
 | x86_64       | AMD Ryzen AI 9 HX 370 (Zen 5)  | [SHOOTOUT_ANALYSIS_X86.md](SHOOTOUT_ANALYSIS_X86.md) |
-| AArch64      | Apple M2 Pro                   | [SHOOTOUT_ANALYSIS_ARM.md](SHOOTOUT_ANALYSIS_ARM.md) — ⚠️ stale |
+| AArch64      | Apple M2 Pro                   | [SHOOTOUT_ANALYSIS_ARM.md](SHOOTOUT_ANALYSIS_ARM.md) |
 
 ## Quick Comparison
 
 bijou64 cell-by-cell standing per architecture:
 
-| Benchmark        | x86 (Zen 5)                              | ARM (M2 Pro) ⚠️ stale       |
-|------------------|------------------------------------------|------------------------------|
-| Encode (Vec)     | Wins 5/6 (loses `small`)                 | Wins 1/6 (`tiny`)            |
-| Decode           | Wins 6/6                                 | Wins 3/6 (`tiny`, `small`, `medium`) |
-| Canonical Decode | Wins 6/6                                 | Wins 4/6                     |
-| Stream Decode    | Wins 6/6                                 | Wins 3/6 (`tiny`, `small`, `medium`) |
-| Encoded Size     | tied `tiny`; 2nd–3rd elsewhere           | 2nd–3rd                      |
-| **Total**        | **23/30**                                | **14/30**                    |
+| Benchmark        | x86 (Zen 5)                       | ARM (M2 Pro)                      |
+|------------------|-----------------------------------|-----------------------------------|
+| Encode (Vec)     | Wins 5/6 (loses `small`)          | Wins 5/6 (loses `small`)          |
+| Decode           | Wins 6/6                          | Wins 6/6                          |
+| Canonical Decode | Wins 6/6                          | Wins 6/6                          |
+| Stream Decode    | Wins 6/6                          | Wins 6/6                          |
+| Encoded Size     | tied `tiny`; 2nd–3rd elsewhere    | tied `tiny`; 2nd–3rd elsewhere    |
+| **Total**        | **23/30**                         | **23/30**                         |
 
-> The ARM column is from an older bench run on an earlier
-> version of the code; numbers will shift when ARM is re-run.
+bijou64 is the fastest decoder on every distribution, on both
+architectures, across all three decode variants (plain, canonical,
+stream), and the fastest encoder on 5 of 6 distributions. The sole
+encode loss on each platform is `small` going to leb128, whose tight
+2-byte-write loop fits both Zen 5's and M2's pipelines well for the
+tier-2-heavy 248–64k range.
 
-On Zen 5, bijou64 is the fastest decoder on every distribution
-across all three decode variants (plain, canonical, stream), and the
-fastest encoder on 5 of 6 distributions. The cells it loses
-(`encoded_size` non-tiny, `encode/small`) are either format-bound
-(vu64's power-of-2 boundaries skip a correction step bijou64 must
-perform) or pipeline-bound on a specific size range.
+The cells bijou64 loses on encoded_size are format-bound: vu64's
+power-of-2 boundaries skip the per-tier correction step bijou64
+must perform, leaving an unavoidable arithmetic gap on
+`encoded_len`'s allocation-free path.
 
 For workloads that care about canonical encoding — content-addressed
 hashes, deterministic serialisation — bijou64's structural
 canonicality means the canonical decode path is identical to plain
-decode, while non-canonical formats pay 2–3× more (leb128 hits 64 µs
-on `large/uniform` canonical decode vs 33 µs without the check).
+decode, while non-canonical formats pay 2–3× more (e.g. leb128 hits
+64 µs on Zen 5 / 55 µs on M2 for `large/uniform` canonical decode,
+versus ~33 µs / ~35 µs without the check).

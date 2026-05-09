@@ -237,18 +237,17 @@ This table is architecture-independent -- the encoded sizes are a property of th
 
 ## Summary
 
-On M2 Pro, bijou64 wins **24 of 36** shootout cells:
+On M2 Pro, bijou64 wins **23 of 30** shootout cells:
 
 | Operation        | Wins |
 |------------------|------|
 | encode           | 5/6  |
 | decode           | 6/6  |
-| encode_array     | 1/6  |
 | encoded_size     | 0/6  |
 | stream_decode    | 6/6  |
 | canonical_decode | 6/6  |
 
-This matches the Zen 5 score exactly (24/36), confirming that the optimisations transfer cleanly across microarchitectures.
+This matches the Zen 5 score exactly (23/30), confirming that the optimisations transfer cleanly across microarchitectures.
 
 bijou64 is the fastest decoder on every distribution, in every benchmark variant (plain decode, canonical decode, stream decode), typically by 1.4--3.3x margins. Structural canonicality is free, making bijou64 the unambiguous choice for protocols that decode more than they encode and that need deterministic serialisation.
 
@@ -256,8 +255,7 @@ On the encode side, bijou64 wins 5 of 6 distributions; only `small` goes to leb1
 
 The cells bijou64 loses are all format-bound:
 
-- `encode_array` non-tiny -- ~1.5x behind vu64 across all 5 distributions. vu64's power-of-2 boundaries let it skip the per-tier correction step bijou64 must perform.
-- `encoded_size` non-tiny -- ~2.9x behind vu64. Same root cause; vu64's `encoded_len` reduces to a single `clz` with no correction.
+- `encoded_size` non-tiny -- ~2.9x behind vu64 across all 5 distributions. vu64's `encoded_len` reduces to a single `clz` with no correction step; bijou64's per-tier offsets force a correction.
 - `encoded_size/tiny` -- statistical tie with varu64 (both 1.28 us).
 
 These gaps are the price of bijective canonicality. For the canonical-decode workloads that motivate bijou64, the trade is overwhelmingly favourable.
