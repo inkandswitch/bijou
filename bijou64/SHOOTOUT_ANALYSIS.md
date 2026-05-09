@@ -58,12 +58,11 @@ bijou64 cell-by-cell standing per architecture:
 | Benchmark        | x86 (Zen 5)                              | ARM (M2 Pro) ⚠️ stale       |
 |------------------|------------------------------------------|------------------------------|
 | Encode (Vec)     | Wins 5/6 (loses `small`)                 | Wins 1/6 (`tiny`)            |
-| Encode Array     | Wins 1/6 (`tiny`)                        | Wins 1/6 (`tiny`)            |
 | Decode           | Wins 6/6                                 | Wins 3/6 (`tiny`, `small`, `medium`) |
 | Canonical Decode | Wins 6/6                                 | Wins 4/6                     |
 | Stream Decode    | Wins 6/6                                 | Wins 3/6 (`tiny`, `small`, `medium`) |
 | Encoded Size     | tied `tiny`; 2nd–3rd elsewhere           | 2nd–3rd                      |
-| **Total**        | **24/36**                                | **15/36**                    |
+| **Total**        | **23/30**                                | **14/30**                    |
 
 > The ARM column is from an older bench run on an earlier
 > version of the code; numbers will shift when ARM is re-run.
@@ -71,10 +70,9 @@ bijou64 cell-by-cell standing per architecture:
 On Zen 5, bijou64 is the fastest decoder on every distribution
 across all three decode variants (plain, canonical, stream), and the
 fastest encoder on 5 of 6 distributions. The cells it loses
-(`encode_array` non-tiny, `encoded_size` non-tiny, `encode/small`)
-are either format-bound (vu64's power-of-2 boundaries skip a
-correction step bijou64 must perform) or pipeline-bound on a
-specific size range.
+(`encoded_size` non-tiny, `encode/small`) are either format-bound
+(vu64's power-of-2 boundaries skip a correction step bijou64 must
+perform) or pipeline-bound on a specific size range.
 
 For workloads that care about canonical encoding — content-addressed
 hashes, deterministic serialisation — bijou64's structural
