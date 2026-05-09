@@ -79,6 +79,6 @@ must perform, leaving an unavoidable arithmetic gap on
 For workloads that care about canonical encoding — content-addressed
 hashes, deterministic serialisation — bijou64's structural
 canonicality means the canonical decode path is identical to plain
-decode, while non-canonical formats pay 2–3× more (e.g. leb128 hits
-64 µs on Zen 5 / 55 µs on M2 for `large/uniform` canonical decode,
-versus ~33 µs / ~35 µs without the check).
+decode, while non-canonical formats pay ~2× more (e.g. leb128 hits
+~53 µs on Zen 5 / ~55 µs on M2 for `large/uniform` canonical decode,
+versus ~30 µs / ~35 µs without the check).

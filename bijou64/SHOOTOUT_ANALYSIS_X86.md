@@ -91,12 +91,12 @@ Encode to a `Vec<u8>`.
 
 | Distribution    | bijou64   | varu64 | vu64  | vu128     | leb128    | bijou64 rank | bijou64 vs other best |
 |-----------------|-----------|--------|-------|-----------|-----------|--------------|-----------------------|
-| tiny (0-247)    | **2.09**  | 10.42  | 21.57 | 11.74     |  4.72     | #1           | 0.44x                 |
-| small (248-64k) | 11.50     | 17.10  | 22.52 | 16.04     | **8.62**  | #2           | 1.33x                 |
-| medium (64k-4B) | **12.06** | 20.95  | 22.61 | 17.77     | 15.05     | #1           | 0.80x                 |
-| large (>4B)     | **12.43** | 25.79  | 27.71 | 17.92     | 28.41     | #1           | 0.69x                 |
-| boundary        | **11.41** | 20.54  | 23.56 | 17.21     | 14.43     | #1           | 0.79x                 |
-| uniform random  | **12.48** | 25.09  | 27.84 | 16.83     | 28.22     | #1           | 0.74x                 |
+| tiny (0-247)    | **1.92**  |  9.48  | 20.81 | 10.96     |  4.83     | #1           | 0.40x                 |
+| small (248-64k) | 10.37     | 16.78  | 22.29 | 15.65     | **8.37**  | #2           | 1.24x                 |
+| medium (64k-4B) | **11.02** | 41.89  | 47.24 | 30.85     | 27.08     | #1           | 0.41x                 |
+| large (>4B)     | **18.95** | 46.28  | 58.48 | 30.70     | 27.31     | #1           | 0.69x                 |
+| boundary        | **10.64** | 20.22  | 22.79 | 15.65     | 14.38     | #1           | 0.74x                 |
+| uniform random  | **11.93** | 24.11  | 27.18 | 15.23     | 27.72     | #1           | 0.78x                 |
 
 <details open>
 <summary>Charts</summary>
@@ -113,12 +113,12 @@ Decode from a `&[u8]` buffer.
 
 | Distribution    | bijou64   | varu64 | vu64  | vu128 | leb128 | bijou64 rank | bijou64 vs other best |
 |-----------------|-----------|--------|-------|-------|--------|--------------|-----------------------|
-| tiny (0-247)    | **2.03**  |  5.18  |  9.48 |  7.44 |  3.83  | #1           | 0.53x                 |
-| small (248-64k) | **4.40**  |  8.92  | 13.95 |  9.72 |  9.71  | #1           | 0.49x                 |
-| medium (64k-4B) | **4.29**  | 12.60  | 16.70 | 10.68 | 12.53  | #1           | 0.40x                 |
-| large (>4B)     | **3.44**  | 20.75  |  8.52 |  7.73 | 33.88  | #1           | 0.45x                 |
-| boundary        | **4.11**  | 13.67  | 12.61 |  8.35 | 10.61  | #1           | 0.49x                 |
-| uniform random  | **3.39**  | 20.66  |  8.30 |  7.49 | 33.26  | #1           | 0.45x                 |
+| tiny (0-247)    | **1.78**  |  5.71  |  8.57 |  6.84 |  3.41  | #1           | 0.52x                 |
+| small (248-64k) | **3.93**  |  8.85  | 12.38 |  8.58 |  8.47  | #1           | 0.46x                 |
+| medium (64k-4B) | **3.86**  | 13.01  | 15.17 |  9.62 | 11.56  | #1           | 0.40x                 |
+| large (>4B)     | **3.11**  | 18.84  |  8.04 |  6.95 | 30.75  | #1           | 0.45x                 |
+| boundary        | **3.75**  | 13.76  | 11.62 |  7.81 |  9.74  | #1           | 0.48x                 |
+| uniform random  | **3.08**  | 18.76  |  7.98 |  7.24 | 29.89  | #1           | 0.43x                 |
 
 <details open>
 <summary>Charts</summary>
@@ -131,6 +131,7 @@ Decode from a `&[u8]` buffer.
 
 bijou64 wins every decode cell on Zen 5, with margins ranging from 1.9× (tiny vs leb128) to 2.5× (medium vs vu128). gungraun reports `decode/tiny` running in ~38 000 modelled cycles per 4096 values — fewer than every competitor on every distribution.
 
+
 ## Canonical Decode
 
 Decode with a guarantee that the encoding is minimal (no overlong representations accepted). This matters for protocols that need deterministic serialisation -- if two peers can encode the same value differently, content-addressed hashes break.
@@ -139,12 +140,12 @@ bijou64 achieves canonicality structurally: its disjoint tier ranges make overlo
 
 | Distribution    | bijou64   | varu64 | vu64  | vu128 | leb128 | bijou64 rank | bijou64 vs other best |
 |-----------------|-----------|--------|-------|-------|--------|--------------|-----------------------|
-| tiny (0-247)    | **2.04**  |  6.18  |  9.57 | 12.01 |  9.05  | #1           | 0.33x                 |
-| small (248-64k) | **4.38**  |  8.94  | 14.05 | 17.29 | 19.76  | #1           | 0.49x                 |
-| medium (64k-4B) | **4.25**  | 12.70  | 16.82 | 13.08 | 28.49  | #1           | 0.33x                 |
-| large (>4B)     | **3.45**  | 20.91  |  8.48 | 10.39 | 64.23  | #1           | 0.41x                 |
-| boundary        | **4.07**  | 13.84  | 12.92 | 10.24 | 26.15  | #1           | 0.40x                 |
-| uniform random  | **3.38**  | 20.61  |  8.39 | 10.43 | 64.03  | #1           | 0.40x                 |
+| tiny (0-247)    | **1.75**  |  6.84  |  8.76 | 10.37 |  7.75  | #1           | 0.26x                 |
+| small (248-64k) | **4.07**  |  8.85  | 12.71 | 17.13 | 17.68  | #1           | 0.46x                 |
+| medium (64k-4B) | **4.01**  | 12.14  | 15.36 | 12.33 | 23.45  | #1           | 0.33x                 |
+| large (>4B)     | **3.18**  | 19.13  |  8.29 |  9.81 | 53.24  | #1           | 0.38x                 |
+| boundary        | **3.77**  | 13.55  | 11.78 |  9.80 | 21.69  | #1           | 0.38x                 |
+| uniform random  | **3.14**  | 19.09  |  7.96 |  9.91 | 52.41  | #1           | 0.39x                 |
 
 <details open>
 <summary>Charts</summary>
@@ -154,9 +155,9 @@ bijou64 achieves canonicality structurally: its disjoint tier ranges make overlo
 
 </details>
 
-The cost of canonicality varies wildly by crate. bijou64's numbers are identical to plain decode because there's nothing extra to check. varu64 always pays its runtime check, so its column matches the plain decode table. vu128 and leb128 pay the round-trip re-encode penalty — leb128 in particular is catastrophic on large/uniform (64 µs vs 33 µs without the check) because of its byte-at-a-time `Write`/`Read` interface.
+The cost of canonicality varies wildly by crate. bijou64's numbers are identical to plain decode because there's nothing extra to check. varu64 always pays its runtime check, so its column matches the plain decode table. vu128 and leb128 pay the round-trip re-encode penalty — leb128 in particular is catastrophic on large/uniform (~53 µs vs ~30 µs without the check) because of its byte-at-a-time `Write`/`Read` interface.
 
-bijou64 wins all 6 canonical decode distributions on x86, including tiny — where structural canonicality edges out varu64's runtime check (2.04 µs vs 6.18 µs). For protocols that _require_ canonical encoding, this is the table that matters.
+bijou64 wins all 6 canonical decode distributions on x86, including tiny — where structural canonicality edges out varu64's runtime check (1.75 µs vs 6.84 µs). For protocols that _require_ canonical encoding, this is the table that matters.
 
 ## Stream Decode
 
@@ -164,12 +165,12 @@ Decode a concatenated stream of encoded values. vu128 is excluded because its AP
 
 | Distribution    | bijou64   | varu64 | vu64  | leb128 | bijou64 rank | bijou64 vs other best |
 |-----------------|-----------|--------|-------|--------|--------------|-----------------------|
-| tiny (0-247)    | **1.06**  |  7.05  | 11.84 |  3.71  | #1           | 0.29x                 |
-| small (248-64k) | **5.23**  |  8.21  | 13.72 | 10.25  | #1           | 0.64x                 |
-| medium (64k-4B) | **5.17**  | 10.38  | 15.32 | 12.35  | #1           | 0.50x                 |
-| large (>4B)     | **3.26**  | 16.78  | 11.35 | 33.50  | #1           | 0.29x                 |
-| boundary        | **3.66**  | 12.29  | 12.99 | 10.34  | #1           | 0.35x                 |
-| uniform random  | **2.96**  | 16.85  | 11.31 | 33.42  | #1           | 0.26x                 |
+| tiny (0-247)    | **0.94**  |  6.57  | 10.47 |  3.62  | #1           | 0.26x                 |
+| small (248-64k) | **3.91**  |  8.60  | 12.31 |  9.80  | #1           | 0.45x                 |
+| medium (64k-4B) | **4.70**  | 11.04  | 13.96 | 11.64  | #1           | 0.40x                 |
+| large (>4B)     | **2.56**  | 16.36  | 10.28 | 30.42  | #1           | 0.25x                 |
+| boundary        | **3.34**  | 13.19  | 11.97 |  9.94  | #1           | 0.34x                 |
+| uniform random  | **2.59**  | 16.35  | 10.13 | 30.09  | #1           | 0.26x                 |
 
 <details open>
 <summary>Charts</summary>
@@ -253,17 +254,17 @@ making bijou64 the unambiguous choice for protocols that decode
 more than they encode and that need deterministic serialisation.
 
 On the encode side, bijou64 wins 5 of 6 distributions; only `small`
-goes to leb128 (1.33× faster on the 248–64k uniform range). leb128's
+goes to leb128 (1.24× faster on the 248–64k uniform range). leb128's
 tight 2-byte-write loop happens to fit Zen 5's pipeline particularly
 well for tier-2-heavy distributions.
 
 The cells bijou64 loses are all format-bound:
 
-- `encoded_size` non-tiny — ~2.4× behind vu64 across all 5
+- `encoded_size` non-tiny — ~2.2–2.5× behind vu64 across all 5
   distributions. vu64's power-of-2 boundaries let it skip the per-tier
   correction step bijou64 must perform; for `encoded_len`'s arithmetic-
   only path that delta is unavoidable.
-- `encoded_size/tiny` — statistical tie with varu64 (1.008×).
+- `encoded_size/tiny` — varu64 wins (~1.9× over bijou64).
 
 These gaps are the price of bijective canonicality. For the
 canonical-decode workloads that motivate bijou64, the trade is
