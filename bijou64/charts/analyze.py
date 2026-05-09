@@ -61,7 +61,6 @@ BENCHMARK_GROUPS = [
     "canonical_decode",
     "decode",
     "encode",
-    "encode_array",
     "encoded_size",
     "stream_decode",
 ]
@@ -170,8 +169,6 @@ def load_criterion_data(workspace: Path) -> list[BenchResult]:
                     bench_dir = candidate
                     break
             if bench_dir is None:
-                # encode_array uses a different naming convention:
-                # encode_array/{library}/{dist} instead of encode_array_{dist}/{library}
                 continue
 
             for lib in LIBRARIES:
@@ -212,8 +209,7 @@ def load_criterion_data(workspace: Path) -> list[BenchResult]:
                     )
                 )
 
-    # Also check encode_array which uses criterion's two-level naming
-    _load_two_level_group(criterion_dir, "encode_array", results)
+    # `encoded_size` uses criterion's two-level naming: encoded_size/{library}/{dist}
     _load_two_level_group(criterion_dir, "encoded_size", results)
 
     if not results:

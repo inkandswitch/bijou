@@ -107,27 +107,6 @@ Encode to a `Vec<u8>`.
 
 </details>
 
-## Encode Array
-
-Encode to a fixed `[u8; 9]` with no allocation. leb128 is excluded because its API requires a `Write` implementor.
-
-| Distribution    | bijou64  | varu64 | vu64     | vu128 | bijou64 rank | bijou64 vs other best |
-|-----------------|----------|--------|----------|-------|--------------|-----------------------|
-| tiny (0-247)    | **1.05** |  6.02  | 1.63     | 1.22  | #1           | 0.86x                 |
-| small (248-64k) | 3.07     |  7.04  | **1.63** | 2.12  | #3           | 1.88x                 |
-| medium (64k-4B) | 3.08     |  9.18  | **1.64** | 2.51  | #3           | 1.88x                 |
-| large (>4B)     | 3.06     | 15.25  | **1.66** | 2.55  | #3           | 1.84x                 |
-| boundary        | 2.75     | 10.07  | **1.63** | 2.17  | #3           | 1.69x                 |
-| uniform random  | 3.06     | 15.21  | **1.64** | 2.55  | #3           | 1.86x                 |
-
-<details open>
-<summary>Charts</summary>
-
-![Encode Array — Bar Chart](charts/x86/encode_array_bar.svg)
-![Encode Array — Box Plot](charts/x86/encode_array_box.svg)
-
-</details>
-
 ## Decode
 
 Decode from a `&[u8]` buffer.
@@ -257,13 +236,12 @@ This table is architecture-independent -- the encoded sizes are a property of th
 
 ## Summary
 
-On Zen 5, bijou64 wins **24 of 36** shootout cells:
+On Zen 5, bijou64 wins **23 of 30** shootout cells:
 
 | Operation        | Wins |
 |------------------|------|
 | encode           | 5/6  |
 | decode           | 6/6  |
-| encode_array     | 1/6  |
 | encoded_size     | 0/6  |
 | stream_decode    | 6/6  |
 | canonical_decode | 6/6  |
@@ -281,10 +259,10 @@ well for tier-2-heavy distributions.
 
 The cells bijou64 loses are all format-bound:
 
-- `encode_array` non-tiny — ~1.85× behind vu64 across all 5
+- `encoded_size` non-tiny — ~2.4× behind vu64 across all 5
   distributions. vu64's power-of-2 boundaries let it skip the per-tier
-  correction step bijou64 must perform.
-- `encoded_size` non-tiny — ~2.4× behind vu64. Same root cause.
+  correction step bijou64 must perform; for `encoded_len`'s arithmetic-
+  only path that delta is unavoidable.
 - `encoded_size/tiny` — statistical tie with varu64 (1.008×).
 
 These gaps are the price of bijective canonicality. For the
