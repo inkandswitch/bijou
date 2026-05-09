@@ -246,8 +246,12 @@
             set -e
             bodge
             cd "$WORKSPACE_ROOT/bijou64_wasm"
+            # `--frozen-lockfile` mirrors what CI does and makes sure the
+            # local run cannot silently mutate `pnpm-lock.yaml` if it
+            # disagrees with `package.json`. To intentionally update the
+            # lockfile, run `pnpm install` directly (without this wrapper).
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install
+              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
             fi
             ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright test
           '';

@@ -62,6 +62,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pin Node + pnpm BEFORE any step that calls into them, so esbuild
+      # (installed globally) and wasm-bodge (which spawns esbuild during
+      # post-processing) run under the version we control rather than
+      # whichever Node/npm happens to be preinstalled on the runner.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: bijou64_wasm/pnpm-lock.yaml
+
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -76,7 +90,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y binaryen
 
-      - name: Install esbuild
+      - name: Install esbuild (under the pinned Node)
         run: npm install -g esbuild
 
       - name: Install wasm-bodge
@@ -91,16 +105,6 @@ jobs:
       - name: Build bijou64_wasm with wasm-bodge
         working-directory: bijou64_wasm
         run: wasm-bodge build
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-          cache-dependency-path: bijou64_wasm/pnpm-lock.yaml
 
       - name: Install JS dependencies
         working-directory: bijou64_wasm

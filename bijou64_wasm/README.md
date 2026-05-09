@@ -11,13 +11,15 @@ structural canonicality so every value has exactly one encoding).
 
 This crate is built into a universal NPM package via
 [`wasm-bodge`](https://github.com/alexjg/wasm-bodge). From the workspace
-dev shell:
+dev shell (the `bodge` command is hard-wired to this crate — there is
+only one wasm crate in the workspace today):
 
 ```sh
-bodge bijou64_wasm
+bodge
 ```
 
-The output lands in `dist/` and is publishable as-is (`pnpm publish`).
+The output lands in `bijou64_wasm/dist/` and is publishable as-is
+(`pnpm publish`).
 
 ## Usage
 
