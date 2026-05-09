@@ -109,8 +109,13 @@ dependencies = [
  "arbitrary",
  "bijou128",
  "bolero",
+ "criterion",
+ "gungraun",
+ "pprof",
+ "rand 0.8.6",
  "testresult",
  "thiserror",
+ "vu128",
 ]
 
 [[package]]

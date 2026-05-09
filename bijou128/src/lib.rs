@@ -131,11 +131,16 @@ const OFFSETS: [u128; NUM_TIERS + 1] = [
     tier_offset(16),
 ];
 
-/// Per-tier upper bounds (exclusive).
+/// Per-tier upper bounds.
 ///
-/// A value belongs to tier `t` if `OFFSETS[t] <= value < BOUNDS[t]`.
-/// `BOUNDS[t] == OFFSETS[t + 1]` for tiers 1–15. Tier 16 extends to
-/// `u128::MAX` (the decoder handles overflow via `checked_add`).
+/// A value belongs to tier `t` if `OFFSETS[t] <= value < BOUNDS[t]` for
+/// `t` in `0..NUM_TIERS`. `BOUNDS[t] == OFFSETS[t + 1]` in that range,
+/// so the bound is exclusive.
+///
+/// For the final tier (`t == NUM_TIERS == 16`), `BOUNDS[16] == u128::MAX`
+/// and the bound is **inclusive** — the comparison degenerates to
+/// `OFFSETS[16] <= value <= u128::MAX`. The decoder handles arithmetic
+/// overflow via `checked_add` rather than the bound check.
 const BOUNDS: [u128; NUM_TIERS + 1] = [
     tier_offset(1), // tier 0 upper bound = tier 1 offset
     tier_offset(2),
@@ -1023,36 +1028,42 @@ mod tests {
         #[test]
         #[cfg_attr(miri, ignore)]
         fn round_trip() {
-            bolero::check!().with_arbitrary::<u128>().for_each(|&value| {
-                let mut buf = Vec::new();
-                encode(value, &mut buf);
-                let (decoded, consumed) = decode(&buf).unwrap_or_else(|e| {
-                    panic!("round-trip decode failed for {value}: {e}");
+            bolero::check!()
+                .with_arbitrary::<u128>()
+                .for_each(|&value| {
+                    let mut buf = Vec::new();
+                    encode(value, &mut buf);
+                    let (decoded, consumed) = decode(&buf).unwrap_or_else(|e| {
+                        panic!("round-trip decode failed for {value}: {e}");
+                    });
+                    assert_eq!(decoded, value, "round-trip failed for {value}");
+                    assert_eq!(consumed, buf.len());
                 });
-                assert_eq!(decoded, value, "round-trip failed for {value}");
-                assert_eq!(consumed, buf.len());
-            });
         }
 
         #[test]
         #[cfg_attr(miri, ignore)]
         fn encoded_len_matches() {
-            bolero::check!().with_arbitrary::<u128>().for_each(|&value| {
-                let mut buf = Vec::new();
-                encode(value, &mut buf);
-                assert_eq!(encoded_len(value), buf.len());
-            });
+            bolero::check!()
+                .with_arbitrary::<u128>()
+                .for_each(|&value| {
+                    let mut buf = Vec::new();
+                    encode(value, &mut buf);
+                    assert_eq!(encoded_len(value), buf.len());
+                });
         }
 
         #[test]
         #[cfg_attr(miri, ignore)]
         fn encode_array_matches() {
-            bolero::check!().with_arbitrary::<u128>().for_each(|&value| {
-                let mut buf = Vec::new();
-                encode(value, &mut buf);
-                let (arr, len) = encode_array(value);
-                assert_eq!(arr.get(..len), Some(buf.as_slice()));
-            });
+            bolero::check!()
+                .with_arbitrary::<u128>()
+                .for_each(|&value| {
+                    let mut buf = Vec::new();
+                    encode(value, &mut buf);
+                    let (arr, len) = encode_array(value);
+                    assert_eq!(arr.get(..len), Some(buf.as_slice()));
+                });
         }
 
         #[test]

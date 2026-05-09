@@ -117,11 +117,16 @@ const OFFSETS: [u64; NUM_TIERS + 1] = [
     tier_offset(8),
 ];
 
-/// Per-tier upper bounds (exclusive).
+/// Per-tier upper bounds.
 ///
-/// A value belongs to tier `t` if `OFFSETS[t] <= value < BOUNDS[t]`.
-/// `BOUNDS[t] == OFFSETS[t + 1]` for tiers 1–7. Tier 8 extends to
-/// `u64::MAX` (the decoder handles overflow via `checked_add`).
+/// A value belongs to tier `t` if `OFFSETS[t] <= value < BOUNDS[t]` for
+/// `t` in `0..NUM_TIERS`. `BOUNDS[t] == OFFSETS[t + 1]` in that range,
+/// so the bound is exclusive.
+///
+/// For the final tier (`t == NUM_TIERS == 8`), `BOUNDS[8] == u64::MAX`
+/// and the bound is **inclusive** — the comparison degenerates to
+/// `OFFSETS[8] <= value <= u64::MAX`. The decoder handles arithmetic
+/// overflow via `checked_add` rather than the bound check.
 const BOUNDS: [u64; NUM_TIERS + 1] = [
     tier_offset(1), // tier 0 upper bound = tier 1 offset
     tier_offset(2),

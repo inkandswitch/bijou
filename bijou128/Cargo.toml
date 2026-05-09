@@ -22,7 +22,20 @@ thiserror = { workspace = true }
 arbitrary = { workspace = true, optional = false, features = ["derive"] }
 bijou128 = { path = ".", features = ["bolero"] }
 bolero = { workspace = true, features = ["arbitrary"] }
+criterion = { workspace = true }
+criterion_pprof = { workspace = true }
+gungraun = "0.18"
+rand = { workspace = true, features = ["small_rng"] }
 testresult = { workspace = true }
+vu128 = "1.1"
+
+[[bench]]
+name = "shootout"
+harness = false
+
+[[bench]]
+name = "gungraun_shootout"
+harness = false
 
 [features]
 default = []
