@@ -200,12 +200,6 @@ pub const fn encoded_len(value: u64) -> usize {
 /// assert_eq!(buf, [0xF8, 0x00]);
 /// ```
 //
-// NOTE: deliberately no `#[inline]` here. Forcing inline regressed every
-// encode distribution 13–101% on Zen 5 — the bench loop body grew large
-// enough that capacity-check elision and register pressure degraded.
-// `#[inline(never)]` on a split-out cold path was worse still. The
-// default inliner does the right thing. See `OPTIMISATION.md`.
-//
 // We write a constant-shape 9-byte block via `extend_from_slice` of a
 // fixed-size literal (which LLVM can lower to a single SIMD store) and
 // then `truncate` away the unused trailing bytes. The unused bytes are

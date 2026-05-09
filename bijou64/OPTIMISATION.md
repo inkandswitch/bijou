@@ -308,7 +308,11 @@ The tiny regression is sub-µs (193 ns over 4096 values, ~0.05 ns/value, well un
 
 ### Why `encode` Doesn't Get the Same Treatment
 
-Adding `#[inline]` to `pub fn encode` regressed every encode distribution: tiny +21%, small +13%, **medium +101%**, large +15%, boundary +27%, uniform +20%. The only change between runs was the attribute. The ~doubling on `encode/medium` was the cleanest signal that something pathological happens when the function with `Vec::push` plus variable-length `extend_from_slice` is inlined into the bench's hot loop — possibly capacity-check elision opportunities being missed when the entire encode path becomes part of a single large basic block. Left as future work.
+Adding `#[inline]` to `pub fn encode` regressed every encode distribution: tiny +21%, small +13%, **medium +101%**, large +15%, boundary +27%, uniform +20%. The only change between runs was the attribute. The ~doubling on `encode/medium` was the cleanest signal that something pathological happens when the function with `Vec::push` plus variable-length `extend_from_slice` is inlined into the bench's hot loop — likely a combination of capacity-check elision opportunities being missed once the encode path becomes part of a single large basic block, and register pressure from the inlined Vec internals.
+
+`#[inline(never)]` on a split-out `encode_multibyte` cold path is even worse — it forces a call boundary the default inliner would have elided when profitable; see [What Didn't Work](#what-didnt-work) below.
+
+The default inliner outperforms both forced directions, so `encode` carries no `#[inline]` attribute at all.
 
 ### Properties Preserved
 
