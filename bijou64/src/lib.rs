@@ -212,9 +212,13 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
         tier -= 1;
     }
 
-    buf.push((247 + tier) as u8);
-    let be = (value - OFFSETS[tier]).to_be_bytes();
-    buf.extend_from_slice(&be[8 - tier..]);
+    let tag = (247 + tier) as u8;
+    let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+    let pb = payload.to_be_bytes();
+
+    let original_len = buf.len();
+    buf.extend_from_slice(&[tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]]);
+    buf.truncate(original_len + tier + 1);
 }
 
 /// Encodes `value` as a `bijou64` into a fixed-size array.
