@@ -24,6 +24,11 @@ rust_out
 **/pkg-node/
 **/pkg-slim/
 
+# playwright
+**/playwright-report/
+**/test-results/
+**/.playwright/
+
 # editor cruft
 .idea
 .vscode

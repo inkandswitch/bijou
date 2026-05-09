@@ -1,0 +1,144 @@
+name: Test Wasm
+
+# Two layers of wasm coverage:
+#
+# 1. `wasm-pack test --node` exercises the Rust ↔ wasm-bindgen boundary
+#    on the wasm32-unknown-unknown target inside Node.js. Fast, no
+#    browser dependencies.
+#
+# 2. Playwright runs JS-level integration tests against the
+#    wasm-bodge-built `dist/` package across chromium / firefox / webkit.
+#    Catches bundler-specific bugs, BigInt edge cases, and missing
+#    package.json subpath exports that the Rust-side tests can't see.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Fast Rust-side integration tests on wasm32 in Node.js.
+  # macOS included so we catch any darwin-specific wasm-bindgen quirks.
+  wasm-pack-node:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+          cache: true
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: wasm-pack test --node
+        run: wasm-pack test --node bijou64_wasm
+
+  # Cross-browser Playwright tests against the wasm-bodge `dist/` output.
+  # Linux only — macOS Playwright runs work but are slow and the bug
+  # surface is similar enough that ubuntu-latest suffices for CI.
+  playwright:
+    runs-on: ubuntu-latest
+    env:
+      # Force playwright to test all three engines on CI.
+      PLAYWRIGHT_INCLUDE_WEBKIT: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+          cache: true
+
+      - name: Install wasm-bindgen-cli (must match workspace pin)
+        run: cargo install --locked wasm-bindgen-cli@0.2.118
+
+      - name: Install wasm-opt (binaryen)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
+      - name: Install esbuild
+        run: npm install -g esbuild
+
+      - name: Install wasm-bodge
+        # wasm-bodge isn't on a package registry; we build it from source
+        # at the same commit the flake pins. Keep this in sync with
+        # `flake.lock`'s wasm-bodge-src node.
+        run: |
+          cargo install --git https://github.com/alexjg/wasm-bodge \
+            --rev 58e0d9b2c3b749d81df7813e380432d04a904f23 \
+            --locked
+
+      - name: Build bijou64_wasm with wasm-bodge
+        working-directory: bijou64_wasm
+        run: wasm-bodge build
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: bijou64_wasm/pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        working-directory: bijou64_wasm
+        run: pnpm install --frozen-lockfile
+
+      - name: Read Playwright version
+        id: playwright-version
+        working-directory: bijou64_wasm
+        run: |
+          version=$(pnpm list @playwright/test --json | \
+            jq -r '.[0].devDependencies["@playwright/test"].version')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: bijou64_wasm
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: bijou64_wasm
+        run: pnpm exec playwright install-deps
+
+      - name: Run Playwright tests
+        working-directory: bijou64_wasm
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: bijou64_wasm/playwright-report/
+          retention-days: 7

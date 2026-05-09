@@ -14,7 +14,10 @@
     };
 
     wasm-bodge-src = {
-      url = "github:alexjg/wasm-bodge/v0.2.3";
+      # Tracks the upstream `main` branch. wasm-bodge moves quickly enough
+      # that being a release or two behind is genuinely costly (see e.g. the
+      # debug/slim and initSync({module}) fixes that landed post-v0.2.3).
+      url = "github:alexjg/wasm-bodge/main";
       flake = false;
     };
   };
@@ -219,32 +222,72 @@
             echo "✓ wasm32 check passed"
           '';
 
-          "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32)" ''
+          "bodge" = cmd "Build bijou64_wasm into a universal NPM package via wasm-bodge" ''
+            set -e
+            ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijou64_wasm/dist"
+            echo "===> wasm-bodge build bijou64_wasm..."
+            ${wasm-bodge}/bin/wasm-bodge build \
+              --crate-path "$WORKSPACE_ROOT/bijou64_wasm" \
+              --package-json "$WORKSPACE_ROOT/bijou64_wasm/package.json" \
+              --out-dir "$WORKSPACE_ROOT/bijou64_wasm/dist"
+            echo ""
+            echo "✓ bijou64_wasm built — output in bijou64_wasm/dist/"
+          '';
+
+          # Rust integration tests on the wasm32 target. Run via Node.js
+          # (the wasm32 ABI is identical across runtimes; cross-browser
+          # behaviour is covered by Playwright at the JS-package level).
+          "test:wasm:node" = cmd "Run bijou64_wasm Rust tests on wasm32 in Node.js" ''
+            set -e
+            ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou64_wasm
+          '';
+
+          "test:e2e" = cmd "Run bijou64_wasm Playwright tests across browsers (rebuilds dist via bodge)" ''
+            set -e
+            bodge
+            cd "$WORKSPACE_ROOT/bijou64_wasm"
+            if [ ! -d node_modules ]; then
+              ${pkgs.nodePackages.pnpm}/bin/pnpm install
+            fi
+            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright test
+          '';
+
+          "test:e2e:report" = cmd "Open the most recent Playwright HTML report" ''
+            cd "$WORKSPACE_ROOT/bijou64_wasm"
+            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright show-report
+          '';
+
+          "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack test)" ''
             set -e
 
-            echo "===> [1/5] Checking formatting..."
+            echo "===> [1/6] Checking formatting..."
             ${pkgs.cargo}/bin/cargo fmt --check
             echo "✓ Formatting OK"
             echo ""
 
-            echo "===> [2/5] Running Clippy..."
+            echo "===> [2/6] Running Clippy..."
             ${pkgs.cargo}/bin/cargo clippy --workspace --all-targets --all-features -- -D warnings
             echo "✓ Clippy OK"
             echo ""
 
-            echo "===> [3/5] Running tests..."
+            echo "===> [3/6] Running host tests..."
             ${pkgs.cargo}/bin/cargo test --workspace --all-features
-            echo "✓ Tests OK"
+            echo "✓ Host tests OK"
             echo ""
 
-            echo "===> [4/5] Checking no_std..."
+            echo "===> [4/6] Checking no_std..."
             ${pkgs.cargo}/bin/cargo check --package bijou64 --no-default-features
             echo "✓ no_std OK"
             echo ""
 
-            echo "===> [5/5] Checking wasm32 build..."
+            echo "===> [5/6] Checking wasm32 build..."
             ${pkgs.cargo}/bin/cargo check --workspace --target wasm32-unknown-unknown
             echo "✓ wasm32 OK"
+            echo ""
+
+            echo "===> [6/6] Running wasm-pack tests in Node.js..."
+            ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou64_wasm
+            echo "✓ wasm-pack tests OK"
             echo ""
 
             echo "✓ All CI checks passed"
@@ -277,7 +320,7 @@
         };
 
         packages = {
-          inherit gungraun-runner;
+          inherit gungraun-runner wasm-bodge;
         };
 
         devShells.default = pkgs.mkShell {
@@ -291,8 +334,11 @@
 
               pkgs.binaryen
               pkgs.gnuplot
+              pkgs.http-server
               pkgs.nodejs
               pkgs.nodePackages.pnpm
+              pkgs.playwright-driver
+              pkgs.playwright-driver.browsers
               pkgs.rust-analyzer
               pkgs.valgrind # required by gungraun
               pkgs.wasm-pack
@@ -311,6 +357,14 @@
             unset SOURCE_DATE_EPOCH
             export WORKSPACE_ROOT="$(pwd)"
             export RUSTFMT="${nightly-rustfmt}/bin/rustfmt"
+
+            # Point Playwright at Nix-provided browsers instead of letting
+            # it download its own (which fails on NixOS due to dynamic
+            # linking, and is wasteful elsewhere).
+            export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+            export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs}/bin/node"
+
             menu
           '';
         };
