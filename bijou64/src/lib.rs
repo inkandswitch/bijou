@@ -152,6 +152,7 @@ const BOUNDS: [u64; NUM_TIERS + 1] = [
 /// assert_eq!(bijou64::encoded_len(504), 3);
 /// assert_eq!(bijou64::encoded_len(u64::MAX), 9);
 /// ```
+#[inline]
 #[must_use]
 pub const fn encoded_len(value: u64) -> usize {
     // Fast path: tier 0 values (0–247) are the most common in many
@@ -281,6 +282,7 @@ pub const fn encode_array(value: u64) -> ([u8; MAX_BYTES], usize) {
 /// let (v, n) = bijou64::decode(&[0xF8, 0x34, 0xFF]).unwrap();
 /// assert_eq!((v, n), (300, 2));
 /// ```
+#[inline]
 #[allow(clippy::many_single_char_names)] // byte destructuring in slice patterns
 pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
     let Some((&tag, rest)) = buf.split_first() else {

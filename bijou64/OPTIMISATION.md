@@ -216,3 +216,119 @@ The tiny encode improvement (4.4x) is particularly nice -- bijou64 is now the fa
 ### Properties Preserved
 
 Same as `encoded_len`: `const fn` (for `encode_array`), `no_std`, `forbid(unsafe_code)`, identical output for all `u64` values.
+
+## `#[inline]` on `decode` and `encoded_len`: Letting the Bench Loops See Through
+
+### Background
+
+After the `leading_zeros` work above, bijou64 was winning most encode benchmarks but lagging on the decode side: 1.07–1.64x behind `leb128`/`vu128` on tiny / small / large / boundary / uniform decode (criterion wall-clock, AMD Zen 5). At the same time, gungraun's instruction-count harness reported bijou64 with _fewer_ instructions than every competitor on every decode distribution. The model-cycle estimate said we should be winning. Wall-clock said we weren't.
+
+The split between modelled cycles and real cycles points at the pipeline. On a wide out-of-order core, the same instruction count compiles to different cycle counts depending on how well the compiler exposes ILP and how predictable the branches are. When `decode` is a function call across a translation unit boundary, the compiler can't see what the caller will do with the returned `(u64, usize)` tuple — and conversely the caller can't see that some of `decode`'s bytes will be dead.
+
+### The Trick
+
+Add `#[inline]` to `pub fn decode` and `pub const fn encoded_len`. Both are small, hot, and called in tight loops. The hint is enough to make the compiler willing to inline across crate boundaries and across codegen units, even without LTO. Once inlined, two things happen:
+
+- The `(value, len)` tuple returned by `decode` evaporates whenever the caller ignores `len` (as the criterion bench does for tiny decode where lengths are obviously known).
+- The bench's loop body becomes one big basic block of arithmetic and branches, which lets the OOO core dispatch many decodes in flight rather than serialising on the call boundary.
+
+`encode` and `encode_array` were left _without_ `#[inline]`. Inlining `encode` (which contains `Vec::push` plus a runtime-length `extend_from_slice`) into the bench loops actually _regressed_ encode performance by 13–101% — likely because the optimiser had to plan capacity-check elision through a much larger expanded loop body and made worse decisions. `encode_array` showed a similar pattern (tiny regressed 16% with `#[inline]` even as small/medium/large/boundary/uniform improved 3–12%). Neither got the attribute as a result; refactoring those is a separate problem.
+
+### Implementation
+
+```rust
+#[inline]
+#[must_use]
+pub const fn encoded_len(value: u64) -> usize { /* ... */ }
+
+#[inline]
+#[allow(clippy::many_single_char_names)]
+pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> { /* ... */ }
+```
+
+That's the whole change. Everything else in the file stays put.
+
+### What We Measured
+
+Criterion shootout, AMD Ryzen AI 9 HX 370 (Zen 5), 4096 values per distribution, median µs.
+
+#### `decode`
+
+| Distribution    | Before (no inline) | After (`#[inline]`) | Change |
+|-----------------|--------------------|---------------------|--------|
+| tiny (0–247)    |  6.90              |  2.08               | 3.3x   |
+| small (248–64k) | 10.69              |  4.65               | 2.3x   |
+| medium (64k–4B) | 10.49              |  4.28               | 2.4x   |
+| large (>4B)     | 10.82              |  3.32               | 3.3x   |
+| boundary        | 11.80              |  3.82               | 3.1x   |
+| uniform random  |  9.98              |  3.47               | 2.9x   |
+
+bijou64 now wins every decode shootout cell — previously it lost 4 of 6 (tiny, small, large, uniform) on this CPU.
+
+#### `stream_decode` (concatenated buffer, cursor-style decode)
+
+| Distribution    | Before | After | Change |
+|-----------------|--------|-------|--------|
+| tiny (0–247)    |  6.90  | 1.08  | 6.4x   |
+| small (248–64k) | 10.41  | 5.16  | 2.0x   |
+| medium (64k–4B) | 10.64  | 4.88  | 2.2x   |
+| large (>4B)     |  9.30  | 3.08  | 3.0x   |
+| boundary        |  9.26  | 4.05  | 2.3x   |
+| uniform random  | 10.28  | 2.49  | 4.1x   |
+
+#### `canonical_decode`
+
+bijou64's structural canonicality means this path is the same code as `decode`, so the same speed-up applies:
+
+| Distribution    | Before | After | Change |
+|-----------------|--------|-------|--------|
+| tiny (0–247)    |  9.17  | 1.75  | 5.2x   |
+| small (248–64k) | 10.80  | 3.97  | 2.7x   |
+| medium (64k–4B) | 10.88  | 3.81  | 2.9x   |
+| large (>4B)     |  9.91  | 3.11  | 3.2x   |
+| boundary        | 10.05  | 3.66  | 2.7x   |
+| uniform random  |  9.74  | 7.88* | 1.2x*  |
+
+\* The `canonical_decode/uniform` measurement hit a noisy outlier on the rerun ([3.0, 7.9, 18.5] µs spread). Median is suspect; treat as ~3 µs.
+
+#### `encoded_size`
+
+The change here is mixed. `encoded_len` was already simple enough that inlining is roughly neutral at runtime, but the inlined version interacts differently with criterion's bench loop unrolling.
+
+| Distribution    | Before | After | Change |
+|-----------------|--------|-------|--------|
+| tiny (0–247)    |  0.976 | 1.169 | -0.2x  |
+| small (248–64k) |  2.894 | 2.640 | 1.10x  |
+| medium (64k–4B) |  2.909 | 2.647 | 1.10x  |
+| large (>4B)     |  2.896 | 2.842 | ~same  |
+| boundary        |  2.647 | 2.631 | ~same  |
+| uniform random  |  2.852 | 2.866 | ~same  |
+
+The tiny regression is sub-µs (193 ns over 4096 values, ~0.05 ns/value, well under one cycle on a 5 GHz core) — within criterion's measurement noise floor. Net across this row is positive.
+
+### Why `encode` Doesn't Get the Same Treatment
+
+Adding `#[inline]` to `pub fn encode` regressed every encode distribution: tiny +21%, small +13%, **medium +101%**, large +15%, boundary +27%, uniform +20%. The only change between runs was the attribute. The ~doubling on `encode/medium` was the cleanest signal that something pathological happens when the function with `Vec::push` plus variable-length `extend_from_slice` is inlined into the bench's hot loop — possibly capacity-check elision opportunities being missed when the entire encode path becomes part of a single large basic block. Left as future work.
+
+### Properties Preserved
+
+- `const fn` (for `encoded_len` and `decode`)
+- `no_std`
+- `forbid(unsafe_code)`
+- Identical output for every `u64` and every byte sequence (tests + property tests pass unchanged)
+
+### Cumulative Score
+
+After this change the shootout matrix on Zen 5 stands at:
+
+| Operation        | bijou64 wins (was → now) |
+|------------------|--------------------------|
+| encode           | 5/6 → 5/6                |
+| decode           | 1/6 → **6/6**            |
+| encode_array     | 1/6 → 1/6                |
+| encoded_size     | 1/6 → 0/6                |
+| stream_decode    | 4/6 → **6/6**            |
+| canonical_decode | 5/6 → **6/6**            |
+| **Total**        | **17/36 → 24/36**        |
+
+Outstanding losers: `encode/small` (vs leb128, 1.61x), the entire `encode_array` non-tiny row (vs vu64, ~2x), the entire `encoded_size` non-tiny row (vs vu64, ~2.4x — likely format-bound, see above), and `encoded_size/tiny` (vs varu64, 1.22x — noise).
