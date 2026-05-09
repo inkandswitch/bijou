@@ -82,20 +82,41 @@
           exec "${nightly-rustfmt-unwrapped}/bin/rustfmt" "$@"
         '';
 
-        # wasm-bodge: universal npm package builder for wasm-bindgen crates.
-        # Not yet in nixpkgs; edition 2024 requires our rust-overlay toolchain.
-        wasm-bodge-rustPlatform = pkgs.makeRustPlatform {
+        # Pinned-toolchain Rust platform for building helper crates from source.
+        # Reused by wasm-bodge and gungraun-runner; both need our edition-2024
+        # rust-overlay toolchain rather than the nixpkgs default.
+        pinnedRustPlatform = pkgs.makeRustPlatform {
           cargo = rust-toolchain;
           rustc = rust-toolchain;
         };
 
-        wasm-bodge = wasm-bodge-rustPlatform.buildRustPackage {
+        wasm-bodge = pinnedRustPlatform.buildRustPackage {
           pname = "wasm-bodge";
           version = wasm-bodge-src.shortRev;
           src = wasm-bodge-src;
           cargoHash = "sha256-akp4r8C4MWGqTbqr40jHdHuzqx6ZKcr4rFynarPsZWI=";
           nativeBuildInputs = [ unstable.cargo-auditable ];
           doCheck = false; # tests require npm/puppeteer infrastructure
+        };
+
+        # gungraun-runner: required binary harness for gungraun (formerly
+        # iai-callgrind) instruction-count benchmarks. Not yet in nixpkgs;
+        # we build it from crates.io. Version must match the `gungraun`
+        # workspace dep in `bijou64/Cargo.toml`.
+        gungraun-runner = pinnedRustPlatform.buildRustPackage rec {
+          pname = "gungraun-runner";
+          version = "0.18.2";
+
+          src = pkgs.fetchCrate {
+            inherit pname version;
+            hash = "sha256-DiJq9TZCZdWKSstIyMjkLuxaYXua0WKD2AVbEIxM590=";
+          };
+
+          cargoHash = "sha256-eb9U1MgCg7MpwzS2RnFXMWdPitweKMMty0n3SC0F6+I=";
+
+          # Tests require a full benchmark execution loop with valgrind.
+          # We're shipping just the binary harness.
+          doCheck = false;
         };
 
         # wasm-bindgen-cli 0.2.118 (not yet in nixpkgs)
@@ -255,6 +276,10 @@
           program = "${bench-charts}/bin/bench-charts";
         };
 
+        packages = {
+          inherit gungraun-runner;
+        };
+
         devShells.default = pkgs.mkShell {
           name = "bijou_shell";
 
@@ -271,6 +296,7 @@
               pkgs.rust-analyzer
               pkgs.valgrind # required by gungraun
               pkgs.wasm-pack
+              gungraun-runner
               wasm-bodge
             ]
             ++ format-pkgs

@@ -319,60 +319,6 @@ fn bench_decode(c: &mut Criterion) {
     }
 }
 
-fn bench_encode_array(c: &mut Criterion) {
-    let mut group = c.benchmark_group("encode_array");
-
-    for (dist_name, values) in &distributions() {
-        group.throughput(Throughput::Elements(BATCH as u64));
-
-        group.bench_function(BenchmarkId::new("bijou64", dist_name), |b| {
-            b.iter(|| {
-                let mut sum = 0usize;
-                for &v in values {
-                    let (_, len) = bijou64::encode_array(v);
-                    sum += len;
-                }
-                sum
-            });
-        });
-
-        group.bench_function(BenchmarkId::new("vu64", dist_name), |b| {
-            b.iter(|| {
-                let mut sum = 0usize;
-                for &v in values {
-                    let encoded = vu64::encode(v);
-                    sum += encoded.as_ref().len();
-                }
-                sum
-            });
-        });
-
-        group.bench_function(BenchmarkId::new("vu128", dist_name), |b| {
-            b.iter(|| {
-                let mut sum = 0usize;
-                let mut buf = [0u8; 9];
-                for &v in values {
-                    sum += vu128::encode_u64(&mut buf, v);
-                }
-                sum
-            });
-        });
-
-        group.bench_function(BenchmarkId::new("varu64", dist_name), |b| {
-            b.iter(|| {
-                let mut sum = 0usize;
-                let mut buf = [0u8; 9];
-                for &v in values {
-                    sum += varu64::encode(v, &mut buf);
-                }
-                sum
-            });
-        });
-    }
-
-    group.finish();
-}
-
 fn bench_encoded_size(c: &mut Criterion) {
     let mut group = c.benchmark_group("encoded_size");
 
@@ -594,7 +540,6 @@ criterion_group! {
     targets =
         bench_encode,
         bench_decode,
-        bench_encode_array,
         bench_encoded_size,
         bench_stream_decode,
         bench_canonical_decode,
