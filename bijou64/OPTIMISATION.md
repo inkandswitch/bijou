@@ -356,52 +356,7 @@ LLVM lowers `to_be_bytes()` to a single `bswap` and the array literal to a singl
 
 Modest gains (1.02–1.04x). The vu64 gap narrows from ~2.0× to ~1.95× — what's left is the format-required correction step, not codegen.
 
-The same trick is applied to `encode` (Vec path) below.
-
-## `encode`: Constant-Shape Write + `truncate`
-
-### Background
-
-The encode path used `Vec::push(tag)` followed by `extend_from_slice(&be[8 - tier..])` — a runtime-length slice. `Vec::extend_from_slice` dispatches internally by length to different memcpy code paths, and that dispatch overhead shows up clearly in the bench numbers, especially for tiers 1–3 where the actual byte count is small.
-
-### The Trick
-
-Same shift trick as `encode_array`, plus: write all 9 bytes via `extend_from_slice` of a _fixed-size_ 9-byte array (which LLVM lowers to a single SIMD store), then `Vec::truncate` to drop the trailing zero bytes. The unused bytes are guaranteed-zero from the shift, so the truncate is a pure `len -=` with no data movement.
-
-```rust
-let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
-let pb = payload.to_be_bytes();
-let original_len = buf.len();
-buf.extend_from_slice(&[
-    tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7],
-]);
-buf.truncate(original_len + tier + 1);
-```
-
-### What We Measured
-
-`encode` (into `Vec<u8>`), µs per 4096 values, vs the previous `extend_from_slice(&be[8 - tier..])` form:
-
-| Distribution     | Before | After | Change |
-|------------------|--------|-------|--------|
-| tiny (0–247)     |  2.275 |  2.045 | 1.11x |
-| small (248–64k)  | 14.594 | 11.247 | 1.30x |
-| medium (64k–4B)  | 13.223 | 12.179 | 1.09x |
-| large (>4B)      | 13.827 | 13.294 | 1.04x |
-| boundary         | 12.730 | 11.746 | 1.08x |
-| uniform random   | 15.937 | 13.740 | 1.16x |
-
-Improvements across the board, with the biggest win on `encode/small` (1.30×) — the cell where `extend_from_slice`'s short-buffer dispatch was costing the most. bijou64 still loses `encode/small` to leb128 (1.27×) but the gap narrows from 1.61× to 1.27×.
-
-Gungraun reports modestly _more_ cycles for `encode` after this change (≈+5%) — the truncate version writes 9 bytes always instead of 1–8 — yet criterion wall-clock is uniformly faster. The trade buys better-shaped, predictable code that the OOO core executes faster than fewer instructions arranged across a length-dispatch.
-
-### Properties Preserved
-
-- `const fn` (for `encode_array`)
-- `no_std`
-- `forbid(unsafe_code)`
-- Identical output for every `u64` (tests + property tests pass unchanged)
-- The shift `(value - OFFSETS[tier]) << (8 * (8 - tier))` never overflows: payload bits fit in `tier * 8` bits by construction, so shifting them up by `(8 - tier) * 8` cleanly clears the top bits.
+`encode` (the `Vec` path) keeps its original shape: `buf.push(tag)` then `buf.extend_from_slice(&be[8 - tier..])`. Pushing a constant-shape 9-byte array and then `truncate`-ing the unused trailing zeros looked tempting and was tried; see [What Didn't Work](#what-didnt-work) below.
 
 ## What Didn't Work
 
@@ -415,9 +370,39 @@ The idea: keep the tier-0 fast path inline, push the multi-byte work into a sepa
 
 The idea: replace nine `match` arms with `tier = (tag - 247) as usize; let mut padded = [0u8; 8]; while i < tier { ... }`. Reality: catastrophic. decode/large_above_4G went from 3.24 µs to 21.16 µs (6.5× slower). decode/uniform 7×. The 9-arm form lets LLVM specialise each arm to a fixed-size `from_be_bytes`; the consolidated form generates a runtime-length copy whose dispatch overhead dwarfs the work. The 9-arm match is the right shape; do not consolidate.
 
+### Constant-shape 9-byte `extend_from_slice` + `truncate` for `encode`
+
+The idea: instead of `buf.push(tag); buf.extend_from_slice(&be[8 - tier..])` (which does a runtime-length memcpy), pre-shift the payload so its `tier` bytes occupy the high `tier` slots of a `[u8; 8]`, push a fixed-size 9-byte literal `[tag, pb[0], …, pb[7]]` via `extend_from_slice` (which LLVM can lower to a single SIMD store), then `truncate(original_len + tier + 1)` to drop the unused trailing zeros.
+
+```rust
+// Tried and reverted:
+let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+let pb = payload.to_be_bytes();
+let original_len = buf.len();
+buf.extend_from_slice(&[tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]]);
+buf.truncate(original_len + tier + 1);
+```
+
+Plausible-looking, mildly more elegant than the variable-length form. A clean A/B re-bench (only the encode body changed; `encode_array`'s shift trick stayed in place) showed it regressing on every distribution:
+
+| Distribution     | extend_from_slice variable (kept) | 9-byte literal + truncate | Δ |
+|------------------|---:|---:|---:|
+| tiny (0–247)     |  2.29 |  2.65 | +16% |
+| small (248–64k)  | 11.69 | 12.40 |  +6% |
+| medium (64k–4B)  | 12.61 | 13.46 |  +7% |
+| large (>4B)      | 13.56 | 14.78 |  +9% |
+| boundary         | 11.78 | 12.09 |  +3% |
+| uniform random   | 13.31 | 14.78 | +11% |
+
+(µs per 4096 values, criterion median.)
+
+The fixed-size 9-byte write does write more bytes per encode, but on Zen 5 the `Vec::extend_from_slice` codegen for small constant-length slices is already SIMD-friendly enough that the dispatch overhead the truncate trick was meant to avoid isn't actually a bottleneck. The extra 1–8 wasted bytes per call cost more than the saved dispatch.
+
+The earlier "1.04–1.30×" improvement claim came from comparing across two changes at once (the truncate trick applied on top of the `encode_array` shift trick), where the gain from the `encode_array` change masked the regression from the truncate change. A focused A/B isolates the truncate trick and shows it's a regression. Keep the simpler `extend_from_slice(&be[8 - tier..])` form.
+
 ## Cumulative Score
 
-After all of this — `#[inline]` on `decode` and `encoded_len`, the shift trick on `encode_array`, the shift+truncate trick on `encode` — the shootout matrix on Zen 5 stands at:
+After all of this — `#[inline]` on `decode` and `encoded_len` plus the shift trick on `encode_array` — the shootout matrix on Zen 5 stands at:
 
 | Operation        | bijou64 wins (was → now) |
 |------------------|--------------------------|
