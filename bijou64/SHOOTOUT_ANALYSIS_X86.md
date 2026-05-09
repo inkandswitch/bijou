@@ -91,12 +91,12 @@ Encode to a `Vec<u8>`.
 
 | Distribution    | bijou64   | varu64 | vu64  | vu128     | leb128    | bijou64 rank | bijou64 vs other best |
 |-----------------|-----------|--------|-------|-----------|-----------|--------------|-----------------------|
-| tiny (0-247)    | **2.35**  | 10.69  | 24.80 | 13.25     |  5.33     | #1           | 0.44x                 |
-| small (248-64k) | 11.99     | 19.24  | 25.37 | 18.33     | **9.56**  | #2           | 1.25x                 |
-| medium (64k-4B) | **12.62** | 22.26  | 25.43 | 17.14     | 16.89     | #1           | 0.75x                 |
-| large (>4B)     | **13.33** | 28.80  | 31.51 | 16.71     | 30.68     | #1           | 0.80x                 |
-| boundary        | **11.87** | 21.40  | 26.31 | 17.17     | 16.21     | #1           | 0.73x                 |
-| uniform random  | **13.34** | 27.07  | 31.57 | 16.62     | 30.43     | #1           | 0.80x                 |
+| tiny (0-247)    | **2.09**  | 10.42  | 21.57 | 11.74     |  4.72     | #1           | 0.44x                 |
+| small (248-64k) | 11.50     | 17.10  | 22.52 | 16.04     | **8.62**  | #2           | 1.33x                 |
+| medium (64k-4B) | **12.06** | 20.95  | 22.61 | 17.77     | 15.05     | #1           | 0.80x                 |
+| large (>4B)     | **12.43** | 25.79  | 27.71 | 17.92     | 28.41     | #1           | 0.69x                 |
+| boundary        | **11.41** | 20.54  | 23.56 | 17.21     | 14.43     | #1           | 0.79x                 |
+| uniform random  | **12.48** | 25.09  | 27.84 | 16.83     | 28.22     | #1           | 0.74x                 |
 
 <details open>
 <summary>Charts</summary>
@@ -275,7 +275,7 @@ making bijou64 the unambiguous choice for protocols that decode
 more than they encode and that need deterministic serialisation.
 
 On the encode side, bijou64 wins 5 of 6 distributions; only `small`
-goes to leb128 (1.25× faster on the 248–64k uniform range). leb128's
+goes to leb128 (1.33× faster on the 248–64k uniform range). leb128's
 tight 2-byte-write loop happens to fit Zen 5's pipeline particularly
 well for tier-2-heavy distributions.
 
