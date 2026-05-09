@@ -106,29 +106,6 @@ Encode to a `Vec<u8>`.
 
 bijou64 wins 5 of 6 encode distributions on M2 Pro. The sole loss is `small` to leb128 (1.23x behind), where leb128's tight 2-byte write loop fits well. The encode improvements from the shift+truncate trick are even more pronounced on ARM than on Zen 5 -- medium and boundary distributions that previously lost are now clear wins.
 
-## Encode Array
-
-Encode to a fixed `[u8; 9]` with no allocation. leb128 is excluded because its API requires a `Write` implementor.
-
-| Distribution    | bijou64      | varu64 | vu64         | vu128 | bijou64 rank | bijou64 vs other best |
-|-----------------|--------------|--------|--------------|-------|--------------|----------------------|
-| tiny (0-247)    | **1.36** | 4.94   | 1.73         | 2.90  | #1           | 0.79x                |
-| small (248-64k) | 2.44         | 8.63   | **1.73** | 3.52  | #2           | 1.41x                |
-| medium (64k-4B) | 2.56         | 12.29  | **1.73** | 3.52  | #2           | 1.48x                |
-| large (>4B)     | 2.67         | 19.89  | **1.73** | 3.51  | #2           | 1.54x                |
-| boundary        | 2.55         | 16.31  | **1.73** | 3.34  | #2           | 1.47x                |
-| uniform random  | 2.53         | 19.79  | **1.73** | 3.50  | #2           | 1.46x                |
-
-<details open>
-<summary>Charts</summary>
-
-![Encode Array — Bar Chart](charts/arm/encode_array_bar.svg)
-![Encode Array — Box Plot](charts/arm/encode_array_box.svg)
-
-</details>
-
-vu64 dominates encode_array for non-tiny values at a near-constant 1.73 us across all distributions -- its power-of-2 tier boundaries let it skip the correction step that bijou64 must perform. bijou64 wins tiny (1.36 vs 1.73 us) and holds a solid #2 across the rest, narrowing the gap from the old ~1.6x to ~1.5x. The gap is format-bound, not codegen-bound.
-
 ## Decode
 
 Decode from a `&[u8]` buffer.
