@@ -1,6 +1,6 @@
 [package]
 name = "bijou64"
-version = "0.1.1"
+version = "0.2.1"
 description = "Bijective variable-length encoding for unsigned 64-bit integers"
 
 categories = ["encoding", "no-std"]
