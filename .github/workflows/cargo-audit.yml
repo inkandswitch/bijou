@@ -33,3 +33,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/audit@v1
         name: Audit Rust Dependencies
+        with:
+          # Suppress GitHub issue filing for advisories also listed in
+          # audit.toml. The `audit.toml` ignore stops `cargo audit` from
+          # failing the job, but this wrapper's issue-creation path is
+          # separate and only consults its own `ignore` input. Keep this
+          # list in sync with `[advisories].ignore` in `audit.toml`.
+          ignore: RUSTSEC-2025-0141

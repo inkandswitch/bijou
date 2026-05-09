@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+  "bijou128",
   "bijou64",
 ]
 
@@ -15,7 +16,8 @@ authors = [
 
 [workspace.dependencies]
 # Internal crates
-bijou64 = { version = "0.1.1", path = "bijou64", default-features = false }
+bijou128 = { version = "0.1.0", path = "bijou128", default-features = false }
+bijou64 = { version = "0.2.1", path = "bijou64", default-features = false }
 
 # External crates
 arbitrary = "1.4"

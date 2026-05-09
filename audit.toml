@@ -14,4 +14,13 @@
 # https://github.com/gungraun/gungraun/pull/608 but has not yet been released
 # (latest gungraun is 0.18.2). Remove this ignore once a gungraun release on
 # bincode-next lands and we bump.
+#
+# Tracked by:
+#   https://github.com/inkandswitch/bijou/issues/1
+#   https://github.com/inkandswitch/bijou/issues/6 (duplicate refile)
+#
+# Note: `audit.toml` only stops `cargo audit` from failing the job. The
+# `actions-rust-lang/audit@v1` wrapper files GitHub issues via a separate
+# code path that needs its own `ignore` input — see
+# `.github/workflows/cargo-audit.yml`.
 ignore = ["RUSTSEC-2025-0141"]
