@@ -221,10 +221,166 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
     buf.truncate(original_len + tier + 1);
 }
 
-/// Encodes `value` as a `bijou64` into a fixed-size array.
+/// A stack-allocated bijou64 encoding, carrying its own valid length.
 ///
-/// Returns `(bytes, len)` where `bytes` is a 9-byte array with the
-/// encoding in `bytes[..len]`.
+/// Returned by [`encoded_bytes`]. Always exposes the correct byte
+/// slice via `Deref<Target = [u8]>` and `AsRef<[u8]>`, so callers can
+/// never accidentally read past the encoded prefix.
+///
+/// # Examples
+///
+/// ```
+/// use bijou64::encoded_bytes;
+///
+/// let enc = encoded_bytes(300);
+/// assert_eq!(&*enc, &[0xF8, 0x34]);   // Deref<Target = [u8]>
+/// assert_eq!(enc.len(), 2);
+/// assert_eq!(enc.as_ref(), &[0xF8, 0x34][..]);
+///
+/// // Works wherever `&[u8]` is accepted:
+/// fn send(bytes: &[u8]) -> usize { bytes.len() }
+/// assert_eq!(send(&enc), 2);
+///
+/// // Iterate the encoded bytes:
+/// let collected: Vec<u8> = enc.into_iter().collect();
+/// assert_eq!(collected, [0xF8, 0x34]);
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct EncodedBytes {
+    buf: [u8; MAX_BYTES],
+    /// Invariant: `len <= MAX_BYTES`. Stored as `u8` because the value
+    /// is always in `1..=9`; the smaller width makes `EncodedBytes`
+    /// fit in 10 bytes total and `Copy` cheaper.
+    len: u8,
+}
+
+// We implement `PartialEq`, `Eq`, `Hash`, `PartialOrd`, and `Ord` by
+// hand against the encoded byte slice (`self.as_slice()`) rather than
+// deriving them on the `(buf, len)` pair. Two reasons:
+//
+//  1. The trailing `MAX_BYTES - len` bytes of `buf` are always zero,
+//     so a derived `PartialEq` *would* compare them and give the same
+//     answer — but only because we maintain that zero-padding
+//     invariant. Comparing the live slice removes that subtle
+//     coupling.
+//
+//  2. Bijou's lex-order property (SPEC.md: "lexicographic byte order
+//     equals numeric order") is the natural ordering for these
+//     values. Making `Ord` explicitly compare `as_slice()` documents
+//     the intent at the impl site.
+
+impl PartialEq for EncodedBytes {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl Eq for EncodedBytes {}
+
+impl core::hash::Hash for EncodedBytes {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state);
+    }
+}
+
+impl PartialOrd for EncodedBytes {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for EncodedBytes {
+    #[inline]
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        // Bijou's lex-order property: byte-lex order = numeric order.
+        self.as_slice().cmp(other.as_slice())
+    }
+}
+
+impl EncodedBytes {
+    /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    /// Always `false`. Bijou encodings are never empty; the smallest
+    /// is a single-byte encoding of value `0`. Included to satisfy
+    /// the standard `len`/`is_empty` API pairing.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        false
+    }
+
+    /// Returns the encoded bytes as a `&[u8]` of the correct length.
+    ///
+    /// Equivalent to `&*self` or `self.as_ref()`; provided as an
+    /// explicit method for callers that prefer it over `Deref`.
+    #[inline]
+    #[must_use]
+    #[allow(clippy::indexing_slicing)] // len is invariant <= MAX_BYTES
+    pub const fn as_slice(&self) -> &[u8] {
+        // Const slicing requires a constant range; `self.len()` is not
+        // const-usable in a slice index expression directly, but we
+        // can hand-roll a `split_at` style call. `&buf[..n]` works in
+        // const fn as of Rust 1.85+.
+        self.buf.split_at(self.len as usize).0
+    }
+}
+
+impl core::ops::Deref for EncodedBytes {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl AsRef<[u8]> for EncodedBytes {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl core::borrow::Borrow<[u8]> for EncodedBytes {
+    #[inline]
+    fn borrow(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl IntoIterator for EncodedBytes {
+    type Item = u8;
+    type IntoIter = core::iter::Take<core::array::IntoIter<u8, MAX_BYTES>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let len = self.len();
+        self.buf.into_iter().take(len)
+    }
+}
+
+impl<'a> IntoIterator for &'a EncodedBytes {
+    type Item = &'a u8;
+    type IntoIter = core::slice::Iter<'a, u8>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+/// Encodes `value` as a stack-allocated [`EncodedBytes`].
+///
+/// This is the alloc-free encoding entry point — the returned value
+/// dereferences directly to a `&[u8]` of the correct length, so the
+/// caller can pass it anywhere a byte slice is accepted without
+/// tracking the length separately.
 ///
 /// Uses `leading_zeros` to derive the tier in O(1) rather than walking
 /// an if/else chain. See [`encoded_len`] for the same technique.
@@ -232,14 +388,23 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
 /// # Examples
 ///
 /// ```
-/// let (bytes, len) = bijou64::encode_array(300);
-/// assert_eq!(&bytes[..len], &[0xF8, 0x34]);
+/// let enc = bijou64::encoded_bytes(300);
+/// assert_eq!(&*enc, &[0xF8, 0x34]);
+///
+/// // Use it anywhere a byte slice is accepted:
+/// let mut sink = Vec::new();
+/// sink.extend_from_slice(&enc);
+/// assert_eq!(sink, [0xF8, 0x34]);
 /// ```
+#[inline]
 #[must_use]
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
-pub const fn encode_array(value: u64) -> ([u8; MAX_BYTES], usize) {
+pub const fn encoded_bytes(value: u64) -> EncodedBytes {
     if value < BOUNDS[0] {
-        return ([(value & 0xFF) as u8, 0, 0, 0, 0, 0, 0, 0, 0], 1);
+        return EncodedBytes {
+            buf: [(value & 0xFF) as u8, 0, 0, 0, 0, 0, 0, 0, 0],
+            len: 1,
+        };
     }
 
     let bw = 64 - value.leading_zeros();
@@ -253,17 +418,16 @@ pub const fn encode_array(value: u64) -> ([u8; MAX_BYTES], usize) {
     // land at positions 0..tier, with zeros at positions tier..8 — so
     // the entire 9-byte array can be constructed as one fixed-shape
     // literal that LLVM compiles to a single `bswap` + 9-byte store.
-    // Replaces the previous while-loop byte copy + 9-byte zero-init,
-    // closing the 2× gap vs vu64 on encode_array small/medium/large/
-    // boundary/uniform.
     let tag = (247 + tier) as u8;
     let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
     let pb = payload.to_be_bytes();
 
-    (
-        [tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]],
-        tier + 1,
-    )
+    EncodedBytes {
+        buf: [tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]],
+        // Invariant: `tier ∈ [1, 8]` and `1 <= tier + 1 <= MAX_BYTES = 9`,
+        // so the cast cannot truncate.
+        len: (tier + 1) as u8,
+    }
 }
 
 /// Decodes a `bijou64` from the front of `buf`.
@@ -274,8 +438,10 @@ pub const fn encode_array(value: u64) -> ([u8; MAX_BYTES], usize) {
 ///
 /// - [`DecodeError::BufferTooShort`] if `buf` has fewer bytes than the
 ///   encoding requires.
-/// - [`DecodeError::Overflow`] if a tier 8 payload, when added to
-///   `OFFSETS[8]`, exceeds `u64::MAX`.
+/// - [`DecodeError::Overflow`] if the input is a tier-8 encoding
+///   (first byte `0xFF`) whose 8-byte payload, added to the tier-8
+///   offset (approximately 7.2×10¹⁶), would exceed `u64::MAX`. See
+///   `SPEC.md` for the per-tier offset table.
 ///
 /// # Examples
 ///
@@ -354,6 +520,126 @@ pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
         Some(value) => Ok((value, consumed)),
         None => Err(DecodeError::Overflow),
     }
+}
+
+/// Iterator over the bijou64-encoded values in `buf`.
+///
+/// Calling [`decode_iter`] is equivalent to writing the manual cursor
+/// loop yourself; it's a convenience for callers who'd rather work
+/// with the iterator combinators than slice arithmetic.
+///
+/// # Behaviour
+///
+/// - Each `next()` decodes one value at the current cursor position.
+/// - On success, yields `Some(Ok(value))` and advances the cursor by
+///   the consumed-byte count.
+/// - On a decode error (`BufferTooShort` or `Overflow`), yields
+///   `Some(Err(_))` and then `None` on every subsequent call (the
+///   iterator is fused — it does not retry).
+/// - When the input is fully consumed, yields `None`.
+///
+/// # Examples
+///
+/// ```
+/// use bijou64::{decode_iter, encode};
+///
+/// let mut buf = Vec::new();
+/// for v in [0u64, 42, 300, 65_535] {
+///     encode(v, &mut buf);
+/// }
+///
+/// // Collect into a Result<Vec<_>, _> to short-circuit on the first error.
+/// let decoded: Result<Vec<u64>, _> = decode_iter(&buf).collect();
+/// assert_eq!(decoded.unwrap(), [0, 42, 300, 65_535]);
+/// ```
+#[derive(Debug)]
+#[must_use = "iterators are lazy; consume with for/.collect/.next"]
+pub struct DecodeIter<'a> {
+    cursor: &'a [u8],
+    fused_err: bool,
+}
+
+/// Decodes successive `bijou64`-encoded values from `buf`.
+///
+/// Returns an iterator that yields `Result<u64, DecodeError>` for each
+/// encoded value in `buf`, in order. See [`DecodeIter`] for the exact
+/// fused-iteration semantics. See the `streaming_decode` example for
+/// usage patterns.
+#[inline]
+pub const fn decode_iter(buf: &[u8]) -> DecodeIter<'_> {
+    DecodeIter {
+        cursor: buf,
+        fused_err: false,
+    }
+}
+
+impl Iterator for DecodeIter<'_> {
+    type Item = Result<u64, DecodeError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.fused_err || self.cursor.is_empty() {
+            return None;
+        }
+        match decode(self.cursor) {
+            Ok((value, consumed)) => {
+                // SAFETY (indexing): `decode` returns `consumed` only on
+                // success, and `consumed <= cursor.len()` is enforced by
+                // its internal slice-pattern matches. So splitting at
+                // `consumed` is always in bounds.
+                self.cursor = match self.cursor.get(consumed..) {
+                    Some(rest) => rest,
+                    None => &[],
+                };
+                Some(Ok(value))
+            }
+            Err(err) => {
+                self.fused_err = true;
+                Some(Err(err))
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.fused_err || self.cursor.is_empty() {
+            return (0, Some(0));
+        }
+        // Lower bound: at least one more `next()` will produce something
+        // (an Ok or an Err) since the cursor is non-empty.
+        // Upper bound: every remaining value takes at least 1 byte, so
+        // we'll yield at most `cursor.len()` more items.
+        (1, Some(self.cursor.len()))
+    }
+}
+
+impl core::iter::FusedIterator for DecodeIter<'_> {}
+
+/// Decodes every `bijou64`-encoded value in `buf`, returning them as
+/// a `Vec<u64>`.
+///
+/// Equivalent to `decode_iter(buf).collect()` but spells out the
+/// short-circuit collect pattern explicitly. The lazy iterator API
+/// ([`decode_iter`]) is more appropriate when you might stop early or
+/// want to combine with `take`, `filter`, etc.
+///
+/// # Errors
+///
+/// Returns the first [`DecodeError`] encountered. The values
+/// successfully decoded before the error are discarded — this is an
+/// all-or-nothing operation, matching the JS-side `decodeAll`.
+///
+/// # Examples
+///
+/// ```
+/// use bijou64::{decode_all, encode};
+///
+/// let mut buf = Vec::new();
+/// for v in [0u64, 42, 300, u64::MAX] {
+///     encode(v, &mut buf);
+/// }
+/// assert_eq!(decode_all(&buf).unwrap(), vec![0, 42, 300, u64::MAX]);
+/// ```
+pub fn decode_all(buf: &[u8]) -> Result<Vec<u64>, DecodeError> {
+    decode_iter(buf).collect()
 }
 
 /// Errors that can occur when decoding a `bijou64`.
@@ -524,6 +810,32 @@ mod tests {
             assert_eq!((v, n), (300, 2));
             Ok(())
         }
+
+        /// `decode` MUST advance the buffer by at least one byte on
+        /// success. A `consumed == 0` would trap a naive streaming
+        /// consumer that loops `while !buf.is_empty() { let (_, n) =
+        /// decode(buf)?; buf = &buf[n..]; }` into an infinite spin.
+        ///
+        /// The current implementation guarantees this structurally
+        /// (tag < 248 returns 1; multi-byte arms return 1 + tier >= 2),
+        /// but a future refactor could easily break the property. This
+        /// test pins it across every possible first byte with enough
+        /// trailing payload that `BufferTooShort` can never fire.
+        #[test]
+        fn decode_always_advances() -> TestResult {
+            let pad = [0u8; MAX_BYTES + 7]; // enough for any tier
+            for first in 0u8..=255u8 {
+                let mut buf = Vec::with_capacity(1 + pad.len());
+                buf.push(first);
+                buf.extend_from_slice(&pad);
+                let (_, n) = decode(&buf)?;
+                assert!(
+                    n >= 1,
+                    "decode returned consumed = 0 on first byte {first:#04X}",
+                );
+            }
+            Ok(())
+        }
     }
 
     mod exhaustive {
@@ -570,6 +882,83 @@ mod tests {
                 let (decoded, consumed) = decode(&buf)?;
                 assert_eq!(decoded, value, "round-trip failed for {value}");
                 assert_eq!(consumed, 3);
+            }
+            Ok(())
+        }
+
+        /// Exhaustively round-trip every tier-3 value (16.8M cases, ~25 s
+        /// in release mode). Gated behind `#[ignore]` so normal `cargo
+        /// test` stays fast; run explicitly via `cargo test --release
+        /// tier3_exhaustive -- --ignored --nocapture`.
+        ///
+        /// Complements `bijection::overlong_encoding_decodes_to_different_value`
+        /// (which checks the inter-tier disjointness property using one
+        /// representative per tier) by covering every concrete payload
+        /// at tier 3.
+        #[test]
+        #[ignore = "16.8M cases, ~25 s in release mode; run via cargo test -- --ignored"]
+        fn tier3_exhaustive() -> TestResult {
+            for value in 66_040u64..=16_843_255u64 {
+                let mut buf = Vec::new();
+                encode(value, &mut buf);
+                assert_eq!(buf.len(), 4, "value {value} should encode in 4 bytes");
+                assert_eq!(buf[0], 0xFA);
+
+                let (decoded, consumed) = decode(&buf)?;
+                assert_eq!(decoded, value, "round-trip failed for {value}");
+                assert_eq!(consumed, 4);
+            }
+            Ok(())
+        }
+
+        /// Exhaustive byte-sequence canonicality sweep over every 1- to
+        /// 4-byte buffer (16.8M cases). For each buffer that decodes
+        /// successfully, the result MUST re-encode to byte-identical
+        /// bytes — the structural-canonicality guarantee from SPEC.md.
+        ///
+        /// This is the strongest possible check for the canonicality
+        /// property at tiers 0-3, and it tests the byte-sequence
+        /// direction (whereas `tier0`/`tier1`/`tier2`/`tier3_exhaustive`
+        /// only cover the value direction).
+        ///
+        /// Gated behind `#[ignore]`; run via `cargo test --release
+        /// canonicality_byte_sequence_exhaustive -- --ignored`.
+        #[test]
+        #[ignore = "16.8M cases, ~25 s in release mode; run via cargo test -- --ignored"]
+        fn canonicality_byte_sequence_exhaustive() -> TestResult {
+            let check = |buf: &[u8]| -> TestResult {
+                // `Err(_)` (truncated / overflow) is fine here — we
+                // only need to check canonicality on successful decodes.
+                if let Ok((value, consumed)) = decode(buf) {
+                    let mut re = Vec::with_capacity(MAX_BYTES);
+                    encode(value, &mut re);
+                    assert_eq!(
+                        re.as_slice(),
+                        &buf[..consumed],
+                        "non-canonical: decode({:02X?}) = {value}, re-encode = {:02X?}",
+                        &buf[..consumed],
+                        re
+                    );
+                }
+                Ok(())
+            };
+
+            // Tier 0 + tier 1 + tier 2 (256 + 256 + 65,536 = 66,048 cases).
+            for b in 0u8..=255u8 {
+                check(&[b])?;
+            }
+            for p in 0u8..=255u8 {
+                check(&[0xF8, p])?;
+            }
+            for p1 in 0u8..=255u8 {
+                for p2 in 0u8..=255u8 {
+                    check(&[0xF9, p1, p2])?;
+                }
+            }
+            // Tier 3: 16,777,216 cases.
+            for p in 0u32..(1u32 << 24) {
+                let bytes = p.to_be_bytes();
+                check(&[0xFA, bytes[1], bytes[2], bytes[3]])?;
             }
             Ok(())
         }
@@ -774,6 +1163,282 @@ mod tests {
         }
     }
 
+    mod encoded_bytes {
+        use super::*;
+
+        /// `encoded_bytes` agrees with `encode`: same bytes, same length.
+        #[test]
+        fn agrees_with_encode() {
+            let probes: &[u64] = &[
+                0,
+                1,
+                247,
+                248,
+                503,
+                504,
+                65_535,
+                66_039,
+                66_040,
+                0x1_01F8,
+                0x101_01F8,
+                u64::MAX,
+            ];
+            for &v in probes {
+                let enc = encoded_bytes(v);
+                let mut via_encode = Vec::new();
+                encode(v, &mut via_encode);
+                assert_eq!(enc.len(), via_encode.len(), "len mismatch for {v}");
+                assert_eq!(&*enc, via_encode.as_slice(), "bytes mismatch for {v}");
+            }
+        }
+
+        /// `Deref`, `AsRef<[u8]>`, and `as_slice` all yield identical
+        /// slices.
+        #[test]
+        fn deref_asref_as_slice_consistent() {
+            let enc = encoded_bytes(300);
+            let via_deref: &[u8] = &enc;
+            let via_asref: &[u8] = enc.as_ref();
+            let via_as_slice: &[u8] = enc.as_slice();
+            assert_eq!(via_deref, &[0xF8, 0x34]);
+            assert_eq!(via_asref, &[0xF8, 0x34]);
+            assert_eq!(via_as_slice, &[0xF8, 0x34]);
+        }
+
+        /// Owned-into-iter walks only the encoded prefix, not the full
+        /// 9-byte backing array.
+        #[test]
+        fn into_iter_walks_only_encoded_bytes() {
+            let enc = encoded_bytes(300); // 2 bytes
+            let collected: Vec<u8> = enc.into_iter().collect();
+            assert_eq!(collected, [0xF8, 0x34]);
+        }
+
+        /// Borrowed-into-iter (`&enc`) yields `&u8` of just the encoded
+        /// bytes.
+        #[test]
+        fn ref_into_iter_yields_encoded_bytes() {
+            let enc = encoded_bytes(300);
+            let collected: Vec<u8> = (&enc).into_iter().copied().collect();
+            assert_eq!(collected, [0xF8, 0x34]);
+        }
+
+        /// `EncodedBytes` is Copy: passing it around doesn't move it.
+        #[test]
+        fn copy_semantics() {
+            let enc = encoded_bytes(42);
+            let dup = enc;
+            // Both bindings still usable.
+            assert_eq!(&*enc, &[0x2A]);
+            assert_eq!(&*dup, &[0x2A]);
+        }
+
+        /// `is_empty` is always false; bijou encodings are never empty.
+        #[test]
+        fn is_empty_is_always_false() {
+            for v in [0u64, 1, 247, 248, u64::MAX] {
+                assert!(!encoded_bytes(v).is_empty(), "is_empty true for {v}");
+            }
+        }
+
+        /// `Borrow<[u8]>`: lets `EncodedBytes` be used as a
+        /// `BTreeMap` key looked up by `&[u8]`.
+        #[test]
+        fn borrow_impl() {
+            use alloc::collections::BTreeMap;
+            let mut map: BTreeMap<EncodedBytes, &'static str> = BTreeMap::new();
+            map.insert(encoded_bytes(42), "the answer");
+            // Lookup via Borrow<[u8]>:
+            assert_eq!(map.get(&[0x2A][..]), Some(&"the answer"));
+        }
+
+        /// `Eq` + `PartialEq` work as expected: distinct values are
+        /// unequal, identical encodings are equal.
+        #[test]
+        fn eq_partial_eq() {
+            let a = encoded_bytes(300);
+            let b = encoded_bytes(300);
+            let c = encoded_bytes(301);
+            assert_eq!(a, b);
+            assert_ne!(a, c);
+        }
+
+        /// Round-trip via `decode`.
+        #[test]
+        fn round_trip_via_decode() -> TestResult {
+            for v in [0u64, 247, 248, 65_535, u64::MAX] {
+                let enc = encoded_bytes(v);
+                let (decoded, n) = decode(&enc)?;
+                assert_eq!(decoded, v);
+                assert_eq!(n, enc.len());
+            }
+            Ok(())
+        }
+
+        /// Const fn: usable at compile time.
+        #[test]
+        fn const_fn() {
+            const ENC: EncodedBytes = encoded_bytes(300);
+            assert_eq!(ENC.len(), 2);
+        }
+
+        /// `EncodedBytes` is `Send + Sync + Unpin`.
+        #[test]
+        fn auto_traits() {
+            fn assert_traits<T: Send + Sync + Unpin>() {}
+            assert_traits::<EncodedBytes>();
+        }
+    }
+
+    mod iter {
+        use super::*;
+
+        /// `decode_iter` on an empty buffer yields nothing.
+        #[test]
+        fn empty_buffer() {
+            let collected: Vec<_> = decode_iter(&[]).collect();
+            assert!(collected.is_empty());
+        }
+
+        /// Happy path: encoded N values, `decode_iter` yields the same N values.
+        #[test]
+        fn round_trip() -> TestResult {
+            let values: &[u64] = &[0, 1, 42, 247, 248, 503, 504, 65_535, 1u64 << 32, u64::MAX];
+            let mut buf = Vec::new();
+            for &v in values {
+                encode(v, &mut buf);
+            }
+            let collected: Result<Vec<u64>, _> = decode_iter(&buf).collect();
+            assert_eq!(collected?, values);
+            Ok(())
+        }
+
+        /// Iterator fuses on error: after the first `Err`, every subsequent
+        /// `next()` returns `None`.
+        #[test]
+        fn fuses_after_error() {
+            // Tag 0xF8 with no payload → BufferTooShort.
+            let mut iter = decode_iter(&[0xF8]);
+            assert_eq!(iter.next(), Some(Err(DecodeError::BufferTooShort)));
+            assert_eq!(iter.next(), None, "iter must fuse after error");
+            assert_eq!(iter.next(), None, "iter must remain fused");
+        }
+
+        /// Tier-8 Overflow surfaces as an Err and fuses.
+        #[test]
+        fn overflow_error_then_fused() {
+            // u64::MAX would require OFFSETS[8] + all-FF, which overflows.
+            let buf = [0xFFu8; 9];
+            let mut iter = decode_iter(&buf);
+            assert_eq!(iter.next(), Some(Err(DecodeError::Overflow)));
+            assert_eq!(iter.next(), None);
+        }
+
+        /// Mixed success then error: the partial decoded prefix is still
+        /// visible to the caller before the error byte.
+        #[test]
+        fn partial_success_then_error() {
+            // [0x42, 0xF8] — first byte decodes to 0x42, second byte is
+            // a tag with no payload.
+            let mut iter = decode_iter(&[0x42, 0xF8]);
+            assert_eq!(iter.next(), Some(Ok(0x42)));
+            assert_eq!(iter.next(), Some(Err(DecodeError::BufferTooShort)));
+            assert_eq!(iter.next(), None);
+        }
+
+        /// `size_hint`: (0, Some(0)) on empty/fused, (1, Some(len)) otherwise.
+        #[test]
+        fn size_hint() {
+            let empty = decode_iter(&[]);
+            assert_eq!(empty.size_hint(), (0, Some(0)));
+
+            let with_data = decode_iter(&[0x42, 0x99]);
+            assert_eq!(with_data.size_hint(), (1, Some(2)));
+
+            // After fusing on error:
+            let mut errored = decode_iter(&[0xF8]);
+            let _ = errored.next();
+            assert_eq!(errored.size_hint(), (0, Some(0)));
+        }
+
+        /// `FusedIterator` trait is implemented (compile-time check).
+        #[test]
+        fn fused_iterator_trait() {
+            fn assert_fused<T: core::iter::FusedIterator>() {}
+            assert_fused::<DecodeIter<'_>>();
+        }
+
+        /// Iterator combinators work as expected.
+        #[test]
+        fn composable_with_combinators() {
+            let mut buf = Vec::new();
+            for v in [10u64, 20, 30, 40, 50] {
+                encode(v, &mut buf);
+            }
+            let sum: u64 = decode_iter(&buf).filter_map(Result::ok).sum();
+            assert_eq!(sum, 150);
+
+            let first_two: Vec<_> = decode_iter(&buf).take(2).filter_map(Result::ok).collect();
+            assert_eq!(first_two, [10, 20]);
+        }
+    }
+
+    mod decode_all {
+        use super::*;
+
+        /// Empty buffer decodes to an empty vector (not an error).
+        #[test]
+        fn empty_buffer() -> TestResult {
+            assert_eq!(decode_all(&[])?, Vec::<u64>::new());
+            Ok(())
+        }
+
+        /// Round-trip: encode N values, `decode_all` yields the same N.
+        #[test]
+        fn round_trip() -> TestResult {
+            let values: &[u64] = &[0, 42, 300, 65_535, 1u64 << 32, u64::MAX];
+            let mut buf = Vec::new();
+            for &v in values {
+                encode(v, &mut buf);
+            }
+            assert_eq!(decode_all(&buf)?, values);
+            Ok(())
+        }
+
+        /// All-or-nothing: a mid-buffer error discards the
+        /// successful prefix.
+        #[test]
+        fn short_circuits_on_first_error() {
+            // [0x42, 0xF8]: 0x42 decodes successfully, then 0xF8 is a
+            // tag with no payload. decode_all must return the error
+            // and discard the 0x42.
+            assert_eq!(decode_all(&[0x42, 0xF8]), Err(DecodeError::BufferTooShort));
+        }
+
+        /// Tier-8 overflow propagates as the typed `Overflow` error.
+        #[test]
+        fn overflow_propagates() {
+            assert_eq!(decode_all(&[0xFF; 9]), Err(DecodeError::Overflow));
+        }
+
+        /// `decode_all` agrees with `decode_iter().collect()` across
+        /// a few inputs.
+        #[test]
+        fn agrees_with_decode_iter_collect() {
+            let inputs: &[&[u8]] = &[
+                &[],
+                &[0x00],
+                &[0x42, 0xF8, 0x34],
+                &[0xF8], // truncated
+            ];
+            for &input in inputs {
+                let via_iter: Result<Vec<u64>, _> = decode_iter(input).collect();
+                let via_all = decode_all(input);
+                assert_eq!(via_iter, via_all, "disagreement on {input:02X?}");
+            }
+        }
+    }
+
     mod encode_api {
         use super::*;
 
@@ -914,12 +1579,12 @@ mod tests {
 
         #[test]
         #[cfg_attr(miri, ignore)]
-        fn encode_array_matches() {
+        fn encoded_bytes_matches() {
             bolero::check!().with_arbitrary::<u64>().for_each(|&value| {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
-                let (arr, len) = encode_array(value);
-                assert_eq!(arr.get(..len), Some(buf.as_slice()));
+                let enc = encoded_bytes(value);
+                assert_eq!(&*enc, buf.as_slice(), "value {value}");
             });
         }
 
@@ -934,6 +1599,21 @@ mod tests {
                 });
         }
 
+        /// On every successful decode, the consumed-byte count is at
+        /// least 1 — otherwise a streaming consumer
+        /// (`while !buf.is_empty() { decode(buf) }`) would spin.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_always_advances() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u8>>()
+                .for_each(|buf| {
+                    if let Ok((_, consumed)) = decode(buf) {
+                        assert!(consumed >= 1, "decode of {buf:02X?} returned consumed = 0");
+                    }
+                });
+        }
+
         /// `a < b ⟹ encode(a) < encode(b)` lexicographically.
         #[test]
         #[cfg_attr(miri, ignore)]
@@ -941,10 +1621,10 @@ mod tests {
             bolero::check!()
                 .with_arbitrary::<(u64, u64)>()
                 .for_each(|&(a, b)| {
-                    let (enc_a, len_a) = encode_array(a);
-                    let (enc_b, len_b) = encode_array(b);
-                    let slice_a = &enc_a[..len_a];
-                    let slice_b = &enc_b[..len_b];
+                    let enc_a = encoded_bytes(a);
+                    let enc_b = encoded_bytes(b);
+                    let slice_a: &[u8] = &enc_a;
+                    let slice_b: &[u8] = &enc_b;
                     assert_eq!(
                         a.cmp(&b),
                         slice_a.cmp(slice_b),

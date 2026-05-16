@@ -16,8 +16,31 @@
 #![cfg(target_family = "wasm")]
 #![allow(clippy::missing_panics_doc, clippy::unwrap_used)]
 
-use bijou64_wasm::{decode, encode, encoded_len, max_bytes};
+use bijou64_wasm::{decode, decode_all, encode, encoded_len, max_bytes};
+use js_sys::BigInt;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
+
+/// Build a `BigInt` from a Rust `u64`. The wasm-bindgen `From<u64> for
+/// BigInt` impl is exactly the right thing here — no truncation, no
+/// loss of precision, no exposure to the wraparound semantics we're
+/// guarding against in the public API.
+fn bi(v: u64) -> BigInt {
+    BigInt::from(v)
+}
+
+/// Build a `BigInt` from a decimal string. Used for values outside the
+/// `u64` range — there is no `From<i64>` shortcut for negatives and we
+/// want to test exactly `2**64` and similar boundaries.
+fn bi_str(s: &str) -> BigInt {
+    BigInt::new(&JsValue::from_str(s)).expect("valid bigint literal")
+}
+
+/// Pull `name` off a thrown `JsValue` so we can assert on it.
+fn js_error_name(err: &JsValue) -> Option<String> {
+    let e: &js_sys::Error = err.dyn_ref()?;
+    e.name().as_string()
+}
 
 #[wasm_bindgen_test]
 fn max_bytes_is_nine() {
@@ -27,22 +50,22 @@ fn max_bytes_is_nine() {
 #[wasm_bindgen_test]
 fn tier_0_single_byte_encoding() {
     // For values < 248 the byte _is_ the value.
-    assert_eq!(encode(0), vec![0x00]);
-    assert_eq!(encode(42), vec![0x2A]);
-    assert_eq!(encode(247), vec![0xF7]);
+    assert_eq!(encode(&bi(0)).unwrap(), vec![0x00]);
+    assert_eq!(encode(&bi(42)).unwrap(), vec![0x2A]);
+    assert_eq!(encode(&bi(247)).unwrap(), vec![0xF7]);
 }
 
 #[wasm_bindgen_test]
 fn tier_1_uses_offset() {
     // Tier 1: tag 0xF8, payload = value - 248.
-    assert_eq!(encode(248), vec![0xF8, 0x00]);
-    assert_eq!(encode(300), vec![0xF8, 0x34]);
-    assert_eq!(encode(503), vec![0xF8, 0xFF]);
+    assert_eq!(encode(&bi(248)).unwrap(), vec![0xF8, 0x00]);
+    assert_eq!(encode(&bi(300)).unwrap(), vec![0xF8, 0x34]);
+    assert_eq!(encode(&bi(503)).unwrap(), vec![0xF8, 0xFF]);
 }
 
 #[wasm_bindgen_test]
 fn u64_max_uses_full_nine_bytes() {
-    let bytes = encode(u64::MAX);
+    let bytes = encode(&bi(u64::MAX)).unwrap();
     assert_eq!(bytes.len(), 9);
     assert_eq!(bytes[0], 0xFF);
 }
@@ -68,8 +91,9 @@ fn encoded_len_matches_encode_len() {
     ];
 
     for v in cases {
-        let computed = encoded_len(v);
-        let actual = encode(v).len();
+        let bv = bi(v);
+        let computed = encoded_len(&bv).unwrap();
+        let actual = encode(&bv).unwrap().len();
         assert_eq!(
             computed, actual,
             "encoded_len({v}) = {computed} but encode produced {actual} bytes",
@@ -99,7 +123,7 @@ fn decode_round_trip() {
     ];
 
     for &v in cases {
-        let bytes = encode(v);
+        let bytes = encode(&bi(v)).unwrap();
         let result = decode(&bytes).unwrap();
         assert_eq!(result.value(), v, "round-trip failed for {v}");
         assert_eq!(result.bytes_read(), bytes.len());
@@ -110,7 +134,7 @@ fn decode_round_trip() {
 fn decode_partial_buffer_reports_bytes_read() {
     // bytesRead should be the encoding length, not the input length —
     // this is what allows stream-decoding by repeatedly slicing.
-    let mut buf = encode(300); // 2 bytes
+    let mut buf = encode(&bi(300)).unwrap(); // 2 bytes
     buf.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
     let result = decode(&buf).unwrap();
     assert_eq!(result.value(), 300);
@@ -132,4 +156,94 @@ fn decode_truncated_tier_1_errors() {
 fn decode_truncated_tier_8_errors() {
     // Tag 0xFF needs 8 payload bytes — supply 7.
     assert!(decode(&[0xFF, 0, 0, 0, 0, 0, 0, 0]).is_err());
+}
+
+// ---- Range-check tests for the bigint → u64 boundary ----------------------
+
+#[wasm_bindgen_test]
+fn encode_rejects_value_equal_to_two_to_the_sixty_fourth() {
+    // 2^64 — exactly one past u64::MAX. Without the validation, this
+    // would silently truncate to 0 and encode as [0x00].
+    let too_big = bi_str("18446744073709551616");
+    let err = encode(&too_big).expect_err("must reject 2^64");
+    assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
+}
+
+#[wasm_bindgen_test]
+fn encode_rejects_negative_one() {
+    // -1n. Without validation, two's-complement wraparound encodes this
+    // as u64::MAX — a real footgun for content-addressed protocols.
+    let neg_one = bi_str("-1");
+    let err = encode(&neg_one).expect_err("must reject -1n");
+    assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
+}
+
+#[wasm_bindgen_test]
+fn encode_rejects_large_negative() {
+    let neg = bi_str("-9223372036854775808"); // -2^63
+    let err = encode(&neg).expect_err("must reject -2^63");
+    assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
+}
+
+#[wasm_bindgen_test]
+fn encoded_len_rejects_out_of_range() {
+    let too_big = bi_str("18446744073709551616");
+    let err = encoded_len(&too_big).expect_err("must reject 2^64");
+    assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
+
+    let neg = bi_str("-1");
+    let err = encoded_len(&neg).expect_err("must reject -1n");
+    assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
+}
+
+#[wasm_bindgen_test]
+fn encode_accepts_u64_max_exactly() {
+    // The largest accepted value: u64::MAX = 2^64 - 1.
+    let max = bi_str("18446744073709551615");
+    let bytes = encode(&max).expect("u64::MAX must be accepted");
+    assert_eq!(bytes.len(), 9);
+    assert_eq!(bytes[0], 0xFF);
+}
+
+#[wasm_bindgen_test]
+fn encode_accepts_zero_exactly() {
+    // The smallest accepted value: 0.
+    let zero = bi_str("0");
+    let bytes = encode(&zero).expect("0 must be accepted");
+    assert_eq!(bytes, vec![0x00]);
+}
+
+// ---- decode_all batch helper -----------------------------------------------
+
+#[wasm_bindgen_test]
+fn decode_all_empty_returns_empty() {
+    let result = decode_all(&[]).expect("empty input decodes to empty array");
+    assert!(result.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn decode_all_multi_value_roundtrip() {
+    // Encode three values back-to-back, decode_all should recover them all.
+    let mut buf = Vec::new();
+    for v in [42u64, 300, 65_535] {
+        buf.extend_from_slice(&encode(&bi(v)).unwrap());
+    }
+    let result = decode_all(&buf).expect("must decode all");
+    assert_eq!(result, vec![42u64, 300, 65_535]);
+}
+
+#[wasm_bindgen_test]
+fn decode_all_propagates_error() {
+    // [0x42, 0xF8] — the first byte decodes, the second is a tag without
+    // payload. decode_all must surface the error and not return the partial
+    // prefix. The error's JS-side `name === "DecodeError"` is verified
+    // in the Playwright e2e suite; here we just confirm the boundary
+    // returns Err.
+    assert!(decode_all(&[0x42, 0xF8]).is_err());
+}
+
+#[wasm_bindgen_test]
+fn decode_all_propagates_overflow() {
+    // Tier-8 all-ones overflows.
+    assert!(decode_all(&[0xFFu8; 9]).is_err());
 }
