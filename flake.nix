@@ -266,6 +266,9 @@
 
           "test:js:browser:report" = cmd "Open the most recent Playwright HTML report" ''
             cd "$WORKSPACE_ROOT/bijou64_wasm"
+            if [ ! -d node_modules ]; then
+              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+            fi
             ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright show-report
           '';
 

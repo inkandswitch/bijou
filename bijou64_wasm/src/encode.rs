@@ -1,10 +1,4 @@
-//! Encode-side surface: `encodedLen` and `encode`, plus the bigint
-//! validation infrastructure they share.
-//!
-//! See the crate-level docs for the cheatsheet and bigint-validation
-//! rationale. The two public functions here both take a JS `bigint`,
-//! validate it at the wasm boundary, and lower failures to native JS
-//! `TypeError` / `RangeError` instances.
+//! Encode
 
 use alloc::{string::ToString, vec::Vec};
 use thiserror::Error;

@@ -50,7 +50,12 @@ jobs:
           cache: true
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        # Pinned prebuilt via taiki-e/install-action instead of
+        # `curl ... | sh` from rustwasm.github.io: deterministic version,
+        # no opaque shell script, ~5s vs ~60s cargo build.
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.14.0
 
       - name: wasm-pack test --node
         run: wasm-pack test --node bijou64_wasm
@@ -98,7 +103,10 @@ jobs:
           sudo apt-get install -y binaryen
 
       - name: Install esbuild (under the pinned Node)
-        run: npm install -g esbuild
+        # Pinned to the version `pkgs.esbuild` provides in the Nix dev
+        # shell, so CI and local runs invoke byte-identical bundler
+        # behaviour. Bump in lockstep with `nixpkgs` if updating either.
+        run: npm install -g esbuild@0.25.5
 
       - name: Install wasm-bodge
         # wasm-bodge isn't on a package registry; we build it from source

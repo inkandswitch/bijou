@@ -1,13 +1,4 @@
-//! Decode-side surface: `decode`, `decodeAll`, and the
-//! [`WasmDecodedBijou64`] / [`WasmDecodeError`] types.
-//!
-//! Decode failures lower to a JS `Error` with `name === "Bijou64DecodeError"`.
-//! JS callers can discriminate via `e.name === "Bijou64DecodeError"`;
-//! the name is also what devtools render in the console trace header
-//! (`Bijou64DecodeError: <message>`), distinguishing bijou64 decode
-//! failures from the many other `"DecodeError"`-named errors in the JS
-//! ecosystem (protobuf, CBOR, JSON, …) and forward-compatible with
-//! future `bijou32` / `bijou128` crates each defining their own name.
+//! Decode
 
 use alloc::{string::ToString, vec::Vec};
 use bijou64::DecodeError;
@@ -16,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 /// Decodes a `bijou64` from the front of `bytes`.
 ///
-/// Returns a [`WasmDecodedBijou64`] carrying the value plus the
+/// Returns a [`WasmDecoded`] carrying the value plus the
 /// number of bytes consumed (so the caller can stream-decode by
 /// slicing).
 ///
@@ -79,7 +70,7 @@ pub fn decode_all(bytes: &[u8]) -> Result<Vec<u64>, WasmDecodeError> {
 /// as a Rust-exported struct rather than constructing a plain JS
 /// object via [`js_sys::Object`] because the struct gives us a real
 /// TypeScript type on the JS side at zero extra runtime cost.
-#[wasm_bindgen(js_name = DecodedBijou64)]
+#[wasm_bindgen(js_name = Decoded)]
 #[derive(Debug, Clone)]
 #[allow(missing_copy_implementations)] // intentional per the wasm-bindgen blog post
 pub struct WasmDecoded {
@@ -87,7 +78,7 @@ pub struct WasmDecoded {
     bytes_read: usize,
 }
 
-#[wasm_bindgen(js_class = DecodedBijou64)]
+#[wasm_bindgen(js_class = Decoded)]
 impl WasmDecoded {
     /// The decoded value.
     #[must_use]
