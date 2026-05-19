@@ -1,15 +1,20 @@
 name: Test Wasm
 
-# Two layers of wasm coverage:
+# Three layers of wasm coverage:
 #
 # 1. `wasm-pack test --node` exercises the Rust ↔ wasm-bindgen boundary
 #    on the wasm32-unknown-unknown target inside Node.js. Fast, no
 #    browser dependencies.
 #
-# 2. Playwright runs JS-level integration tests against the
-#    wasm-bodge-built `dist/` package across chromium / firefox / webkit.
-#    Catches bundler-specific bugs, BigInt edge cases, and missing
-#    package.json subpath exports that the Rust-side tests can't see.
+# 2. Mocha tests (`test:js:node`) exercise the wasm-bodge `dist/` output
+#    through the `package.json` `node` exports condition. Catches build
+#    output regressions that Rust-side tests can't see (e.g. CJS shim,
+#    `fs.readFileSync` wasm-loading path).
+#
+# 3. Playwright tests (`test:js:browser`) exercise the same `dist/`
+#    output through the `browser` exports condition across chromium /
+#    firefox / webkit. Catches BigInt edge cases, base64 wasm init,
+#    and engine-specific TypedArray behaviour.
 
 on:
   push:
@@ -50,10 +55,12 @@ jobs:
       - name: wasm-pack test --node
         run: wasm-pack test --node bijou64_wasm
 
-  # Cross-browser Playwright tests against the wasm-bodge `dist/` output.
-  # Linux only — macOS Playwright runs work but are slow and the bug
-  # surface is similar enough that ubuntu-latest suffices for CI.
-  playwright:
+  # JS-package tests against the wasm-bodge `dist/` output: Mocha
+  # exercises the Node entrypoint; Playwright exercises the browser
+  # entrypoint across chromium / firefox / webkit. Linux only — macOS
+  # Playwright runs work but are slow and the bug surface is similar
+  # enough that ubuntu-latest suffices for CI.
+  js-package:
     runs-on: ubuntu-latest
     env:
       # Force playwright to test all three engines on CI.
@@ -135,9 +142,13 @@ jobs:
         working-directory: bijou64_wasm
         run: pnpm exec playwright install-deps
 
-      - name: Run Playwright tests
+      - name: Run Node JS-package tests (Mocha)
         working-directory: bijou64_wasm
-        run: pnpm exec playwright test
+        run: pnpm run test:js:node
+
+      - name: Run browser JS-package tests (Playwright)
+        working-directory: bijou64_wasm
+        run: pnpm run test:js:browser
 
       - name: Upload Playwright report on failure
         if: failure()

@@ -1,16 +1,20 @@
 //! Wasm-target integration tests for `bijou64_wasm`.
 //!
-//! Compiled to `wasm32-unknown-unknown` by `wasm-pack test` and run inside
-//! the host runtime (Node.js or a real browser via `--headless --chrome`,
-//! `--firefox`, etc.). This complements the host-side Rust tests in
-//! `bijou64` and the JS-side Playwright tests in `e2e/` — together they
-//! cover Rust ↔ wasm-bindgen ↔ JS at every layer.
+//! Compiled to `wasm32-unknown-unknown` by `wasm-pack test --node` and run
+//! in Node.js. This layer exercises the Rust ↔ wasm-bindgen ABI directly
+//! (without going through the wasm-bodge dist build). Cross-environment
+//! coverage of the actual `dist/` package lives at the JS layer:
+//!
+//! - `test:js:node`    — Mocha against `dist/esm/node.js` (CJS path is
+//!   covered by `dist/cjs/node.cjs`)
+//! - `test:js:browser` — Playwright against `dist/esm/web.js` across
+//!   chromium / firefox / webkit
 //!
 //! Run locally:
 //!
 //! ```sh
-//! wasm:test:node       # Node.js (fast, no browser dependencies)
-//! wasm:test:chrome     # Headless Chromium
+//! wasm:test:node     # this file, Rust ABI in Node
+//! test:js            # node + browsers, JS surface against `dist/`
 //! ```
 
 #![cfg(target_family = "wasm")]

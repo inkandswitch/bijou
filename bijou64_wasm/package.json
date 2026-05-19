@@ -25,13 +25,20 @@
     "url": "https://github.com/inkandswitch/bijou/issues"
   },
   "scripts": {
-    "test:e2e": "playwright test",
-    "test:e2e:report": "playwright show-report"
+    "test:js": "pnpm run test:js:node && pnpm run test:js:browser",
+    "test:js:browser": "playwright test",
+    "test:js:browser:report": "playwright show-report",
+    "test:js:node": "mocha"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.10.0",
+    "chai": "^6.2.2",
     "http-server": "^14.1.1",
+    "mocha": "^11.7.5",
+    "tsx": "^4.22.2",
     "typescript": "^5.7.2"
   },
   "main": "./dist/cjs/node.cjs",
