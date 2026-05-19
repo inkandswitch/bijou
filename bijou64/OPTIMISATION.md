@@ -2,9 +2,6 @@
 
 > These are implementation notes, not part of the specification. The [spec][SPEC] defines the _format_; this document records why the reference implementation makes the choices it does, what we measured, and where the remaining costs come from.
 
-> [!NOTE]
-> Function-name drift: this document describes work done on a function originally named `encode_array(u64) -> ([u8; 9], usize)`. That function was replaced by `encoded_bytes(u64) -> EncodedBytes` (a smallvec-style wrapper that always exposes the correct prefix via `Deref<[u8]>`). The codegen properties analysed below are unchanged — `encoded_bytes` does the same shift-and-array-literal trick — only the name and return type differ.
-
 [SPEC]: ./SPEC.md
 
 ## `encoded_len`: `leading_zeros` Instead of an If-Chain

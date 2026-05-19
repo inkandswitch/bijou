@@ -886,15 +886,6 @@ mod tests {
             Ok(())
         }
 
-        /// Exhaustively round-trip every tier-3 value (16.8M cases, ~25 s
-        /// in release mode). Gated behind `#[ignore]` so normal `cargo
-        /// test` stays fast; run explicitly via `cargo test --release
-        /// tier3_exhaustive -- --ignored --nocapture`.
-        ///
-        /// Complements `bijection::overlong_encoding_decodes_to_different_value`
-        /// (which checks the inter-tier disjointness property using one
-        /// representative per tier) by covering every concrete payload
-        /// at tier 3.
         #[test]
         fn tier3_exhaustive() -> TestResult {
             for value in 66_040u64..=16_843_255u64 {
@@ -910,18 +901,6 @@ mod tests {
             Ok(())
         }
 
-        /// Exhaustive byte-sequence canonicality sweep over every 1- to
-        /// 4-byte buffer (16.8M cases). For each buffer that decodes
-        /// successfully, the result MUST re-encode to byte-identical
-        /// bytes — the structural-canonicality guarantee from SPEC.md.
-        ///
-        /// This is the strongest possible check for the canonicality
-        /// property at tiers 0-3, and it tests the byte-sequence
-        /// direction (whereas `tier0`/`tier1`/`tier2`/`tier3_exhaustive`
-        /// only cover the value direction).
-        ///
-        /// Gated behind `#[ignore]`; run via `cargo test --release
-        /// canonicality_byte_sequence_exhaustive -- --ignored`.
         #[test]
         fn canonicality_byte_sequence_exhaustive() -> TestResult {
             let check = |buf: &[u8]| -> TestResult {
