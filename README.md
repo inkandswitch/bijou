@@ -1,4 +1,4 @@
-# 💎 bijou
+# 💎 Bijou
 
 Bijective variable-length encodings for unsigned integers.
 
@@ -7,18 +7,6 @@ property that _every value has exactly one encoding_, and _every
 encoding decodes to exactly one value_. The tag byte alone determines
 the total length, payloads are big-endian (so lexicographic byte
 order matches numeric order), and there is no `std` requirement.
-
-## Crates
-
-| Crate                     | Width  | Status      |
-|---------------------------|--------|-------------|
-| [`bijou64`](./bijou64)    | `u64`  | Released    |
-| `bijou32` _(coming soon)_ | `u32`  | Planned     |
-| `bijou128` _(coming soon)_| `u128` | Planned     |
-
-Each crate is independently versioned and `no_std`-compatible.
-See the per-crate README and `SPEC.md` for the full encoding
-specification, offset tables, and test vectors.
 
 ## Quick start
 

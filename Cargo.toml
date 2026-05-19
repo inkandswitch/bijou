@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
   "bijou64",
+  "bijou64_wasm",
 ]
 
 [workspace.package]
@@ -15,16 +16,20 @@ authors = [
 
 [workspace.dependencies]
 # Internal crates
-bijou64 = { version = "0.1.1", path = "bijou64", default-features = false }
+bijou64 = { version = "0.2", path = "bijou64", default-features = false }
+bijou64_wasm = { version = "0.1", path = "bijou64_wasm", default-features = false }
 
 # External crates
 arbitrary = "1.4"
 bolero = "0.13.4"
 criterion = { version = "0.5", default-features = false }
 criterion_pprof = { package = "pprof", version = "0.15", default-features = false, features = ["criterion", "flamegraph"] }
+js-sys = { version = "=0.3.95", default-features = false }
 rand = { version = "0.8.5", default-features = false }
 testresult = "0.4.1"
 thiserror = { version = "2.0", default-features = false }
+wasm-bindgen = { version = "=0.2.118", default-features = false }
+wasm-bindgen-test = "0.3"
 
 [workspace.lints.rust]
 future_incompatible = { level = "warn", priority = -1 }
@@ -60,12 +65,10 @@ cargo = { level = "deny", priority = -1 }
 multiple_crate_versions = "allow" # various transitive deps
 pedantic = { level = "deny", priority = -1 }
 
-# Release profile is tuned for Wasm bundle size. Override per-package below
-# to opt-level = 3 for crates that are not shared with the Wasm target.
 [profile.release]
 codegen-units = 1
 lto = "fat"
-opt-level = "z"
+opt-level = 3
 panic = "abort"
 strip = "symbols"
 
@@ -74,7 +77,7 @@ strip = "symbols"
 # to 3 for accurate native benchmark numbers.
 [profile.bench]
 codegen-units = 1
-debug = true        # Full debug symbols for flamegraphs/profiling
-lto = "thin"        # Faster link than "fat", close enough for profiling
-opt-level = 3       # Speed, not size
-strip = false       # Keep symbols for profiling tools
+debug = true
+lto = "thin"
+opt-level = 3
+strip = false

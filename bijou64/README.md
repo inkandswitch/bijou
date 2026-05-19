@@ -12,23 +12,68 @@ each encoding has exactly one value.
 ## Quick start
 
 ```rust
-// Encode
+// Encode — appends 1..=9 bytes to the existing buffer.
 let mut buf = Vec::new();
 bijou64::encode(300, &mut buf);
 assert_eq!(buf, [0xF8, 0x34]); // tag 0xF8, payload 300 - 248 = 52
 
-// Decode
+// Decode — returns the value and the number of bytes consumed,
+// leaving any trailing bytes untouched.
 let (value, len) = bijou64::decode(&buf).unwrap();
 assert_eq!(value, 300);
 assert_eq!(len, 2);
 
-// Stack-allocated encoding (no alloc needed)
-let (bytes, len) = bijou64::encode_array(300);
-assert_eq!(&bytes[..len], &[0xF8, 0x34]);
+// Stack-allocated encoding (no alloc needed). The returned value
+// derefs to `&[u8]` of the correct length — no slicing required.
+let bytes = bijou64::encoded_bytes(300);
+assert_eq!(&*bytes, &[0xF8, 0x34]);
 
 // Query encoded length without encoding
 assert_eq!(bijou64::encoded_len(300), 2);
 ```
+
+`encode` _appends_ to its buffer rather than overwriting, so you can
+build up a stream of encoded values back-to-back:
+
+```rust
+let mut buf = Vec::new();
+for value in [0u64, 42, 248, 65_535, u64::MAX] {
+    bijou64::encode(value, &mut buf);
+}
+// buf now contains five concatenated bijou64 encodings.
+```
+
+## Streaming decode
+
+Each `decode` call returns `(value, consumed_bytes)`. To read a
+sequence of back-to-back values, advance the cursor by `consumed_bytes`
+after each call:
+
+```rust
+let mut cursor: &[u8] = &buf;
+let mut decoded = Vec::new();
+while !cursor.is_empty() {
+    let (value, n) = bijou64::decode(cursor).unwrap();
+    decoded.push(value);
+    cursor = &cursor[n..];
+}
+```
+
+If you'd rather use iterator combinators, `decode_iter` returns a
+fused `Iterator<Item = Result<u64, DecodeError>>`:
+
+```rust
+let total: u64 = bijou64::decode_iter(&buf).filter_map(Result::ok).sum();
+```
+
+Or, to get every value or the first error in one call:
+
+```rust
+let values: Result<Vec<u64>, _> = bijou64::decode_all(&buf);
+```
+
+See [`examples/decode.rs`](./examples/decode.rs) for a runnable
+demonstration of all three patterns.
 
 ## Encoding
 
@@ -50,8 +95,8 @@ worked examples, and test vectors.
 
 ## Features
 
-- `no_std` (requires `alloc` for `encode()`; `encode_array()` and
-  `decode()` are allocation-free)
+- `no_std` (requires `alloc` for `encode()` and `decode_all()`;
+  `encoded_bytes()` and `decode()` are allocation-free)
 - `#![forbid(unsafe_code)]`
 - Canonical by construction — no runtime canonicality checks
 - Big-endian payloads — lexicographic byte order = numeric order
