@@ -72,8 +72,8 @@ Or, to get every value or the first error in one call:
 let values: Result<Vec<u64>, _> = bijou64::decode_all(&buf);
 ```
 
-See [`examples/streaming_decode.rs`](./examples/streaming_decode.rs)
-for a runnable demonstration of all three patterns.
+See [`examples/decode.rs`](./examples/decode.rs) for a runnable
+demonstration of all three patterns.
 
 ## Encoding
 

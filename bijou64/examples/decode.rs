@@ -8,7 +8,7 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run --example streaming_decode --package bijou64
+//! cargo run --example decode --package bijou64
 //! ```
 //!
 //! Four patterns are demonstrated, in order from highest- to

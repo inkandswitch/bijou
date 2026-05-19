@@ -563,8 +563,8 @@ pub struct DecodeIter<'a> {
 ///
 /// Returns an iterator that yields `Result<u64, DecodeError>` for each
 /// encoded value in `buf`, in order. See [`DecodeIter`] for the exact
-/// fused-iteration semantics. See the `streaming_decode` example for
-/// usage patterns.
+/// fused-iteration semantics. See the `decode` example for usage
+/// patterns.
 #[inline]
 pub const fn decode_iter(buf: &[u8]) -> DecodeIter<'_> {
     DecodeIter {
