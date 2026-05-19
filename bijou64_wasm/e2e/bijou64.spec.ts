@@ -129,7 +129,7 @@ test("decode reports bytesRead < input length when buffer has trailing data", as
   expect(result.inputLength).toBe(5);
 });
 
-test("decode throws DecodeError on empty input", async ({ page }) => {
+test("decode throws Bijou64DecodeError on empty input", async ({ page }) => {
   const result = await page.evaluate(() => {
     const { decode } = (window as any).bijou64;
     try {
@@ -140,11 +140,11 @@ test("decode throws DecodeError on empty input", async ({ page }) => {
     }
   });
   expect(result.threw).toBe(true);
-  expect(result.name).toBe("DecodeError");
+  expect(result.name).toBe("Bijou64DecodeError");
   expect(result.message).toContain("buffer too short");
 });
 
-test("decode throws DecodeError on truncated tier-8 input", async ({ page }) => {
+test("decode throws Bijou64DecodeError on truncated tier-8 input", async ({ page }) => {
   const result = await page.evaluate(() => {
     const { decode } = (window as any).bijou64;
     try {
@@ -156,13 +156,13 @@ test("decode throws DecodeError on truncated tier-8 input", async ({ page }) => 
     }
   });
   expect(result.threw).toBe(true);
-  expect(result.name).toBe("DecodeError");
+  expect(result.name).toBe("Bijou64DecodeError");
 });
 
-test("DecodeError thrown is an instance of the platform Error", async ({ page }) => {
+test("Bijou64DecodeError thrown is an instance of the platform Error", async ({ page }) => {
   // Sanity-check that the JsValue conversion preserves the JS Error
   // prototype chain — important for downstream code that relies on
-  // `instanceof Error` rather than just `.name === "DecodeError"`.
+  // `instanceof Error` rather than just `.name === "Bijou64DecodeError"`.
   const result = await page.evaluate(() => {
     const { decode } = (window as any).bijou64;
     try {
@@ -306,7 +306,7 @@ test("decodeAll on an empty buffer returns an empty BigUint64Array", async ({ pa
   expect(result.length).toBe(0);
 });
 
-test("decodeAll throws DecodeError on a malformed element", async ({ page }) => {
+test("decodeAll throws Bijou64DecodeError on a malformed element", async ({ page }) => {
   // [0x42, 0xF8] — first byte decodes to 0x42 successfully, second
   // byte is a tag with no payload. decodeAll must abort and surface
   // the error, NOT silently return the partial prefix.
@@ -320,7 +320,7 @@ test("decodeAll throws DecodeError on a malformed element", async ({ page }) => 
     }
   });
   expect(result.threw).toBe(true);
-  expect(result.name).toBe("DecodeError");
+  expect(result.name).toBe("Bijou64DecodeError");
   expect(result.isError).toBe(true);
 });
 

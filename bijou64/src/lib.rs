@@ -896,7 +896,6 @@ mod tests {
         /// representative per tier) by covering every concrete payload
         /// at tier 3.
         #[test]
-        #[ignore = "16.8M cases, ~25 s in release mode; run via cargo test -- --ignored"]
         fn tier3_exhaustive() -> TestResult {
             for value in 66_040u64..=16_843_255u64 {
                 let mut buf = Vec::new();
@@ -924,7 +923,6 @@ mod tests {
         /// Gated behind `#[ignore]`; run via `cargo test --release
         /// canonicality_byte_sequence_exhaustive -- --ignored`.
         #[test]
-        #[ignore = "16.8M cases, ~25 s in release mode; run via cargo test -- --ignored"]
         fn canonicality_byte_sequence_exhaustive() -> TestResult {
             let check = |buf: &[u8]| -> TestResult {
                 // `Err(_)` (truncated / overflow) is fine here — we

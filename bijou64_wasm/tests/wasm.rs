@@ -16,7 +16,11 @@
 #![cfg(target_family = "wasm")]
 #![allow(clippy::missing_panics_doc, clippy::unwrap_used)]
 
-use bijou64_wasm::{decode, decode_all, encode, encoded_len, max_bytes};
+use bijou64_wasm::{
+    decode::{decode, decode_all},
+    encode::{encode, encoded_len},
+    max_bytes,
+};
 use js_sys::BigInt;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -36,9 +40,14 @@ fn bi_str(s: &str) -> BigInt {
     BigInt::new(&JsValue::from_str(s)).expect("valid bigint literal")
 }
 
-/// Pull `name` off a thrown `JsValue` so we can assert on it.
-fn js_error_name(err: &JsValue) -> Option<String> {
-    let e: &js_sys::Error = err.dyn_ref()?;
+/// Pull `name` off any throwable so we can assert on it.
+///
+/// Accepts anything `Clone + Into<JsValue>` so callers can pass the
+/// raw `WasmBigintError` returned from `encode`/`encodedLen` directly,
+/// without having to convert it themselves.
+fn js_error_name<E: Clone + Into<JsValue>>(err: &E) -> Option<String> {
+    let v: JsValue = err.clone().into();
+    let e: &js_sys::Error = v.dyn_ref()?;
     e.name().as_string()
 }
 
