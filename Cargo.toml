@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = [
+  "bijou32",
+  "bijou32_wasm",
   "bijou64",
   "bijou64_wasm",
   "bijou128",
@@ -18,6 +20,8 @@ authors = [
 
 [workspace.dependencies]
 # Internal crates
+bijou32 = { version = "0.1", path = "bijou32", default-features = false }
+bijou32_wasm = { version = "0.1", path = "bijou32_wasm", default-features = false }
 bijou64 = { version = "0.2", path = "bijou64", default-features = false }
 bijou64_wasm = { version = "0.1", path = "bijou64_wasm", default-features = false }
 bijou128 = { version = "0.1", path = "bijou128", default-features = false }
