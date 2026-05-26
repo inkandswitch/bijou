@@ -5,7 +5,7 @@ These are architecture-independent (the chart is a property of the format,
 not the implementation). Outputs into `bijou64/charts/size/`:
 
   - bytes_vs_value.svg       full-range step plot, log-x
-  - bytes_vs_value_low.svg   zoomed step plot for 0--65,791 (where formats diverge)
+  - bytes_vs_value_low.svg   zoomed step plot for 0–66,500 (where formats diverge)
   - heatmap.svg              22-value reference table as a heatmap
   - boundary_detail.svg      four side-by-side panels around each interesting tier boundary
 
@@ -26,7 +26,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
-from matplotlib.ticker import FixedLocator, FuncFormatter, LogLocator
 
 # ---------------------------------------------------------------------------
 # Format definitions
@@ -146,7 +145,9 @@ def boundary_dense_values() -> list[int]:
 
 
 def plot_bytes_vs_value(out: Path) -> None:
-    xs_int = boundary_dense_values()
+    # Log-scale x-axis can't represent v == 0, so drop it for this plot only.
+    # (Other plots use symlog or linear axes and keep the zero point.)
+    xs_int = [v for v in boundary_dense_values() if v > 0]
     # Matplotlib wants numeric arrays; cast to float since u64::MAX exceeds i64.
     xs = np.array(xs_int, dtype=float)
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -200,27 +201,37 @@ def plot_bytes_vs_value_low(out: Path) -> None:
 
     ax.set_xscale("symlog", linthresh=10)
     ax.set_xlim(0, 66_500)
-    ax.set_ylim(0.5, 4.5)
+    # Extra headroom at the top so the rotated boundary labels don't overlap
+    # the data lines.
+    ax.set_ylim(0.5, 5.6)
     ax.set_yticks([1, 2, 3, 4])
     ax.set_xlabel("Value (symlog scale, linear below 10)")
     ax.set_ylabel("Encoded length (bytes)")
-    ax.set_title("Encoded length vs value (low range, 0--66,500)")
+    ax.set_title("Encoded length vs value (low range, 0\u201366,500)")
 
-    # Label boundaries with vertical bands. bijou64 tier-N→(N+1) happens at
-    # OFFSETS[N+1]; key values in this range:
+    # Label boundaries with vertical lines + rotated text. bijou64 tier-N→(N+1)
+    # happens at OFFSETS[N+1]; key values in this range:
     #   OFFSETS[1] = 248,  OFFSETS[2] = 504,  OFFSETS[3] = 66,040.
     # vu64 boundaries are powers of 128 (7-bit payload): 128, 16,384.
     boundary_annotations = [
         (128, "vu64 tier 1→2", "#2ca02c"),
         (248, "bijou64/varu64 tier 0→1", "#1f77b4"),
-        (256, "varu64 → 3B (no offset correction)", "#ff7f0e"),
+        (256, "varu64 → 3B (no offset)", "#ff7f0e"),
         (504, "bijou64 tier 1→2", "#1f77b4"),
         (16_384, "vu64 tier 2→3", "#2ca02c"),
-        (65_536, "varu64 → 4B (no offset correction)", "#ff7f0e"),
+        (65_536, "varu64 → 4B (no offset)", "#ff7f0e"),
         (66_040, "bijou64 tier 2→3", "#1f77b4"),
     ]
     for x, label, color in boundary_annotations:
         ax.axvline(x, color=color, linestyle=":", linewidth=0.7, alpha=0.5)
+        # Anchor the label just above the data area; rotated 90° so each one
+        # fits in the narrow channel its vertical line occupies.
+        ax.text(
+            x, 4.65, label,
+            rotation=90, rotation_mode="anchor",
+            va="bottom", ha="center",
+            fontsize=7, color=color, alpha=0.9,
+        )
 
     ax.grid(True, which="major", alpha=0.3)
     ax.legend(loc="upper left", framealpha=0.95)
