@@ -20,6 +20,64 @@ end up identical to varu64 at most values -- with two important
 exceptions (256--503 and 65,536--66,039), where bijou64's offset
 correction lets it use _fewer_ bytes than varu64.
 
+## Encoded Length vs Value
+
+How encoded length climbs across the full `u64` range. Vertical
+dotted lines mark tier boundaries: blue for bijou64, green for
+vu64/leb128. The x-axis is log-scale; the y-axis is byte count
+(1--10).
+
+![Encoded length vs value (full u64 range)](charts/size/bytes_vs_value.svg)
+
+The four formats stay within one byte of each other at every value,
+but the curve shape differs: vu64/leb128 climb in even 7-bit steps,
+while bijou64/varu64 climb in 8-bit steps. They cross repeatedly --
+each format wins in some regimes and loses in others.
+
+### Where The Formats Actually Disagree
+
+Outside the range below, all four formats agree on byte count to
+within ±1. The low end (0--66,500) is where the interesting choices
+live. Tier transitions are annotated with vertical lines.
+
+![Encoded length vs value (low range, 0--66,500)](charts/size/bytes_vs_value_low.svg)
+
+Three transitions visible here are worth pointing out:
+
+- **At 128**: vu64/leb128 jump from 1 to 2 bytes; bijou64/varu64 stay
+  at 1 byte until 248. This is bijou64's wider tier-0 range.
+- **At 256**: varu64 jumps from 2 to 3 bytes (its tier 1 covers
+  only 248--255); bijou64 stays at 2 bytes until 504 thanks to the
+  per-tier offset correction. The same shape repeats at 65,536→66,040.
+- **At 504**: bijou64 finally jumps to 3 bytes; vu64/leb128 stay at
+  2 until 16,384. This is the regime where bijou64 strictly loses.
+
+### Boundary Detail
+
+Four panels zoomed into the transitions where formats disagree.
+Step lines show byte count at each integer value.
+
+![Boundary detail](charts/size/boundary_detail.svg)
+
+- **(a)** bijou64 and varu64 share a wider 1-byte tier (0--247) than
+  vu64/leb128 (0--127). Their lines overlap exactly here.
+- **(b)** From 248 onward bijou64 and varu64 _start_ together at
+  2 bytes, but bijou64's offset correction stretches its tier 1 all
+  the way to 503 -- a 248-value window where bijou64 is strictly
+  smaller than varu64.
+- **(c)** vu64's tier 2→3 boundary at 16,384 doesn't involve bijou64
+  at all -- bijou64 was already at 3 bytes from 504 onward.
+- **(d)** Mirror image of (b), one tier higher: bijou64 keeps using
+  3 bytes through 66,039 while varu64 has already jumped to 4 from
+  65,536.
+
+## Per-Value Heatmap
+
+The 22-value reference table as a heatmap. Lighter cells use fewer
+bytes; the per-row minimum is bolded.
+
+![Encoded length heatmap](charts/size/heatmap.svg)
+
 ## Bytes Per Value
 
 Each cell shows `bytes (% of raw u64)`. The leader (or leaders, in a
@@ -74,7 +132,7 @@ There is one regime where bijou64 is strictly worse than vu64/vu128/leb128:
 
 | Range          | bijou64 | vu64/vu128/leb128 | Why                                              |
 |----------------|--------:|------------------:|--------------------------------------------------|
-| 504--16,383    | 3 bytes | 2 bytes           | bijou64's tier-2 range ends at 65,791; vu64 can pack 14 bits in 2 bytes here |
+| 504--16,383    | 3 bytes | 2 bytes           | bijou64's tier 1 ended at 503; vu64/leb128 can still pack 14 bits in 2 bytes through 16,383 |
 | 100,000        | 4 bytes | 3 bytes           | Same root cause, one tier higher                 |
 
 These are the cost of structural canonicality: bijou64's tier ranges
@@ -91,6 +149,23 @@ right choice.
 | 256--503       | 2 bytes | 3 bytes | 2 bytes    | 2 bytes  | bijou64 ties vu64/vu128/leb128; varu64 trails       |
 | 65,536--66,039 | 3 bytes | 4 bytes | 3 bytes    | 3 bytes  | Same shape, one tier higher                         |
 | 2^64 - 1       | 9 bytes | 9 bytes | 9 bytes    | 10 bytes | leb128's continuation bits cost an extra byte here  |
+
+## Reproducing The Charts
+
+The charts in this document are generated from the format definitions
+in `bijou64/charts/size_charts.py` (which mirrors the encoding rules
+in `bijou64/src/lib.rs`). They are arch-independent, so they don't
+require any benchmark runs:
+
+```bash
+# via nix flake app
+nix run .#size-charts
+
+# via the dev shell
+size:charts
+```
+
+Output lands in `bijou64/charts/size/`.
 
 ## License
 
