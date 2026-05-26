@@ -202,50 +202,51 @@ Heatmaps provide a quick visual overview of which library performs best across a
 
 Interactive versions with hover-for-detail are in `charts/x86/*_heatmap.html`.
 
-## Encoded Size
+## Encoded Size (runtime)
 
-Bytes per value compared to a raw 8-byte `u64`. All tag-byte formats (bijou64, varu64, vu64/vu128) add 1 byte of overhead for multi-byte values. leb128 uses 1 continuation bit per byte instead.
+Wall-clock time to call `encoded_len(v)` across the 6 distributions.
+vu128 is excluded because it has no standalone `encoded_len(u64)` --
+the size is only computed as a side effect of encoding.
 
-bijou64 and varu64 share the same tag threshold (248), so their 1-byte range is wider than vu64/vu128 (0-247 vs 0-127). bijou64's per-tier offsets shift the multi-byte boundaries slightly, but the encoded sizes end up identical to varu64 at every value.
+> For the arch-independent _format_ size comparison (how many bytes
+> each format uses), see [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md).
 
-| Value    | Raw `u64` | bijou64          | varu64           | vu64 / vu128     | leb128           |
-|----------|-----------|------------------|------------------|------------------|------------------|
-| 0        | 8         | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        |
-| 127      | 8         | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        |
-| 128      | 8         | **1 (12.5%)** | **1 (12.5%)** | 2 (25%)          | 2 (25%)          |
-| 247      | 8         | **1 (12.5%)** | **1 (12.5%)** | 2 (25%)          | 2 (25%)          |
-| 248      | 8         | 2 (25%)          | 2 (25%)          | 2 (25%)          | 2 (25%)          |
-| 255      | 8         | 2 (25%)          | 2 (25%)          | 2 (25%)          | 2 (25%)          |
-| 256      | 8         | **2 (25%)**   | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 503      | 8         | **2 (25%)**   | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 504      | 8         | 3 (37.5%)        | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 1,000    | 8         | 3 (37.5%)        | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 16,383   | 8         | 3 (37.5%)        | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 16,384   | 8         | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        |
-| 65,535   | 8         | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        |
-| 65,536   | 8         | **3 (37.5%)** | 4 (50%)          | **3 (37.5%)** | **3 (37.5%)** |
-| 66,039   | 8         | **3 (37.5%)** | 4 (50%)          | **3 (37.5%)** | **3 (37.5%)** |
-| 100,000  | 8         | 4 (50%)          | 4 (50%)          | **3 (37.5%)** | **3 (37.5%)** |
-| 2^24 - 1 | 8         | 4 (50%)          | 4 (50%)          | 4 (50%)          | 4 (50%)          |
-| 2^32 - 1 | 8         | 5 (62.5%)        | 5 (62.5%)        | 5 (62.5%)        | 5 (62.5%)        |
-| 2^40 - 1 | 8         | 6 (75%)          | 6 (75%)          | 6 (75%)          | 6 (75%)          |
-| 2^48 - 1 | 8         | 7 (87.5%)        | 7 (87.5%)        | 7 (87.5%)        | 7 (87.5%)        |
-| 2^56 - 1 | 8         | 8 (100%)         | 8 (100%)         | 8 (100%)         | 8 (100%)         |
-| 2^64 - 1 | 8         | 9 (112.5%)       | 9 (112.5%)       | 9 (112.5%)       | 10 (125%)        |
+| Distribution    | bijou64 | varu64 | vu64     | bijou64 rank | bijou64 vs other best |
+|-----------------|--------:|-------:|---------:|--------------|-----------------------|
+| tiny (0-247)    | 1.75    | **0.91** | 1.09   | #3           | 1.92x                 |
+| small (248-64k) | 2.67    | 1.79   | **1.11** | #3           | 2.41x                 |
+| medium (64k-4B) | 2.67    | 2.52   | **1.09** | #3           | 2.45x                 |
+| large (>4B)     | 2.69    | 4.77   | **1.09** | #2           | 2.47x                 |
+| boundary        | 2.44    | 3.21   | **1.09** | #2           | 2.23x                 |
+| uniform random  | 2.67    | 4.77   | **1.09** | #2           | 2.44x                 |
 
-This table is architecture-independent -- the encoded sizes are a property of the format, not the implementation.
+<details open>
+<summary>Charts</summary>
+
+![Encoded Size — Bar Chart](charts/x86/encoded_size_bar.svg)
+![Encoded Size — Box Plot](charts/x86/encoded_size_box.svg)
+![Encoded Size — CDF](charts/x86/encoded_size_cdf.svg)
+
+</details>
+
+vu64 wins every cell because its tier boundaries are exact powers of
+2, so `encoded_len` reduces to a single `leading_zeros` instruction
+with no correction step. bijou64's per-tier offsets force an extra
+comparison; the gap (~2.2-2.5x) is unavoidable for the
+canonicality-preserving path. See [OPTIMISATION.md](OPTIMISATION.md)
+for the full analysis.
 
 ## Summary
 
-On Zen 5, bijou64 wins **23 of 30** shootout cells:
+On Zen 5, bijou64 wins **23 of 30** shootout cells outright:
 
-| Operation        | Wins |
-|------------------|------|
-| encode           | 5/6  |
-| decode           | 6/6  |
-| encoded_size     | 0/6  |
-| stream_decode    | 6/6  |
-| canonical_decode | 6/6  |
+| Operation        | Wins | Ties | Note                                              |
+|------------------|-----:|-----:|---------------------------------------------------|
+| encode           | 5/6  | 0    | Loses `small` to leb128                           |
+| decode           | 6/6  | 0    |                                                   |
+| encoded_size     | 0/6  | 0    | vu64 wins every cell; bijou64 is #2 in 3 of 6     |
+| stream_decode    | 6/6  | 0    |                                                   |
+| canonical_decode | 6/6  | 0    |                                                   |
 
 bijou64 is the fastest decoder on every distribution, in every
 benchmark variant (plain decode, canonical decode, stream decode),
