@@ -178,6 +178,10 @@
           exec "${bench-charts-python}/bin/python3" "$WORKSPACE_ROOT/bijou64/charts/analyze.py" "$@"
         '';
 
+        size-charts = pkgs.writeShellScriptBin "size-charts" ''
+          exec "${bench-charts-python}/bin/python3" "$WORKSPACE_ROOT/bijou64/charts/size_charts.py" "$@"
+        '';
+
         # Project-specific commands
         projectCommands = {
           "bench:shootout" = cmd "Run the bijou64 criterion shootout benchmark" ''
@@ -190,6 +194,10 @@
 
           "bench:charts" = cmd "Generate benchmark comparison charts (requires bench results in target/criterion)" ''
             ${bench-charts}/bin/bench-charts "$@"
+          '';
+
+          "size:charts" = cmd "Generate encoded-size comparison charts (arch-independent, no benchmarks needed)" ''
+            ${size-charts}/bin/size-charts "$@"
           '';
 
           "test:props" = cmd "Run property tests with 1M iterations" ''
@@ -340,6 +348,11 @@
         apps.bench-charts = {
           type = "app";
           program = "${bench-charts}/bin/bench-charts";
+        };
+
+        apps.size-charts = {
+          type = "app";
+          program = "${size-charts}/bin/size-charts";
         };
 
         packages = {

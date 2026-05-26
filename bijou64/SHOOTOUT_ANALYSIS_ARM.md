@@ -106,6 +106,42 @@ Encode to a `Vec<u8>`.
 
 bijou64 wins 5 of 6 encode distributions on M2 Pro. The sole loss is `small` to leb128 (1.14x behind), where leb128's tight 2-byte write loop fits well. The encode improvements from the shift+truncate trick are even more pronounced on ARM than on Zen 5 -- medium and boundary distributions that previously lost are now clear wins.
 
+## Encoded Size (runtime)
+
+Wall-clock time to call `encoded_len(v)` across the 6 distributions.
+vu128 and leb128 are excluded: neither crate exposes a standalone
+`encoded_len(u64)` query (both compute size only as a side effect of
+encoding).
+
+> For the arch-independent _format_ size comparison (how many bytes
+> each format uses), see [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md).
+
+| Distribution    | bijou64  | varu64   | vu64     | bijou64 rank        | bijou64 vs other best |
+|-----------------|---------:|---------:|---------:|---------------------|-----------------------|
+| tiny (0-247)    | 1.37     | 1.37     | **1.00** | tied #2 with varu64 | 1.37x                 |
+| small (248-64k) | 2.94     | 2.66     | **1.00** | #3                  | 2.95x                 |
+| medium (64k-4B) | 2.93     | 5.39     | **1.00** | #2                  | 2.93x                 |
+| large (>4B)     | 2.99     | 6.62     | **1.00** | #2                  | 3.01x                 |
+| boundary        | 2.94     | 6.04     | **1.01** | #2                  | 2.92x                 |
+| uniform random  | 2.90     | 6.05     | **0.92** | #2                  | 3.17x                 |
+
+<details open>
+<summary>Charts</summary>
+
+![Encoded Size — Bar Chart](charts/arm/encoded_size_bar.svg)
+![Encoded Size — Box Plot](charts/arm/encoded_size_box.svg)
+![Encoded Size — CDF](charts/arm/encoded_size_cdf.svg)
+
+</details>
+
+vu64 wins every cell because its tier boundaries are exact powers of
+2, so `encoded_len` reduces to a single `clz` with no correction step.
+bijou64's per-tier offsets force an extra comparison; the gap
+(~2.9-3.2x) is unavoidable for the canonicality-preserving path. On
+`tiny`, bijou64 and varu64 are a statistical tie (1.369 us vs 1.372
+us; the difference is well inside criterion's confidence interval).
+See [OPTIMISATION.md](OPTIMISATION.md) for the full analysis.
+
 ## Decode
 
 Decode from a `&[u8]` buffer.
@@ -202,52 +238,20 @@ Heatmaps provide a quick visual overview of which library performs best across a
 
 Interactive versions with hover-for-detail are in `charts/arm/*_heatmap.html`.
 
-## Encoded Size
-
-Bytes per value compared to a raw 8-byte `u64`. All tag-byte formats (bijou64, varu64, vu64/vu128) add 1 byte of overhead for multi-byte values. leb128 uses 1 continuation bit per byte instead.
-
-bijou64 and varu64 share the same tag threshold (248), so their 1-byte range is wider than vu64/vu128 (0-247 vs 0-127). bijou64's per-tier offsets shift the multi-byte boundaries slightly, but the encoded sizes end up identical to varu64 at every value.
-
-| Value    | Raw `u64` | bijou64          | varu64           | vu64 / vu128     | leb128           |
-|----------|-----------|------------------|------------------|------------------|------------------|
-| 0        | 8         | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        |
-| 127      | 8         | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        | 1 (12.5%)        |
-| 128      | 8         | **1 (12.5%)** | **1 (12.5%)** | 2 (25%)          | 2 (25%)          |
-| 247      | 8         | **1 (12.5%)** | **1 (12.5%)** | 2 (25%)          | 2 (25%)          |
-| 248      | 8         | 2 (25%)          | 2 (25%)          | 2 (25%)          | 2 (25%)          |
-| 255      | 8         | 2 (25%)          | 2 (25%)          | 2 (25%)          | 2 (25%)          |
-| 256      | 8         | **2 (25%)**   | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 503      | 8         | **2 (25%)**   | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 504      | 8         | 3 (37.5%)        | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 1,000    | 8         | 3 (37.5%)        | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 16,383   | 8         | 3 (37.5%)        | 3 (37.5%)        | **2 (25%)**   | **2 (25%)**   |
-| 16,384   | 8         | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        |
-| 65,535   | 8         | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        | 3 (37.5%)        |
-| 65,536   | 8         | **3 (37.5%)** | 4 (50%)          | **3 (37.5%)** | **3 (37.5%)** |
-| 66,039   | 8         | **3 (37.5%)** | 4 (50%)          | **3 (37.5%)** | **3 (37.5%)** |
-| 100,000  | 8         | 4 (50%)          | 4 (50%)          | **3 (37.5%)** | **3 (37.5%)** |
-| 2^24 - 1 | 8         | 4 (50%)          | 4 (50%)          | 4 (50%)          | 4 (50%)          |
-| 2^32 - 1 | 8         | 5 (62.5%)        | 5 (62.5%)        | 5 (62.5%)        | 5 (62.5%)        |
-| 2^40 - 1 | 8         | 6 (75%)          | 6 (75%)          | 6 (75%)          | 6 (75%)          |
-| 2^48 - 1 | 8         | 7 (87.5%)        | 7 (87.5%)        | 7 (87.5%)        | 7 (87.5%)        |
-| 2^56 - 1 | 8         | 8 (100%)         | 8 (100%)         | 8 (100%)         | 8 (100%)         |
-| 2^64 - 1 | 8         | 9 (112.5%)       | 9 (112.5%)       | 9 (112.5%)       | 10 (125%)        |
-
-This table is architecture-independent -- the encoded sizes are a property of the format, not the implementation.
-
 ## Summary
 
-On M2 Pro, bijou64 wins **23 of 30** shootout cells:
+On M2 Pro, bijou64 wins **23 of 30** shootout cells outright, plus 1
+shared second place:
 
-| Operation        | Wins |
-|------------------|------|
-| encode           | 5/6  |
-| decode           | 6/6  |
-| encoded_size     | 0/6  |
-| stream_decode    | 6/6  |
-| canonical_decode | 6/6  |
+| Operation        | Wins | Ties | Note                                                              |
+|------------------|-----:|-----:|-------------------------------------------------------------------|
+| encode           | 5/6  | 0    | Loses `small` to leb128                                           |
+| decode           | 6/6  | 0    |                                                                   |
+| encoded_size     | 0/6  | 1    | vu64 wins every cell; bijou64 ties varu64 for #2 on `tiny`        |
+| stream_decode    | 6/6  | 0    |                                                                   |
+| canonical_decode | 6/6  | 0    |                                                                   |
 
-This matches the Zen 5 score exactly (23/30), confirming that the optimisations transfer cleanly across microarchitectures.
+This matches the Zen 5 outright-win score exactly (23/30), confirming that the optimisations transfer cleanly across microarchitectures.
 
 bijou64 is the fastest decoder on every distribution, in every benchmark variant (plain decode, canonical decode, stream decode), typically by 1.4--3.2x margins. Structural canonicality is free, making bijou64 the unambiguous choice for protocols that decode more than they encode and that need deterministic serialisation.
 
