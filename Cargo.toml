@@ -3,6 +3,8 @@ resolver = "3"
 members = [
   "bijou64",
   "bijou64_wasm",
+  "bijou128",
+  "bijou128_wasm",
 ]
 
 [workspace.package]
@@ -18,6 +20,8 @@ authors = [
 # Internal crates
 bijou64 = { version = "0.2", path = "bijou64", default-features = false }
 bijou64_wasm = { version = "0.1", path = "bijou64_wasm", default-features = false }
+bijou128 = { version = "0.1", path = "bijou128", default-features = false }
+bijou128_wasm = { version = "0.1", path = "bijou128_wasm", default-features = false }
 
 # External crates
 arbitrary = "1.4"
