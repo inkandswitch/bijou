@@ -136,6 +136,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "bijou32"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "bijou32",
+ "bolero",
+ "testresult",
+ "thiserror",
+]
+
+[[package]]
+name = "bijou32_wasm"
+version = "0.1.0"
+dependencies = [
+ "bijou32",
+ "js-sys",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "bijou64"
 version = "0.2.1"
 dependencies = [

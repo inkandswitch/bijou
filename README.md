@@ -12,16 +12,24 @@ order matches numeric order), and there is no `std` requirement.
 
 | Crate                                  | Integer | Max bytes | Description                                                |
 |----------------------------------------|---------|-----------|------------------------------------------------------------|
+| [`bijou32`](./bijou32)                 | `u32`   | 5         | The narrowest variant. Tag threshold 252.                  |
+| [`bijou32_wasm`](./bijou32_wasm)       | `u32`   | 5         | Wasm/JS bindings for `bijou32` (npm package `bijou32`).    |
 | [`bijou64`](./bijou64)                 | `u64`   | 9         | The reference implementation. Tag threshold 248.           |
 | [`bijou64_wasm`](./bijou64_wasm)       | `u64`   | 9         | Wasm/JS bindings for `bijou64` (npm package `bijou64`).    |
 | [`bijou128`](./bijou128)               | `u128`  | 17        | Same scheme widened to 128 bits. Tag threshold 240.        |
 | [`bijou128_wasm`](./bijou128_wasm)     | `u128`  | 17        | Wasm/JS bindings for `bijou128` (npm package `bijou128`).  |
 
-The 64- and 128-bit variants are **not wire-compatible** — they use
-different tag thresholds (248 vs 240) so they can both reach their
-respective maximums in the smallest number of bytes. Pick the width
-that matches your value domain; don't mix encodings on the same wire
-without an out-of-band signal.
+The three width variants are **not wire-compatible** — they use
+different tag thresholds (252 vs 248 vs 240) so each can reach its
+maximum in the smallest number of bytes. Pick the width that matches
+your value domain; don't mix encodings on the same wire without an
+out-of-band signal.
+
+The wasm crates also differ in their JS boundary type:
+
+- `bijou32` uses plain JS `number` (since `u32::MAX < Number.MAX_SAFE_INTEGER`)
+- `bijou64` and `bijou128` use `bigint`
+- `decodeAll` returns `Uint32Array` (bijou32), `BigUint64Array` (bijou64), or `Array<bigint>` (bijou128, since the web platform has no `BigUint128Array`)
 
 ## Quick start
 
@@ -37,16 +45,18 @@ assert_eq!(value, 300);
 assert_eq!(len, 2);
 ```
 
-For 128-bit values, the API is identical:
+For 32-bit and 128-bit values, the API is identical:
 
 ```rust
+// 32-bit
+let mut buf = Vec::new();
+bijou32::encode(300, &mut buf);
+assert_eq!(buf, [0xFC, 0x30]);
+
+// 128-bit
 let mut buf = Vec::new();
 bijou128::encode(500, &mut buf);
 assert_eq!(buf, [0xF1, 0x00, 0x04]);
-
-let (value, len) = bijou128::decode(&buf).unwrap();
-assert_eq!(value, 500);
-assert_eq!(len, 3);
 ```
 
 ## Development
