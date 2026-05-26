@@ -107,6 +107,41 @@ Encode to a `Vec<u8>`.
 
 </details>
 
+## Encoded Size (runtime)
+
+Wall-clock time to call `encoded_len(v)` across the 6 distributions.
+vu128 and leb128 are excluded: neither crate exposes a standalone
+`encoded_len(u64)` query (both compute size only as a side effect of
+encoding).
+
+> For the arch-independent _format_ size comparison (how many bytes
+> each format uses), see [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md).
+
+| Distribution    | bijou64 | varu64 | vu64     | bijou64 rank | bijou64 vs other best |
+|-----------------|--------:|-------:|---------:|--------------|-----------------------|
+| tiny (0-247)    | 1.75    | **0.91** | 1.09   | #3           | 1.92x                 |
+| small (248-64k) | 2.67    | 1.79   | **1.11** | #3           | 2.41x                 |
+| medium (64k-4B) | 2.67    | 2.52   | **1.09** | #3           | 2.45x                 |
+| large (>4B)     | 2.69    | 4.77   | **1.09** | #2           | 2.47x                 |
+| boundary        | 2.44    | 3.21   | **1.09** | #2           | 2.23x                 |
+| uniform random  | 2.67    | 4.77   | **1.09** | #2           | 2.44x                 |
+
+<details open>
+<summary>Charts</summary>
+
+![Encoded Size — Bar Chart](charts/x86/encoded_size_bar.svg)
+![Encoded Size — Box Plot](charts/x86/encoded_size_box.svg)
+![Encoded Size — CDF](charts/x86/encoded_size_cdf.svg)
+
+</details>
+
+vu64 wins every cell because its tier boundaries are exact powers of
+2, so `encoded_len` reduces to a single `leading_zeros` instruction
+with no correction step. bijou64's per-tier offsets force an extra
+comparison; the gap (~2.2-2.5x) is unavoidable for the
+canonicality-preserving path. See [OPTIMISATION.md](OPTIMISATION.md)
+for the full analysis.
+
 ## Decode
 
 Decode from a `&[u8]` buffer.
@@ -201,40 +236,6 @@ Heatmaps provide a quick visual overview of which library performs best across a
 </details>
 
 Interactive versions with hover-for-detail are in `charts/x86/*_heatmap.html`.
-
-## Encoded Size (runtime)
-
-Wall-clock time to call `encoded_len(v)` across the 6 distributions.
-vu128 is excluded because it has no standalone `encoded_len(u64)` --
-the size is only computed as a side effect of encoding.
-
-> For the arch-independent _format_ size comparison (how many bytes
-> each format uses), see [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md).
-
-| Distribution    | bijou64 | varu64 | vu64     | bijou64 rank | bijou64 vs other best |
-|-----------------|--------:|-------:|---------:|--------------|-----------------------|
-| tiny (0-247)    | 1.75    | **0.91** | 1.09   | #3           | 1.92x                 |
-| small (248-64k) | 2.67    | 1.79   | **1.11** | #3           | 2.41x                 |
-| medium (64k-4B) | 2.67    | 2.52   | **1.09** | #3           | 2.45x                 |
-| large (>4B)     | 2.69    | 4.77   | **1.09** | #2           | 2.47x                 |
-| boundary        | 2.44    | 3.21   | **1.09** | #2           | 2.23x                 |
-| uniform random  | 2.67    | 4.77   | **1.09** | #2           | 2.44x                 |
-
-<details open>
-<summary>Charts</summary>
-
-![Encoded Size — Bar Chart](charts/x86/encoded_size_bar.svg)
-![Encoded Size — Box Plot](charts/x86/encoded_size_box.svg)
-![Encoded Size — CDF](charts/x86/encoded_size_cdf.svg)
-
-</details>
-
-vu64 wins every cell because its tier boundaries are exact powers of
-2, so `encoded_len` reduces to a single `leading_zeros` instruction
-with no correction step. bijou64's per-tier offsets force an extra
-comparison; the gap (~2.2-2.5x) is unavoidable for the
-canonicality-preserving path. See [OPTIMISATION.md](OPTIMISATION.md)
-for the full analysis.
 
 ## Summary
 

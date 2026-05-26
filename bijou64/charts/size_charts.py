@@ -271,17 +271,19 @@ def plot_heatmap(out: Path) -> None:
             grid[r, c] = FORMATS[name][0](v)
 
     fig, ax = plt.subplots(figsize=(7, 9))
-    im = ax.imshow(grid, aspect="auto", cmap="YlOrRd", vmin=1, vmax=10)
+    im = ax.imshow(grid, aspect="auto", cmap="YlOrRd", vmin=1, vmax=10,
+                   origin="lower")
 
     ax.set_xticks(range(len(formats)))
     ax.set_xticklabels(formats)
     ax.set_yticks(range(len(labels)))
     ax.set_yticklabels(labels)
     ax.set_xlabel("Format")
-    ax.set_ylabel("Value")
+    ax.set_ylabel("Value (ascending)")
     ax.set_title("Encoded length (bytes) per value")
 
-    # Cell annotations
+    # Cell annotations -- with origin="lower" the matrix is rendered with
+    # row 0 at the bottom, so we use the same row indices as the data grid.
     for r in range(grid.shape[0]):
         row_min = grid[r].min()
         for c in range(grid.shape[1]):
