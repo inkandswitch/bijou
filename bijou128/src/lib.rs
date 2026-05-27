@@ -40,10 +40,9 @@
 //! └───────────┴──────────────────┴───────────────────────────────────────┘
 //! ```
 //!
-//! See [`OFFSETS`] for the exact per-tier offsets and `bijou64::SPEC.md`
-//! for a detailed walk-through of the underlying scheme (bijou128 uses
-//! the same recurrence with a wider integer type and lower tag
-//! threshold).
+//! See [`OFFSETS`] for the exact per-tier offsets, and the
+//! [specification](https://github.com/inkandswitch/bijou/blob/main/bijou128/SPEC.md)
+//! for the full format definition, design rationale, and test vectors.
 //!
 //! # Canonicality
 //!
@@ -1017,6 +1016,61 @@ mod tests {
             }
             Ok(())
         }
+
+        #[test]
+        fn tier3_exhaustive() -> TestResult {
+            // Tier 3 spans 66_032..=16_843_247 — about 16.8M values, 1–2 s on host.
+            for value in 66_032u128..=16_843_247u128 {
+                let mut buf = Vec::new();
+                encode(value, &mut buf);
+                assert_eq!(buf.len(), 4, "value {value} should encode in 4 bytes");
+                assert_eq!(buf[0], 0xF2);
+
+                let (decoded, consumed) = decode(&buf)?;
+                assert_eq!(decoded, value, "round-trip failed for {value}");
+                assert_eq!(consumed, 4);
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn canonicality_byte_sequence_exhaustive() -> TestResult {
+            let check = |buf: &[u8]| -> TestResult {
+                // `Err(_)` (truncated / overflow) is fine here — we
+                // only need to check canonicality on successful decodes.
+                if let Ok((value, consumed)) = decode(buf) {
+                    let mut re = Vec::with_capacity(MAX_BYTES);
+                    encode(value, &mut re);
+                    assert_eq!(
+                        re.as_slice(),
+                        &buf[..consumed],
+                        "non-canonical: decode({:02X?}) = {value}, re-encode = {:02X?}",
+                        &buf[..consumed],
+                        re
+                    );
+                }
+                Ok(())
+            };
+
+            // Tier 0 + tier 1 + tier 2 (256 + 256 + 65,536 = 66,048 cases).
+            for b in 0u8..=255u8 {
+                check(&[b])?;
+            }
+            for p in 0u8..=255u8 {
+                check(&[0xF0, p])?;
+            }
+            for p1 in 0u8..=255u8 {
+                for p2 in 0u8..=255u8 {
+                    check(&[0xF1, p1, p2])?;
+                }
+            }
+            // Tier 3: 16,777,216 cases.
+            for p in 0u32..(1u32 << 24) {
+                let bytes = p.to_be_bytes();
+                check(&[0xF2, bytes[1], bytes[2], bytes[3]])?;
+            }
+            Ok(())
+        }
     }
 
     mod boundaries {
@@ -1489,7 +1543,18 @@ mod tests {
             (66_031, &[0xF1, 0xFF, 0xFF]),
             // Tier 3: tag 0xF2 + 3 bytes
             (66_032, &[0xF2, 0x00, 0x00, 0x00]),
-            // Tier 16: tag 0xFF + 16 bytes
+            (67_000, &[0xF2, 0x00, 0x03, 0xC8]),
+            (16_843_247, &[0xF2, 0xFF, 0xFF, 0xFF]),
+            // Tier 4: tag 0xF3 + 4 bytes
+            (16_843_248, &[0xF3, 0x00, 0x00, 0x00, 0x00]),
+            ((1u128 << 32) - 1, &[0xF3, 0xFE, 0xFE, 0xFE, 0x0F]),
+            // Tier 8: tag 0xF7 + 8 bytes; representative for the
+            // u64 boundary (`(1 << 64) - 1`).
+            (
+                (1u128 << 64) - 1,
+                &[0xF7, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x0F],
+            ),
+            // Tier 16: tag 0xFF + 16 bytes (u128::MAX)
             (
                 u128::MAX,
                 &[

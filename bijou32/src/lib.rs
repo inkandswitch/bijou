@@ -13,6 +13,9 @@
 //! range (`0..=251`) means tier-0-heavy distributions encode in slightly
 //! fewer bytes than `bijou64` would for the same values.
 //!
+//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/bijou32/SPEC.md)
+//! for the full format definition, design rationale, and test vectors.
+//!
 //! # Encoding
 //!
 //! The first byte determines the encoding:

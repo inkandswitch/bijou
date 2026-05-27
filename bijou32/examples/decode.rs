@@ -41,6 +41,9 @@ fn main() -> Result<(), DecodeError> {
     println!("encoded {} values into {} bytes", values.len(), buf.len());
 
     // -------- Pattern 1: decode_all (eager batch) --------
+    //
+    // The simplest "give me every value or fail" spelling. Allocates
+    // one Vec sized to the decoded count.
     {
         let decoded = decode_all(&buf)?;
         assert_eq!(decoded, values);
@@ -48,6 +51,10 @@ fn main() -> Result<(), DecodeError> {
     }
 
     // -------- Pattern 2: decode_iter (lazy + combinators) --------
+    //
+    // `decode_iter` returns a fused `Iterator`. Use it when you want to
+    // chain combinators or stop early — for example, filter on the
+    // decoded values without allocating the intermediate Vec.
     {
         let count_below_1000: usize = decode_iter(&buf)
             .filter_map(Result::ok)
@@ -57,6 +64,9 @@ fn main() -> Result<(), DecodeError> {
     }
 
     // -------- Pattern 3: decode_iter::collect (what decode_all does) --------
+    //
+    // Equivalent to Pattern 1. Useful to know if you want a Vec but
+    // also want to fuse extra iterator combinators in.
     {
         let decoded: Result<Vec<u32>, DecodeError> = decode_iter(&buf).collect();
         assert_eq!(decoded?, values);
@@ -67,12 +77,21 @@ fn main() -> Result<(), DecodeError> {
     }
 
     // -------- Pattern 4: manual cursor --------
+    //
+    // The decoder returns `(value, bytes_consumed)`. The caller advances
+    // its own slice cursor by `bytes_consumed`. Useful when you need to
+    // interleave bijou decodes with other reads from the same buffer
+    // (e.g. a length-prefixed framing protocol where each frame has a
+    // bijou-encoded length followed by the framed payload).
     {
         let mut cursor: &[u8] = &buf;
         let mut decoded = Vec::new();
         while !cursor.is_empty() {
             let (value, n) = decode(cursor)?;
             decoded.push(value);
+            // `decode` guarantees `n <= cursor.len()`, so this slice is
+            // always in bounds. `get(n..)` keeps the example panic-free
+            // even under hostile static analysis.
             cursor = cursor.get(n..).unwrap_or(&[]);
         }
         assert_eq!(decoded, values);

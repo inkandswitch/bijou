@@ -1,6 +1,6 @@
 //! Decode
 
-use alloc::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 use bijou32::DecodeError;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
@@ -55,8 +55,8 @@ pub fn decode(bytes: &[u8]) -> Result<WasmDecoded, WasmDecodeError> {
 /// // values is Uint32Array([42, 300, 65535])
 /// ```
 #[wasm_bindgen(js_name = decodeAll)]
-pub fn decode_all(bytes: &[u8]) -> Result<alloc::vec::Vec<u32>, WasmDecodeError> {
-    let mut out = alloc::vec::Vec::new();
+pub fn decode_all(bytes: &[u8]) -> Result<Vec<u32>, WasmDecodeError> {
+    let mut out = Vec::new();
     for result in bijou32::decode_iter(bytes) {
         out.push(result?);
     }
