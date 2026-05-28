@@ -215,7 +215,7 @@ Decode a concatenated stream of encoded values, advancing a cursor by the number
 
 </details>
 
-bijou64 wins all 6 stream_decode cells, with margins from 1.93× (small vs varu64) up to 3.94× (large vs vu64). vu128 is competitive on `tiny` (2nd place behind leb128, ahead of varu64), and stays mid-pack on the multi-byte distributions; the per-iteration `[u8; 9]` copy doesn't disqualify it from the bench, but it doesn't catch bijou64 either.
+bijou64 wins all 6 stream_decode cells, with margins from 1.93× (small vs varu64) up to 3.94× (large vs vu64). vu128 places 3rd on small/large/boundary/uniform, 4th on tiny (behind leb128 and varu64), and last on medium; the per-iteration `[u8; 9]` copy keeps it well behind bijou64 across the board.
 
 <a id="vu128-copy-cost"></a>
 > **vu128 copy cost.** `vu128::decode_u64` requires a `&[u8; 9]`. To decode from a `&[u8]` stream, each iteration copies up to 9 bytes from the cursor into a stack-allocated array. The cost is real and intrinsic to the `vu128` crate's API — a hypothetical alternative crate exposing a slice-input API would skip this — but the comparison here is between published crates as they actually ship. `bench_decode` and `bench_canonical_decode` use the identical pattern.
