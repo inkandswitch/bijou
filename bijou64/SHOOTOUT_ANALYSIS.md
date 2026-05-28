@@ -61,9 +61,11 @@ bijou64 cell-by-cell standing per architecture (5 ops × 6 distributions = 30 ce
 | Encode (Vec)     | Wins 5/6 (loses `small` to leb128)       | Wins 5/6 (loses `small` to leb128)       |
 | Decode           | Wins 6/6                                 | Wins 6/6                                 |
 | Canonical Decode | Wins 6/6                                 | Wins 6/6                                 |
-| Stream Decode    | Wins 6/6                                 | Wins 6/6                                 |
+| Stream Decode    | Wins 6/6 (incl. vu128)                   | Wins 6/6* (vu128 pending re-bench)       |
 | Encoded Size     | 0/6 outright (vu64 sweeps; #2 in 3 of 6) | 0/6 outright (vu64 sweeps; tied #2 on `tiny`) |
 | **Total**        | **23/30 outright wins**                  | **23/30 outright wins + 1 tie for #2**   |
+
+\* ARM's `stream_decode` table predates the inclusion of vu128 in the bench (added 2026-05-27 with the same per-iteration `[u8; 9]` copy as plain decode). On x86 the addition did not flip any stream_decode cell; ARM verification awaits a re-run on M2 hardware. See [SHOOTOUT_ANALYSIS_ARM.md](SHOOTOUT_ANALYSIS_ARM.md#stream-decode).
 
 bijou64 is the fastest decoder on every distribution, on both
 architectures, across all three decode variants (plain, canonical,

@@ -196,16 +196,16 @@ bijou64 wins all 6 canonical decode distributions on x86, including tiny — whe
 
 ## Stream Decode
 
-Decode a concatenated stream of encoded values. vu128 is excluded because its API requires a fixed `[u8; 9]` input.
+Decode a concatenated stream of encoded values, advancing a cursor by the number of bytes consumed per call. vu128 is included with the per-iteration `[u8; 9]` copy required by its API (matching the treatment in plain decode and canonical decode — see [Methodology / vu128 copy cost](#vu128-copy-cost) below).
 
-| Distribution    | bijou64   | varu64 | vu64  | leb128 | bijou64 rank | bijou64 vs other best |
-|-----------------|-----------|--------|-------|--------|--------------|-----------------------|
-| tiny (0-247)    | **0.94**  |  6.57  | 10.47 |  3.62  | #1           | 0.26x                 |
-| small (248-64k) | **3.91**  |  8.60  | 12.31 |  9.80  | #1           | 0.45x                 |
-| medium (64k-4B) | **4.70**  | 11.04  | 13.96 | 11.64  | #1           | 0.40x                 |
-| large (>4B)     | **2.56**  | 16.36  | 10.28 | 30.42  | #1           | 0.25x                 |
-| boundary        | **3.34**  | 13.19  | 11.97 |  9.94  | #1           | 0.34x                 |
-| uniform random  | **2.59**  | 16.35  | 10.13 | 30.09  | #1           | 0.26x                 |
+| Distribution    | bijou64   | varu64 | vu64  | vu128 | leb128 | bijou64 rank | bijou64 vs other best |
+|-----------------|-----------|--------|-------|-------|--------|--------------|-----------------------|
+| tiny (0-247)    | **1.18**  |  7.86  | 13.24 |  8.15 |  4.12  | #1           | 0.29x                 |
+| small (248-64k) | **4.94**  |  9.53  | 15.04 | 10.39 | 11.12  | #1           | 0.52x                 |
+| medium (64k-4B) | **5.88**  | 12.36  | 17.63 | 18.03 | 13.54  | #1           | 0.48x                 |
+| large (>4B)     | **3.12**  | 20.33  | 12.28 | 16.24 | 38.23  | #1           | 0.25x                 |
+| boundary        | **4.45**  | 15.66  | 14.67 | 12.13 | 11.34  | #1           | 0.39x                 |
+| uniform random  | **3.30**  | 19.41  | 12.37 | 17.32 | 36.63  | #1           | 0.27x                 |
 
 <details open>
 <summary>Charts</summary>
@@ -214,6 +214,11 @@ Decode a concatenated stream of encoded values. vu128 is excluded because its AP
 ![Stream Decode — CDF](charts/x86/stream_decode_cdf.svg)
 
 </details>
+
+bijou64 wins all 6 stream_decode cells, with margins from 1.93× (small vs varu64) up to 3.94× (large vs vu64). vu128 places 3rd on small/large/boundary/uniform, 4th on tiny (behind leb128 and varu64), and last on medium; the per-iteration `[u8; 9]` copy keeps it well behind bijou64 across the board.
+
+<a id="vu128-copy-cost"></a>
+> **vu128 copy cost.** `vu128::decode_u64` requires a `&[u8; 9]`. To decode from a `&[u8]` stream, each iteration copies up to 9 bytes from the cursor into a stack-allocated array. The cost is real and intrinsic to the `vu128` crate's API — a hypothetical alternative crate exposing a slice-input API would skip this — but the comparison here is between published crates as they actually ship. `bench_decode` and `bench_canonical_decode` use the identical pattern.
 
 ## Percentile Statistics
 
@@ -251,7 +256,9 @@ On Zen 5, bijou64 wins **23 of 30** shootout cells outright:
 
 bijou64 is the fastest decoder on every distribution, in every
 benchmark variant (plain decode, canonical decode, stream decode),
-typically by 2–3.5× margins. Structural canonicality is free,
+by margins of roughly 1.9–4×. The narrowest margin (1.93×) is
+`stream_decode/small` vs varu64; the widest (~4×) is
+`stream_decode/large` vs vu64. Structural canonicality is free,
 making bijou64 the unambiguous choice for protocols that decode
 more than they encode and that need deterministic serialisation.
 
