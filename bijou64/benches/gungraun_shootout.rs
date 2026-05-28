@@ -124,6 +124,16 @@ fn pre_encode_vu64(values: &[u64]) -> Vec<u8> {
     buf
 }
 
+fn pre_encode_vu128(values: &[u64]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(values.len() * 5);
+    let mut tmp = [0u8; 9];
+    for &v in values {
+        let n = vu128::encode_u64(&mut tmp, v);
+        buf.extend_from_slice(&tmp[..n]);
+    }
+    buf
+}
+
 fn pre_encode_leb128(values: &[u64]) -> Vec<u8> {
     let mut buf = Vec::with_capacity(values.len() * 5);
     for &v in values {
@@ -276,6 +286,34 @@ fn decode_vu64(buf: Vec<u8>) -> u64 {
 
 #[library_benchmark]
 #[benches::dist(
+    pre_encode_vu128(&tiny_values()),
+    pre_encode_vu128(&small_values()),
+    pre_encode_vu128(&medium_values()),
+    pre_encode_vu128(&large_values()),
+    pre_encode_vu128(&boundary_values()),
+    pre_encode_vu128(&uniform_values())
+)]
+fn decode_vu128(buf: Vec<u8>) -> u64 {
+    let buf = black_box(&buf);
+    let mut pos = 0;
+    let mut sum = 0u64;
+    while pos < buf.len() {
+        // vu128 requires a &[u8; 9] — copy from the slice.
+        // In practice callers would have a buffer already;
+        // we include the copy to be fair (matches `shootout.rs`).
+        let remaining = &buf[pos..];
+        let mut tmp = [0u8; 9];
+        let copy_len = remaining.len().min(9);
+        tmp[..copy_len].copy_from_slice(&remaining[..copy_len]);
+        let (v, consumed) = vu128::decode_u64(&tmp);
+        sum = sum.wrapping_add(v);
+        pos += consumed;
+    }
+    sum
+}
+
+#[library_benchmark]
+#[benches::dist(
     pre_encode_leb128(&tiny_values()),
     pre_encode_leb128(&small_values()),
     pre_encode_leb128(&medium_values()),
@@ -359,7 +397,7 @@ library_benchmark_group!(
 
 library_benchmark_group!(
     name = decode_group;
-    benchmarks = decode_bijou64, decode_varu64, decode_vu64, decode_leb128
+    benchmarks = decode_bijou64, decode_varu64, decode_vu64, decode_vu128, decode_leb128
 );
 
 library_benchmark_group!(

@@ -371,6 +371,7 @@ fn bench_stream_decode(c: &mut Criterion) {
         let (bijou_buf, _) = pre_encode_bijou64(values);
         let (varu_buf, _) = pre_encode_varu64(values);
         let (vu64_buf, _) = pre_encode_vu64(values);
+        let (vu_buf, _) = pre_encode_vu128(values);
         let (leb_buf, _) = pre_encode_leb128(values);
 
         group.bench_function(BenchmarkId::new("bijou64", ""), |b| {
@@ -413,6 +414,26 @@ fn bench_stream_decode(c: &mut Criterion) {
             });
         });
 
+        group.bench_function(BenchmarkId::new("vu128", ""), |b| {
+            b.iter(|| {
+                let mut pos = 0;
+                let mut sum = 0u64;
+                while pos < vu_buf.len() {
+                    // vu128 requires a &[u8; 9] — copy from the slice.
+                    // In practice callers would have a buffer already;
+                    // we include the copy to be fair (matches `bench_decode`).
+                    let remaining = &vu_buf[pos..];
+                    let mut tmp = [0u8; 9];
+                    let copy_len = remaining.len().min(9);
+                    tmp[..copy_len].copy_from_slice(&remaining[..copy_len]);
+                    let (v, consumed) = vu128::decode_u64(&tmp);
+                    sum = sum.wrapping_add(v);
+                    pos += consumed;
+                }
+                sum
+            });
+        });
+
         group.bench_function(BenchmarkId::new("leb128", ""), |b| {
             b.iter(|| {
                 let mut cursor = leb_buf.as_slice();
@@ -424,10 +445,6 @@ fn bench_stream_decode(c: &mut Criterion) {
                 sum
             });
         });
-
-        // vu128 skipped for stream decode — its fixed &[u8; 9] API
-        // doesn't naturally support streaming from a contiguous buffer
-        // without knowing offsets ahead of time.
 
         group.finish();
     }
