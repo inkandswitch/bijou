@@ -9,7 +9,7 @@ functions, JS `bigint` boundary), wider integer range.
 ## Build
 
 ```sh
-bodge   # nix dev-shell command; output lands in dist/
+bodge:128   # nix dev-shell command; output lands in dist/
 ```
 
 ## Usage

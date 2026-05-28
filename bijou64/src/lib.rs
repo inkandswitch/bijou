@@ -212,8 +212,8 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
         tier -= 1;
     }
 
-    let tag = (247 + tier) as u8;
-    let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+    let tag = (TAG_THRESHOLD as usize + tier - 1) as u8;
+    let payload = (value - OFFSETS[tier]) << (8 * (NUM_TIERS - tier));
     let pb = payload.to_be_bytes();
 
     let original_len = buf.len();
@@ -418,8 +418,8 @@ pub const fn encoded_bytes(value: u64) -> EncodedBytes {
     // land at positions 0..tier, with zeros at positions tier..8 — so
     // the entire 9-byte array can be constructed as one fixed-shape
     // literal that LLVM compiles to a single `bswap` + 9-byte store.
-    let tag = (247 + tier) as u8;
-    let payload = (value - OFFSETS[tier]) << (8 * (8 - tier));
+    let tag = (TAG_THRESHOLD as usize + tier - 1) as u8;
+    let payload = (value - OFFSETS[tier]) << (8 * (NUM_TIERS - tier));
     let pb = payload.to_be_bytes();
 
     EncodedBytes {

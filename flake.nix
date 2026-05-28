@@ -444,10 +444,13 @@
           (rust.bench { cargo = pkgs.cargo; cargo-criterion = pkgs.cargo-criterion; inherit xdg-open; })
           (rust.watch { cargo-watch = pkgs.cargo-watch; })
 
-          # Wasm commands — all target the `bijou64_wasm` crate
-          # (not the workspace root, which has a `[workspace]` manifest
-          # rather than a `[package]` manifest and would make wasm-pack
-          # bail out with "missing field `package`").
+          # Default wasm commands target the `bijou64_wasm` crate. They
+          # need to point at a `[package]`-manifest crate (the workspace
+          # root has only `[workspace]` and would make wasm-pack bail out
+          # with "missing field `package`"). The `bijou32_wasm` and
+          # `bijou128_wasm` crates have their own dedicated commands —
+          # see `bodge:32` / `bodge:128` and `test:js:32` / `test:js:128`
+          # in `projectCommands` below.
           (wasm.build { wasm-pack = pkgs.wasm-pack; path = "bijou64_wasm"; })
           (wasm.release { wasm-pack = pkgs.wasm-pack; gzip = pkgs.gzip; path = "bijou64_wasm"; })
           (wasm.test { wasm-pack = pkgs.wasm-pack; path = "bijou64_wasm"; features = ""; })

@@ -122,6 +122,22 @@ encodings on the same wire without an out-of-band signal.
 | `arbitrary` | `Arbitrary` impl for fuzz testing                        |
 | `bolero`    | Property-based testing with bolero (implies `arbitrary`) |
 
+## Performance
+
+bijou32 shares its core algorithm (per-tier offsets, `leading_zeros`
+dispatch, fixed-shape big-endian payload write) with bijou64. The
+bijou64 crate is the canonical performance reference: benchmark
+methodology, comparison against `leb128` / `varu64` / `vu64` /
+`vu128`, optimisation rationale, and the on-disk encoded-size
+analysis all live there:
+
+- [`bijou64/SHOOTOUT_ANALYSIS.md`](../bijou64/SHOOTOUT_ANALYSIS.md)
+- [`bijou64/OPTIMISATION.md`](../bijou64/OPTIMISATION.md)
+- [`bijou64/SIZE_ANALYSIS.md`](../bijou64/SIZE_ANALYSIS.md)
+
+Dedicated bijou32 benchmarks are planned but not yet in this
+repository.
+
 ## License
 
 The code is licensed under MIT OR Apache-2.0 (workspace default).

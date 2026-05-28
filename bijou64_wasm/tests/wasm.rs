@@ -13,8 +13,8 @@
 //! Run locally:
 //!
 //! ```sh
-//! wasm:test:node     # this file, Rust ABI in Node
-//! test:js            # node + browsers, JS surface against `dist/`
+//! wasm-pack test --node bijou64_wasm   # this file, Rust ABI in Node
+//! test:js                               # node + browsers, JS surface against `dist/`
 //! ```
 
 #![cfg(target_family = "wasm")]

@@ -5,16 +5,16 @@
 //! (without going through the wasm-bodge dist build). Cross-environment
 //! coverage of the actual `dist/` package lives at the JS layer:
 //!
-//! - `test:js:node`    — Mocha against `dist/esm/node.js` (CJS path is
+//! - `test:js:128:node`    — Mocha against `dist/esm/node.js` (CJS path is
 //!   covered by `dist/cjs/node.cjs`)
-//! - `test:js:browser` — Playwright against `dist/esm/web.js` across
+//! - `test:js:128:browser` — Playwright against `dist/esm/web.js` across
 //!   chromium / firefox / webkit
 //!
 //! Run locally:
 //!
 //! ```sh
-//! wasm:test:node     # this file, Rust ABI in Node
-//! test:js            # node + browsers, JS surface against `dist/`
+//! wasm-pack test --node bijou128_wasm   # this file, Rust ABI in Node
+//! test:js:128                            # node + browsers, JS surface against `dist/`
 //! ```
 
 #![cfg(target_family = "wasm")]
@@ -121,6 +121,7 @@ fn decode_round_trip() {
         65_535,
         66_031,
         66_032,
+        16_843_247,
         1u128 << 32,
         1u128 << 64,
         1u128 << 96,

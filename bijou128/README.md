@@ -89,21 +89,23 @@ Values below 240 encode as a single byte equal to the value. Larger
 values use a tag byte (`0xF0`–`0xFF`) followed by 1–16 big-endian
 payload bytes encoding `value - OFFSET[tier]`.
 
-## Comparison with bijou64
+## Comparison with bijou32 and bijou64
 
-|                | bijou64    | bijou128       |
-|----------------|------------|----------------|
-| Integer type   | `u64`      | `u128`         |
-| Max bytes      | 9          | 17             |
-| Tag threshold  | 248        | 240            |
-| Multi-byte tags| 0xF8–0xFF  | 0xF0–0xFF      |
-| Multi-byte tiers | 8        | 16             |
-| Tier 0 width   | 0 – 247    | 0 – 239        |
+|                  | bijou32     | bijou64    | bijou128       |
+|------------------|-------------|------------|----------------|
+| Integer type     | `u32`       | `u64`      | `u128`         |
+| Max bytes        | 5           | 9          | 17             |
+| Tag threshold    | 252         | 248        | 240            |
+| Multi-byte tags  | 0xFC–0xFF   | 0xF8–0xFF  | 0xF0–0xFF      |
+| Multi-byte tiers | 4           | 8          | 16             |
+| Tier 0 width     | 0 – 251     | 0 – 247    | 0 – 239        |
 
-The two formats are **not wire-compatible** — bijou64's `0xF7` is a
-plain value byte (247), but bijou128's `0xF7` is a tag (tier-8). Pick
-the width that matches your value domain; don't mix encodings on the
-same wire without an out-of-band signal.
+None of the three formats are wire-compatible — they use different tag
+thresholds so each can reach its maximum in the smallest number of
+bytes. bijou64's `0xF7` is a plain value byte (247), but bijou128's
+`0xF7` is a tag (tier-8). Pick the width that matches your value
+domain; don't mix encodings on the same wire without an out-of-band
+signal.
 
 ## Features
 
@@ -121,6 +123,22 @@ same wire without an out-of-band signal.
 |-------------|----------------------------------------------------------|
 | `arbitrary` | `Arbitrary` impl for fuzz testing                        |
 | `bolero`    | Property-based testing with bolero (implies `arbitrary`) |
+
+## Performance
+
+bijou128 shares its core algorithm (per-tier offsets, `leading_zeros`
+dispatch, fixed-shape big-endian payload write) with bijou64. The
+bijou64 crate is the canonical performance reference: benchmark
+methodology, comparison against `leb128` / `varu64` / `vu64` /
+`vu128`, optimisation rationale, and the on-disk encoded-size
+analysis all live there:
+
+- [`bijou64/SHOOTOUT_ANALYSIS.md`](../bijou64/SHOOTOUT_ANALYSIS.md)
+- [`bijou64/OPTIMISATION.md`](../bijou64/OPTIMISATION.md)
+- [`bijou64/SIZE_ANALYSIS.md`](../bijou64/SIZE_ANALYSIS.md)
+
+Dedicated bijou128 benchmarks are planned but not yet in this
+repository.
 
 ## License
 
