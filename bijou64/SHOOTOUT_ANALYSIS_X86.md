@@ -107,7 +107,7 @@ Encode to a `Vec<u8>`.
 
 </details>
 
-## Encoded Size (runtime)
+## Encoded Size Query (runtime)
 
 Wall-clock time to call `encoded_len(v)` across the 6 distributions.
 vu128 and leb128 are excluded: neither crate exposes a standalone

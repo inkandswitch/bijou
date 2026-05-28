@@ -106,7 +106,7 @@ Encode to a `Vec<u8>`.
 
 bijou64 wins 5 of 6 encode distributions on M2 Pro. The sole loss is `small` to leb128 (1.14x behind), where leb128's tight 2-byte write loop fits well. The encode improvements from the shift+truncate trick are even more pronounced on ARM than on Zen 5 -- medium and boundary distributions that previously lost are now clear wins.
 
-## Encoded Size (runtime)
+## Encoded Size Query (runtime)
 
 Wall-clock time to call `encoded_len(v)` across the 6 distributions.
 vu128 and leb128 are excluded: neither crate exposes a standalone
