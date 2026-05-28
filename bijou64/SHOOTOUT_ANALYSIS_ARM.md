@@ -195,7 +195,10 @@ bijou64 wins all 6 canonical decode distributions on M2 Pro. For protocols that 
 
 ## Stream Decode
 
-Decode a concatenated stream of encoded values. vu128 is excluded because its API requires a fixed `[u8; 9]` input.
+Decode a concatenated stream of encoded values, advancing a cursor by the number of bytes consumed per call.
+
+> [!NOTE]
+> The table below predates the inclusion of vu128 in the stream_decode bench (added 2026-05-27; vu128 uses the same per-iteration `[u8; 9]` copy as plain decode — see [SHOOTOUT_ANALYSIS_X86.md](SHOOTOUT_ANALYSIS_X86.md#vu128-copy-cost)). The four-column numbers below remain valid for the listed codecs, but a vu128 column and any potential score adjustment require re-running the shootout on ARM hardware. The "wins 6/6" claim below is provisional on that re-bench. On x86 the addition did not flip any stream_decode cell.
 
 | Distribution    | bijou64      | varu64 | vu64  | leb128 | bijou64 rank | bijou64 vs other best |
 |-----------------|--------------|--------|-------|--------|--------------|----------------------|
@@ -214,7 +217,7 @@ Decode a concatenated stream of encoded values. vu128 is excluded because its AP
 
 </details>
 
-bijou64 wins every stream_decode cell. The tiny distribution is particularly striking: 1.82 us vs 5.85 us for the next-best (leb128), a 3.2x margin.
+bijou64 wins every stream_decode cell against varu64/vu64/leb128. The tiny distribution is particularly striking: 1.82 us vs 5.85 us for the next-best (leb128), a 3.2x margin. vu128 ranking pending ARM re-bench.
 
 ## Percentile Statistics
 
@@ -248,7 +251,7 @@ shared second place:
 | encode           | 5/6  | 0    | Loses `small` to leb128                                           |
 | decode           | 6/6  | 0    |                                                                   |
 | encoded_size     | 0/6  | 1    | vu64 wins every cell; bijou64 ties varu64 for #2 on `tiny`        |
-| stream_decode    | 6/6  | 0    |                                                                   |
+| stream_decode    | 6/6* | 0    | *vs varu64/vu64/leb128; vu128 ranking pending ARM re-bench        |
 | canonical_decode | 6/6  | 0    |                                                                   |
 
 This matches the Zen 5 outright-win score exactly (23/30), confirming that the optimisations transfer cleanly across microarchitectures.
