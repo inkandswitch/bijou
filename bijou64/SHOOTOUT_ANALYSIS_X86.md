@@ -256,7 +256,9 @@ On Zen 5, bijou64 wins **23 of 30** shootout cells outright:
 
 bijou64 is the fastest decoder on every distribution, in every
 benchmark variant (plain decode, canonical decode, stream decode),
-typically by 2–3.5× margins. Structural canonicality is free,
+by margins of roughly 1.9–4×. The narrowest margin (1.93×) is
+`stream_decode/small` vs varu64; the widest (~4×) is
+`stream_decode/large` vs vu64. Structural canonicality is free,
 making bijou64 the unambiguous choice for protocols that decode
 more than they encode and that need deterministic serialisation.
 
