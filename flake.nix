@@ -5,8 +5,13 @@
     nixpkgs.url = "nixpkgs/nixos-26.05";
     nixos-unstable.url = "nixpkgs/nixos-unstable-small";
 
-    command-utils.url = "git+https://codeberg.org/expede/nix-command-utils";
     flake-utils.url = "github:numtide/flake-utils";
+
+    command-utils = {
+      url = "git+https://codeberg.org/expede/nix-command-utils";
+      inputs.flake-utils.follows = "flake-utils";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
