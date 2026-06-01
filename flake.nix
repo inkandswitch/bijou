@@ -1,8 +1,8 @@
 {
-  description = "bijou — bijective variable-length integer encodings";
+  description = "bijou: bijective variable-length integer encodings";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-25.11";
+    nixpkgs.url = "nixpkgs/nixos-26.05";
     nixos-unstable.url = "nixpkgs/nixos-unstable-small";
 
     command-utils.url = "git+https://codeberg.org/expede/nix-command-utils";
@@ -160,8 +160,15 @@
           wasm-tools
         ];
 
-        # Built-in command modules from nix-command-utils
-        rust = command-utils.rust.${system};
+         # `xdg-utils` lacks `meta.mainProgram`, which makes `getExe`
+         # (used by the command-utils modules below) emit a deprecation
+         # warning. Annotate it so `getExe` resolves `xdg-open` cleanly.
+         xdg-open = pkgs.xdg-utils // {
+           meta = (pkgs.xdg-utils.meta or { }) // { mainProgram = "xdg-open"; };
+         };
+
+         # Built-in command modules from nix-command-utils
+         rust = command-utils.rust.${system};
         wasm = command-utils.wasm.${system};
         cmd = command-utils.cmd.${system};
 
@@ -253,9 +260,9 @@
             bodge
             cd "$WORKSPACE_ROOT/bijou64_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm run test:js:node
+            ${pkgs.pnpm}/bin/pnpm run test:js:node
           '';
 
           "test:js:browser" = cmd "Run bijou64_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge)" ''
@@ -267,17 +274,17 @@
             # disagrees with `package.json`. To intentionally update the
             # lockfile, run `pnpm install` directly (without this wrapper).
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright test
+            ${pkgs.pnpm}/bin/pnpm exec playwright test
           '';
 
           "test:js:browser:report" = cmd "Open the most recent Playwright HTML report" ''
             cd "$WORKSPACE_ROOT/bijou64_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright show-report
+            ${pkgs.pnpm}/bin/pnpm exec playwright show-report
           '';
 
           "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package)" ''
@@ -329,7 +336,7 @@
           (rust.lint { cargo = pkgs.cargo; })
           (rust.fmt { cargo = pkgs.cargo; })
           (rust.doc { cargo = pkgs.cargo; })
-          (rust.bench { cargo = pkgs.cargo; cargo-criterion = pkgs.cargo-criterion; xdg-open = pkgs.xdg-utils; })
+          (rust.bench { cargo = pkgs.cargo; cargo-criterion = pkgs.cargo-criterion; inherit xdg-open; })
           (rust.watch { cargo-watch = pkgs.cargo-watch; })
 
           # Wasm commands — all target the `bijou64_wasm` crate
@@ -339,7 +346,7 @@
           (wasm.build { wasm-pack = pkgs.wasm-pack; path = "bijou64_wasm"; })
           (wasm.release { wasm-pack = pkgs.wasm-pack; gzip = pkgs.gzip; path = "bijou64_wasm"; })
           (wasm.test { wasm-pack = pkgs.wasm-pack; path = "bijou64_wasm"; features = ""; })
-          (wasm.doc { cargo = pkgs.cargo; xdg-open = pkgs.xdg-utils; })
+          (wasm.doc { cargo = pkgs.cargo; inherit xdg-open; })
 
           { commands = projectCommands; packages = []; }
         ];
@@ -362,18 +369,21 @@
         devShells.default = pkgs.mkShell {
           name = "bijou_shell";
 
-          nativeBuildInputs =
-            [
-              command_menu
-              rust-toolchain
-              nightly-rustfmt
+           nativeBuildInputs =
+             # `command_menu` is itself a list of derivations, so splice it
+             # in with `++` rather than nesting it as a single element
+             # (a nested list in `nativeBuildInputs` is deprecated).
+             command_menu
+             ++ [
+               rust-toolchain
+               nightly-rustfmt
 
               pkgs.binaryen
               pkgs.esbuild # wasm-bodge spawns esbuild as a subprocess for bundling
               pkgs.gnuplot
               pkgs.http-server
               pkgs.nodejs
-              pkgs.nodePackages.pnpm
+              pkgs.pnpm
               pkgs.playwright-driver
               pkgs.playwright-driver.browsers
               pkgs.rust-analyzer
