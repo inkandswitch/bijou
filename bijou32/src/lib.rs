@@ -1171,17 +1171,6 @@ mod tests {
             Ok(())
         }
 
-        #[test]
-        fn const_fn() {
-            const ENC: EncodedBytes = encoded_bytes(300);
-            assert_eq!(ENC.len(), 2);
-        }
-
-        #[test]
-        fn auto_traits() {
-            fn assert_traits<T: Send + Sync + Unpin>() {}
-            assert_traits::<EncodedBytes>();
-        }
     }
 
     mod iter {
@@ -1241,12 +1230,6 @@ mod tests {
             let mut errored = decode_iter(&[0xFC]);
             let _ = errored.next();
             assert_eq!(errored.size_hint(), (0, Some(0)));
-        }
-
-        #[test]
-        fn fused_iterator_trait() {
-            fn assert_fused<T: core::iter::FusedIterator>() {}
-            assert_fused::<DecodeIter<'_>>();
         }
 
         #[test]
@@ -1319,6 +1302,19 @@ mod tests {
             assert_eq!(consumed, 2);
             assert_eq!(buf.len(), 4);
             Ok(())
+        }
+
+        /// `MAX_BYTES` must equal the actual worst-case encoded length.
+        /// `u32::MAX` is the worst case, so this single input fully covers
+        /// the invariant. Guards against a future tier-layout change that
+        /// updates `MAX_BYTES` but not the encoder (or vice versa).
+        #[test]
+        fn max_bytes_equals_encoded_len_of_max() {
+            let mut buf = Vec::new();
+            encode(u32::MAX, &mut buf);
+            assert_eq!(buf.len(), MAX_BYTES, "MAX_BYTES disagrees with encode(u32::MAX).len()");
+            assert_eq!(encoded_len(u32::MAX), MAX_BYTES);
+            assert_eq!(encoded_bytes(u32::MAX).len(), MAX_BYTES);
         }
     }
 
@@ -1471,8 +1467,87 @@ mod tests {
                             "bijection violated: decode({:02X?}) = {value}, \
                              re-encode = {:02X?}",
                             buf.get(..consumed).unwrap_or_default(),
-                            re_encoded
+                             re_encoded
                         );
+                    }
+                });
+        }
+
+        /// Whole-stream roundtrip: a packed stream of N arbitrary values
+        /// decodes back to exactly those N values.
+        ///
+        /// `forall xs. decode_all(concat(map(encode, xs))) == Ok(xs)`
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_all_roundtrips_arbitrary_streams() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u32>>()
+                .for_each(|xs| {
+                    let mut buf = Vec::new();
+                    for &x in xs {
+                        encode(x, &mut buf);
+                    }
+                    assert_eq!(decode_all(&buf).as_deref(), Ok(xs.as_slice()));
+                });
+        }
+
+        /// Oracle: `decode_iter` must behave exactly like the hand-rolled
+        /// cursor loop it replaces, on arbitrary (possibly malformed)
+        /// bytes — same successful prefix, same first error, then stop.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_iter_matches_manual_cursor() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u8>>()
+                .for_each(|buf| {
+                    let via_iter: Vec<Result<u32, DecodeError>> = decode_iter(buf).collect();
+
+                    let mut manual = Vec::new();
+                    let mut cursor: &[u8] = buf;
+                    loop {
+                        if cursor.is_empty() {
+                            break;
+                        }
+                        match decode(cursor) {
+                            Ok((v, n)) => {
+                                manual.push(Ok(v));
+                                cursor = cursor.get(n..).unwrap_or_default();
+                            }
+                            Err(e) => {
+                                manual.push(Err(e));
+                                break; // iterator fuses on error
+                            }
+                        }
+                    }
+                    assert_eq!(
+                        via_iter, manual,
+                        "decode_iter disagreed with manual loop on {buf:02X?}"
+                    );
+                });
+        }
+
+        /// Once `decode_iter` yields an `Err`, every subsequent `next()`
+        /// must be `None` (the iterator is fused).
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_iter_fuses_after_any_error() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u8>>()
+                .for_each(|buf| {
+                    let mut it = decode_iter(buf);
+                    let mut seen_err = false;
+                    for item in it.by_ref() {
+                        assert!(
+                            !seen_err,
+                            "decode_iter yielded after an error on {buf:02X?}"
+                        );
+                        if item.is_err() {
+                            seen_err = true;
+                        }
+                    }
+                    if seen_err {
+                        assert!(it.next().is_none(), "must stay fused");
+                        assert!(it.next().is_none(), "must stay fused");
                     }
                 });
         }

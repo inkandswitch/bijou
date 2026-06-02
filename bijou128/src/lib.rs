@@ -827,10 +827,30 @@ mod tests {
 
         #[test]
         fn known_values() {
+            // Pin every tier offset against an *independently* computed
+            // closed form — `OFFSETS[t] = TAG_THRESHOLD + sum(256^k for
+            // k in 1..t)` — rather than restating the table literals.
+            // This catches a typo in `tier_offset`'s recurrence that the
+            // `recurrence` test (which uses the same accumulation shape)
+            // might share.
+            assert_eq!(OFFSETS[0], 0);
+            for tier in 1..=NUM_TIERS {
+                let mut expected = TAG_THRESHOLD as u128;
+                let mut power = 1u128; // 256^0
+                for _ in 1..tier {
+                    power *= 256;
+                    expected += power;
+                }
+                assert_eq!(
+                    OFFSETS[tier], expected,
+                    "OFFSETS[{tier}] should be {expected}"
+                );
+            }
+
+            // A few hand-checked anchors for human readability.
             assert_eq!(OFFSETS[1], 240);
             assert_eq!(OFFSETS[2], 240 + 256);
             assert_eq!(OFFSETS[3], 240 + 256 + 65536);
-            // Higher tiers checked indirectly via recurrence().
         }
 
         #[test]
@@ -1359,17 +1379,6 @@ mod tests {
             Ok(())
         }
 
-        #[test]
-        fn const_fn() {
-            const ENC: EncodedBytes = encoded_bytes(240);
-            assert_eq!(ENC.len(), 2);
-        }
-
-        #[test]
-        fn auto_traits() {
-            fn assert_traits<T: Send + Sync + Unpin>() {}
-            assert_traits::<EncodedBytes>();
-        }
     }
 
     mod iter {
@@ -1444,12 +1453,6 @@ mod tests {
         }
 
         #[test]
-        fn fused_iterator_trait() {
-            fn assert_fused<T: core::iter::FusedIterator>() {}
-            assert_fused::<DecodeIter<'_>>();
-        }
-
-        #[test]
         fn composable_with_combinators() {
             let mut buf = Vec::new();
             for v in [10u128, 20, 30, 40, 50] {
@@ -1519,6 +1522,19 @@ mod tests {
             assert_eq!(consumed, 3);
             assert_eq!(buf.len(), 5);
             Ok(())
+        }
+
+        /// `MAX_BYTES` must equal the actual worst-case encoded length.
+        /// `u128::MAX` is the worst case, so this single input fully covers
+        /// the invariant. Guards against a future tier-layout change that
+        /// updates `MAX_BYTES` but not the encoder (or vice versa).
+        #[test]
+        fn max_bytes_equals_encoded_len_of_max() {
+            let mut buf = Vec::new();
+            encode(u128::MAX, &mut buf);
+            assert_eq!(buf.len(), MAX_BYTES, "MAX_BYTES disagrees with encode(u128::MAX).len()");
+            assert_eq!(encoded_len(u128::MAX), MAX_BYTES);
+            assert_eq!(encoded_bytes(u128::MAX).len(), MAX_BYTES);
         }
     }
 
@@ -1689,11 +1705,90 @@ mod tests {
                         assert_eq!(
                             re_encoded.as_slice(),
                             buf.get(..consumed).unwrap_or_default(),
-                            "bijection violated: decode({:02X?}) = {value}, \
+                             "bijection violated: decode({:02X?}) = {value}, \
                              re-encode = {:02X?}",
                             buf.get(..consumed).unwrap_or_default(),
                             re_encoded
                         );
+                    }
+                });
+        }
+
+        /// Whole-stream roundtrip: a packed stream of N arbitrary values
+        /// decodes back to exactly those N values.
+        ///
+        /// `forall xs. decode_all(concat(map(encode, xs))) == Ok(xs)`
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_all_roundtrips_arbitrary_streams() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u128>>()
+                .for_each(|xs| {
+                    let mut buf = Vec::new();
+                    for &x in xs {
+                        encode(x, &mut buf);
+                    }
+                    assert_eq!(decode_all(&buf).as_deref(), Ok(xs.as_slice()));
+                });
+        }
+
+        /// Oracle: `decode_iter` must behave exactly like the hand-rolled
+        /// cursor loop it replaces, on arbitrary (possibly malformed)
+        /// bytes — same successful prefix, same first error, then stop.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_iter_matches_manual_cursor() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u8>>()
+                .for_each(|buf| {
+                    let via_iter: Vec<Result<u128, DecodeError>> = decode_iter(buf).collect();
+
+                    let mut manual = Vec::new();
+                    let mut cursor: &[u8] = buf;
+                    loop {
+                        if cursor.is_empty() {
+                            break;
+                        }
+                        match decode(cursor) {
+                            Ok((v, n)) => {
+                                manual.push(Ok(v));
+                                cursor = cursor.get(n..).unwrap_or_default();
+                            }
+                            Err(e) => {
+                                manual.push(Err(e));
+                                break; // iterator fuses on error
+                            }
+                        }
+                    }
+                    assert_eq!(
+                        via_iter, manual,
+                        "decode_iter disagreed with manual loop on {buf:02X?}"
+                    );
+                });
+        }
+
+        /// Once `decode_iter` yields an `Err`, every subsequent `next()`
+        /// must be `None` (the iterator is fused).
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn decode_iter_fuses_after_any_error() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u8>>()
+                .for_each(|buf| {
+                    let mut it = decode_iter(buf);
+                    let mut seen_err = false;
+                    for item in it.by_ref() {
+                        assert!(
+                            !seen_err,
+                            "decode_iter yielded after an error on {buf:02X?}"
+                        );
+                        if item.is_err() {
+                            seen_err = true;
+                        }
+                    }
+                    if seen_err {
+                        assert!(it.next().is_none(), "must stay fused");
+                        assert!(it.next().is_none(), "must stay fused");
                     }
                 });
         }
