@@ -1,9 +1,55 @@
 //! Decode
 
-use alloc::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 use bijou128::DecodeError;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
+
+/// Validates that `bytes` is a real JS `Uint8Array` and copies it into
+/// an owned `Vec<u8>`.
+///
+/// The decode entry points take `&JsValue` rather than `&[u8]` or
+/// `&js_sys::Uint8Array` so that the rejection survives bundling.
+/// wasm-bindgen's `&[u8]`/`&Uint8Array` marshalling both ultimately
+/// coerce the argument through `new Uint8Array(arg)` (or equivalent),
+/// which **silently truncates** any array-like whose elements fall
+/// outside `0..=255` — a plain JS `[1000]` becomes `[232]`. For a codec
+/// whose whole point is structural canonicality, silently corrupting
+/// the input bytes is exactly the footgun we must not ship, so we
+/// inspect the raw value ourselves and reject anything that isn't a
+/// genuine `Uint8Array`. This mirrors the wrong-type guard
+/// [`crate::encode`] applies to its `bigint` argument.
+///
+/// The public TypeScript parameter type is still `Uint8Array` (set via
+/// `unchecked_param_type` on the exports below), so typed callers are
+/// unaffected; this guard only changes runtime behaviour for untyped
+/// JS callers who would otherwise get silent corruption.
+fn bytes_from_js(bytes: &JsValue) -> Result<Vec<u8>, WasmInputError> {
+    let arr = bytes
+        .dyn_ref::<js_sys::Uint8Array>()
+        .ok_or(WasmInputError::WrongType)?;
+
+    Ok(arr.to_vec())
+}
+
+/// Failure mode for the input-type validation that runs at the wasm
+/// boundary of every decode entry point.
+///
+/// Lowered to a JS native `TypeError` (via [`js_sys::TypeError::new`])
+/// so callers can use both `e.name === "TypeError"` and
+/// `e instanceof TypeError`.
+#[derive(Debug, Clone, Copy, Error)]
+pub enum WasmInputError {
+    /// Caller passed a value that isn't a JS `Uint8Array`.
+    #[error("bijou128: expected a Uint8Array")]
+    WrongType,
+}
+
+impl From<WasmInputError> for JsValue {
+    fn from(err: WasmInputError) -> Self {
+        js_sys::TypeError::new(&err.to_string()).into()
+    }
+}
 
 /// Decodes a `bijou128` from the front of `bytes`.
 ///
@@ -13,6 +59,7 @@ use wasm_bindgen::prelude::*;
 ///
 /// # Errors
 ///
+/// Throws a JS native `TypeError` if `bytes` is not a `Uint8Array`.
 /// Throws a JS `Error` with `name === "Bijou128DecodeError"` if `bytes`
 /// is too short for the encoding indicated by its tag byte, or if a
 /// tier-16 payload would overflow `u128`. See [`WasmDecodeError`].
@@ -23,10 +70,14 @@ use wasm_bindgen::prelude::*;
 /// import { decode } from "bijou128";
 /// const { value, bytesRead } = decode(new Uint8Array([0xF1, 0x00, 0x04, 0xFF]));
 /// // value === 500n, bytesRead === 3
+/// decode([0xF1, 0x00, 0x04]); // throws TypeError (plain Array, not Uint8Array)
 /// ```
 #[wasm_bindgen]
-pub fn decode(bytes: &[u8]) -> Result<WasmDecoded, WasmDecodeError> {
-    let (value, bytes_read) = bijou128::decode(bytes)?;
+pub fn decode(
+    #[wasm_bindgen(unchecked_param_type = "Uint8Array")] bytes: &JsValue,
+) -> Result<WasmDecoded, JsValue> {
+    let bytes = bytes_from_js(bytes)?;
+    let (value, bytes_read) = bijou128::decode(&bytes).map_err(WasmDecodeError::from)?;
     Ok(WasmDecoded { value, bytes_read })
 }
 
@@ -44,6 +95,7 @@ pub fn decode(bytes: &[u8]) -> Result<WasmDecoded, WasmDecodeError> {
 ///
 /// # Errors
 ///
+/// Throws a JS native `TypeError` if `bytes` is not a `Uint8Array`.
 /// Throws a JS `Error` with `name === "Bijou128DecodeError"` (same
 /// shape as [`decode`]) if any element fails to decode. The
 /// partial-prefix decoded so far is *not* returned — the operation
@@ -58,10 +110,13 @@ pub fn decode(bytes: &[u8]) -> Result<WasmDecoded, WasmDecodeError> {
 /// // values is [42n, 500n, 65535n]
 /// ```
 #[wasm_bindgen(js_name = decodeAll)]
-pub fn decode_all(bytes: &[u8]) -> Result<js_sys::Array, WasmDecodeError> {
+pub fn decode_all(
+    #[wasm_bindgen(unchecked_param_type = "Uint8Array")] bytes: &JsValue,
+) -> Result<js_sys::Array, JsValue> {
+    let bytes = bytes_from_js(bytes)?;
     let out = js_sys::Array::new();
-    for result in bijou128::decode_iter(bytes) {
-        let value: u128 = result?;
+    for result in bijou128::decode_iter(&bytes) {
+        let value: u128 = result.map_err(WasmDecodeError::from)?;
         out.push(&JsValue::from(value));
     }
     Ok(out)

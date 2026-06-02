@@ -44,6 +44,18 @@ fn js_error_name<E: Clone + Into<JsValue>>(err: &E) -> Option<String> {
     e.name().as_string()
 }
 
+/// Pull `name` off a raw `JsValue` throwable.
+fn js_value_error_name(v: &JsValue) -> Option<String> {
+    v.dyn_ref::<js_sys::Error>()?.name().as_string()
+}
+
+/// Build a JS `Uint8Array` from a byte slice as a `JsValue`. The decode
+/// entry points take `&JsValue` (and validate it is a `Uint8Array`), so
+/// tests marshal through one rather than passing a Rust slice directly.
+fn u8s(bytes: &[u8]) -> JsValue {
+    js_sys::Uint8Array::from(bytes).into()
+}
+
 #[wasm_bindgen_test]
 fn max_bytes_is_five() {
     assert_eq!(max_bytes(), 5);
@@ -122,7 +134,7 @@ fn decode_round_trip() {
 
     for &v in cases {
         let bytes = encode(&n(v)).unwrap();
-        let result = decode(&bytes).unwrap();
+        let result = decode(&u8s(&bytes)).unwrap();
         assert_eq!(result.value(), v, "round-trip failed for {v}");
         assert_eq!(result.bytes_read(), bytes.len());
     }
@@ -132,26 +144,63 @@ fn decode_round_trip() {
 fn decode_partial_buffer_reports_bytes_read() {
     let mut buf = encode(&n(300)).unwrap(); // 2 bytes
     buf.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
-    let result = decode(&buf).unwrap();
+    let result = decode(&u8s(&buf)).unwrap();
     assert_eq!(result.value(), 300);
     assert_eq!(result.bytes_read(), 2);
 }
 
 #[wasm_bindgen_test]
 fn decode_empty_input_errors() {
-    assert!(decode(&[]).is_err());
+    assert!(decode(&u8s(&[])).is_err());
 }
 
 #[wasm_bindgen_test]
 fn decode_truncated_tier_1_errors() {
     // Tag 0xFC needs 1 payload byte — supply only the tag.
-    assert!(decode(&[0xFC]).is_err());
+    assert!(decode(&u8s(&[0xFC])).is_err());
 }
 
 #[wasm_bindgen_test]
 fn decode_truncated_tier_4_errors() {
     // Tag 0xFF needs 4 payload bytes — supply 3.
-    assert!(decode(&[0xFF, 0, 0, 0]).is_err());
+    assert!(decode(&u8s(&[0xFF, 0, 0, 0])).is_err());
+}
+
+// ---- input-type guard tests (non-Uint8Array rejection) --------------------
+
+#[wasm_bindgen_test]
+fn decode_rejects_plain_array() {
+    // A plain JS `Array` is not a `Uint8Array`. The default
+    // `&[u8]`/`&Uint8Array` marshalling would coerce it via
+    // `new Uint8Array(arr)`, silently truncating out-of-range elements.
+    // We now reject it with a TypeError.
+    let plain = js_sys::Array::of1(&JsValue::from(0u8));
+    let err = decode(plain.as_ref()).expect_err("plain Array must be rejected");
+    assert_eq!(js_value_error_name(&err).as_deref(), Some("TypeError"));
+}
+
+#[wasm_bindgen_test]
+fn decode_rejects_out_of_range_array_element_without_truncation() {
+    // [1000] as a plain Array. The old behaviour silently decoded this
+    // as value 232 (1000 & 0xFF). It must now throw, never truncate.
+    let plain = js_sys::Array::of1(&JsValue::from(1000u32));
+    let err = decode(plain.as_ref()).expect_err("out-of-range Array element must be rejected");
+    assert_eq!(js_value_error_name(&err).as_deref(), Some("TypeError"));
+}
+
+#[wasm_bindgen_test]
+fn decode_all_rejects_plain_array() {
+    let plain = js_sys::Array::of2(&JsValue::from(0u8), &JsValue::from(1u8));
+    let err = decode_all(plain.as_ref()).expect_err("plain Array must be rejected");
+    assert_eq!(js_value_error_name(&err).as_deref(), Some("TypeError"));
+}
+
+#[wasm_bindgen_test]
+fn decode_rejects_non_array_inputs() {
+    for bad in [JsValue::NULL, JsValue::from(42u32), JsValue::from_str("nope")] {
+        let err = decode(&bad).expect_err("non-Uint8Array must be rejected");
+        assert_eq!(js_value_error_name(&err).as_deref(), Some("TypeError"));
+    }
 }
 
 // ---- Range-check tests for the number → u32 boundary ----------------------
@@ -225,7 +274,7 @@ fn encode_accepts_zero_exactly() {
 
 #[wasm_bindgen_test]
 fn decode_all_empty_returns_empty() {
-    let result = decode_all(&[]).expect("empty input decodes to empty array");
+    let result = decode_all(&u8s(&[])).expect("empty input decodes to empty array");
     assert!(result.is_empty());
 }
 
@@ -235,7 +284,7 @@ fn decode_all_multi_value_roundtrip() {
     for v in [42u32, 300, 65_535] {
         buf.extend_from_slice(&encode(&n(v)).unwrap());
     }
-    let result = decode_all(&buf).expect("must decode all");
+    let result = decode_all(&u8s(&buf)).expect("must decode all");
     assert_eq!(result, vec![42u32, 300, 65_535]);
 }
 
@@ -244,11 +293,11 @@ fn decode_all_propagates_error() {
     // [0x42, 0xFC] — the first byte decodes, the second is a tag without
     // payload. decode_all must surface the error and not return the partial
     // prefix.
-    assert!(decode_all(&[0x42, 0xFC]).is_err());
+    assert!(decode_all(&u8s(&[0x42, 0xFC])).is_err());
 }
 
 #[wasm_bindgen_test]
 fn decode_all_propagates_overflow() {
     // Tier-4 all-ones overflows.
-    assert!(decode_all(&[0xFFu8; 5]).is_err());
+    assert!(decode_all(&u8s(&[0xFFu8; 5])).is_err());
 }
