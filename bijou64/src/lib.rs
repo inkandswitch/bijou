@@ -1251,7 +1251,6 @@ mod tests {
             }
             Ok(())
         }
-
     }
 
     mod iter {
@@ -1425,7 +1424,11 @@ mod tests {
         fn max_bytes_equals_encoded_len_of_max() {
             let mut buf = Vec::new();
             encode(u64::MAX, &mut buf);
-            assert_eq!(buf.len(), MAX_BYTES, "MAX_BYTES disagrees with encode(u64::MAX).len()");
+            assert_eq!(
+                buf.len(),
+                MAX_BYTES,
+                "MAX_BYTES disagrees with encode(u64::MAX).len()"
+            );
             assert_eq!(encoded_len(u64::MAX), MAX_BYTES);
             assert_eq!(encoded_bytes(u64::MAX).len(), MAX_BYTES);
         }

@@ -208,7 +208,11 @@ fn decode_all_rejects_plain_array() {
 
 #[wasm_bindgen_test]
 fn decode_rejects_non_array_inputs() {
-    for bad in [JsValue::NULL, JsValue::from(42u32), JsValue::from_str("nope")] {
+    for bad in [
+        JsValue::NULL,
+        JsValue::from(42u32),
+        JsValue::from_str("nope"),
+    ] {
         let err = decode(&bad).expect_err("non-Uint8Array must be rejected");
         assert_eq!(js_value_error_name(&err).as_deref(), Some("TypeError"));
     }

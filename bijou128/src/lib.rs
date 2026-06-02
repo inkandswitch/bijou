@@ -1378,7 +1378,6 @@ mod tests {
             }
             Ok(())
         }
-
     }
 
     mod iter {
@@ -1532,7 +1531,11 @@ mod tests {
         fn max_bytes_equals_encoded_len_of_max() {
             let mut buf = Vec::new();
             encode(u128::MAX, &mut buf);
-            assert_eq!(buf.len(), MAX_BYTES, "MAX_BYTES disagrees with encode(u128::MAX).len()");
+            assert_eq!(
+                buf.len(),
+                MAX_BYTES,
+                "MAX_BYTES disagrees with encode(u128::MAX).len()"
+            );
             assert_eq!(encoded_len(u128::MAX), MAX_BYTES);
             assert_eq!(encoded_bytes(u128::MAX).len(), MAX_BYTES);
         }
@@ -1705,7 +1708,7 @@ mod tests {
                         assert_eq!(
                             re_encoded.as_slice(),
                             buf.get(..consumed).unwrap_or_default(),
-                             "bijection violated: decode({:02X?}) = {value}, \
+                            "bijection violated: decode({:02X?}) = {value}, \
                              re-encode = {:02X?}",
                             buf.get(..consumed).unwrap_or_default(),
                             re_encoded
