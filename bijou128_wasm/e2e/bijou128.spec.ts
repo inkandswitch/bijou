@@ -174,6 +174,38 @@ test("Bijou128DecodeError thrown is an instance of the platform Error", async ({
   expect(result.hasStack).toBe(true);
 });
 
+test("decode throws TypeError on non-Uint8Array input (no silent truncation)", async ({ page }) => {
+  // Guards the shipped dist against the silent-truncation footgun in a
+  // real browser: a plain JS Array would be coerced via
+  // `new Uint8Array(arr)`, truncating out-of-range elements
+  // (1000 & 0xFF === 232). decode/decodeAll must reject anything that
+  // isn't a real Uint8Array.
+  const result = await page.evaluate(() => {
+    const { decode, decodeAll } = (window as any).bijou128;
+    const bad: unknown[] = [[1000], [0x00], null, 42, "nope"];
+    const out = { fn: "", allTypeError: true };
+    for (const input of bad) {
+      for (const [name, f] of [
+        ["decode", decode],
+        ["decodeAll", decodeAll],
+      ] as const) {
+        try {
+          f(input);
+          out.fn = name;
+          out.allTypeError = false;
+        } catch (e: any) {
+          if (!(e instanceof TypeError)) {
+            out.fn = name;
+            out.allTypeError = false;
+          }
+        }
+      }
+    }
+    return out;
+  });
+  expect(result.allTypeError, `failing fn: ${result.fn}`).toBe(true);
+});
+
 test("encode throws RangeError for bigint >= 2n ** 128n", async ({ page }) => {
   const result = await page.evaluate(() => {
     const { encode } = (window as any).bijou128;

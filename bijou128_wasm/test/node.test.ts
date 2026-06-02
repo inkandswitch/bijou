@@ -125,6 +125,20 @@ describe("bijou128 (node)", () => {
         expect(e.stack).to.be.a("string").and.not.empty;
       }
     });
+
+    it("throws TypeError on non-Uint8Array input (no silent truncation)", () => {
+      // Guards the shipped dist against the silent-truncation footgun:
+      // a plain JS Array would be coerced via `new Uint8Array(arr)`,
+      // bitwise-truncating out-of-range elements (1000 & 0xFF === 232).
+      // decode/decodeAll must reject anything that isn't a real
+      // Uint8Array. Exercised here through the published package (the
+      // wasm-bindgen ABI layer is covered separately in tests/wasm.rs).
+      const bad: unknown[] = [[1000], [0x00], null, 42, "nope"];
+      for (const input of bad) {
+        expect(() => (bijou128.decode as any)(input)).to.throw(TypeError);
+        expect(() => (bijou128.decodeAll as any)(input)).to.throw(TypeError);
+      }
+    });
   });
 
   describe("encode (errors)", () => {

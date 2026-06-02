@@ -835,7 +835,7 @@ mod tests {
             // might share.
             assert_eq!(OFFSETS[0], 0);
             for tier in 1..=NUM_TIERS {
-                let mut expected = TAG_THRESHOLD as u128;
+                let mut expected = u128::from(TAG_THRESHOLD);
                 let mut power = 1u128; // 256^0
                 for _ in 1..tier {
                     power *= 256;
