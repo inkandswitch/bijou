@@ -329,9 +329,9 @@
             "bodge:32"
             cd "$WORKSPACE_ROOT/bijou32_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm run test:js:node
+            ${pkgs.pnpm}/bin/pnpm run test:js:node
           '';
 
           "test:js:32:browser" = cmd "Run bijou32_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge:32)" ''
@@ -339,17 +339,17 @@
             "bodge:32"
             cd "$WORKSPACE_ROOT/bijou32_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright test
+            ${pkgs.pnpm}/bin/pnpm exec playwright test
           '';
 
           "test:js:32:browser:report" = cmd "Open the most recent bijou32_wasm Playwright HTML report" ''
             cd "$WORKSPACE_ROOT/bijou32_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright show-report
+            ${pkgs.pnpm}/bin/pnpm exec playwright show-report
           '';
 
           "test:js:128" = cmd "Run bijou128_wasm JS-package tests in Node + browsers (rebuilds dist via bodge:128)" ''
@@ -363,9 +363,9 @@
             "bodge:128"
             cd "$WORKSPACE_ROOT/bijou128_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm run test:js:node
+            ${pkgs.pnpm}/bin/pnpm run test:js:node
           '';
 
           "test:js:128:browser" = cmd "Run bijou128_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge:128)" ''
@@ -373,17 +373,17 @@
             "bodge:128"
             cd "$WORKSPACE_ROOT/bijou128_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright test
+            ${pkgs.pnpm}/bin/pnpm exec playwright test
           '';
 
           "test:js:128:browser:report" = cmd "Open the most recent bijou128_wasm Playwright HTML report" ''
             cd "$WORKSPACE_ROOT/bijou128_wasm"
             if [ ! -d node_modules ]; then
-              ${pkgs.nodePackages.pnpm}/bin/pnpm install --frozen-lockfile
+              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
-            ${pkgs.nodePackages.pnpm}/bin/pnpm exec playwright show-report
+            ${pkgs.pnpm}/bin/pnpm exec playwright show-report
           '';
 
           "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package)" ''
