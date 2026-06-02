@@ -72,7 +72,7 @@ Or, to get every value or the first error in one call:
 let values: Result<Vec<u32>, _> = bijou32::decode_all(&buf);
 ```
 
-See [`examples/decode.rs`](./examples/decode.rs) for a runnable
+See [`examples/decode32.rs`](./examples/decode32.rs) for a runnable
 demonstration of all three patterns.
 
 ## Encoding
@@ -137,6 +137,15 @@ analysis all live there:
 
 Dedicated bijou32 benchmarks are planned but not yet in this
 repository.
+
+## Family
+
+bijou32 is one of three width-specialised siblings sharing the same
+recurrence, big-endian payload layout, and canonical-by-construction
+property. They differ only in the tag-byte threshold and tier count:
+
+- [`bijou64`](../bijou64) — `u64` variant (1–9 bytes, threshold `248`).
+- [`bijou128`](../bijou128) — wider `u128` variant (1–17 bytes, threshold `240`).
 
 ## License
 

@@ -1,6 +1,6 @@
 //! Streaming encode and decode.
 //!
-//! Many real-world uses of `bijou32` involve a stream of values rather
+//! Many real-world uses of `bijou64` involve a stream of values rather
 //! than a single one — a length-prefixed framing protocol, a list of
 //! offsets, a series of counters. This example shows the canonical
 //! patterns for both directions.
@@ -8,15 +8,15 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run --example decode --package bijou32
+//! cargo run --example decode64 --package bijou64
 //! ```
 //!
 //! Four patterns are demonstrated, in order from highest- to
 //! lowest-level:
 //!
-//! 1. **`decode_all`** — eager batch decode into a `Vec<u32>`. The
+//! 1. **`decode_all`** — eager batch decode into a `Vec<u64>`. The
 //!    simplest spelling when you want every value or the first error.
-//! 2. **`decode_iter`** — lazy `Iterator<Item = Result<u32, DecodeError>>`.
+//! 2. **`decode_iter`** — lazy `Iterator<Item = Result<u64, DecodeError>>`.
 //!    Cleaner for combinator chains (`map`, `filter`, `take`).
 //! 3. **`decode_iter` with `collect::<Result<Vec, _>>`** — what
 //!    `decode_all` does under the hood, written out.
@@ -24,10 +24,10 @@
 //!    Works in any Rust environment; useful when you want to interleave
 //!    other reads between bijou decodes.
 
-use bijou32::{DecodeError, decode, decode_all, decode_iter, encode};
+use bijou64::{DecodeError, decode, decode_all, decode_iter, encode};
 
 fn main() -> Result<(), DecodeError> {
-    let values: &[u32] = &[0, 1, 42, 251, 252, 507, 508, 65_535, 1u32 << 24, u32::MAX];
+    let values: &[u64] = &[0, 1, 42, 247, 248, 503, 504, 65_535, 1u64 << 32, u64::MAX];
 
     // -------- Encode --------
     //
@@ -68,7 +68,7 @@ fn main() -> Result<(), DecodeError> {
     // Equivalent to Pattern 1. Useful to know if you want a Vec but
     // also want to fuse extra iterator combinators in.
     {
-        let decoded: Result<Vec<u32>, DecodeError> = decode_iter(&buf).collect();
+        let decoded: Result<Vec<u64>, DecodeError> = decode_iter(&buf).collect();
         assert_eq!(decoded?, values);
         println!(
             "[collect] decoded {} values via decode_iter().collect::<Result<Vec, _>>()",

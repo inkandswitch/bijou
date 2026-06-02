@@ -73,8 +73,18 @@
 //! assert_eq!(len, 17);
 //! ```
 //!
+//! # Family
+//!
+//! bijou128 is one of three width-specialised siblings sharing the same
+//! recurrence, big-endian payload layout, and canonical-by-construction
+//! property. They differ only in the tag-byte threshold and tier count:
+//!
+//! - [`bijou32`] — narrower `u32` variant (1–5 bytes, threshold `252`).
+//! - [`bijou64`] — `u64` variant (1–9 bytes, threshold `248`).
+//!
 //! [VARU64]: https://github.com/AljoschaMeyer/varu64-rs
 //! [bijective numeration]: https://en.wikipedia.org/wiki/Bijective_numeration
+//! [`bijou32`]: https://docs.rs/bijou32
 //! [`bijou64`]: https://docs.rs/bijou64
 
 #![no_std]
