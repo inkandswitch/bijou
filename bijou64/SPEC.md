@@ -291,20 +291,26 @@ In bijou64, the offset addition replaces this runtime check with a structural gu
 
 The trade-off is that bijou64 payloads are not the raw value, so hexdump inspection is less direct for values above 247. For values below 248 (the common case), the encoding is byte-identical to VARU64.
 
-# Future Extensions
+# Width Variants
 
-The bijou64 design generalizes naturally to other integer widths. The offset recurrence, tag-byte framing, and bijective property are not specific to 64-bit integers — they depend only on the tag threshold (248), the number of tiers, and the maximum payload width. A family of encodings could be defined:
+The bijou64 design generalizes naturally to other integer widths. The offset recurrence, tag-byte framing, and bijective property are not specific to 64-bit integers — they depend only on the tag threshold, the number of tiers, and the maximum payload width.
 
-| Variant  | Max value   | Max bytes | Tiers |
-|----------|-------------|-----------|-------|
-| bijou16  | `u16::MAX`  | 3         | 0–2   |
-| bijou32  | `u32::MAX`  | 5         | 0–4   |
-| bijou64  | `u64::MAX`  | 9         | 0–8   |
-| bijou128 | `u128::MAX` | 17        | 0–16  |
+Three width variants are currently specified:
 
-Each variant would use the same tag-byte threshold (248), the same offset recurrence, and the same encoding/decoding algorithms — differing only in the number of tiers and the maximum payload width. bijou128 would require tag bytes beyond `0xFF`, which would need an extended framing scheme (e.g., `0xFF` followed by a secondary length byte).
+| Variant                       | Max value   | Max bytes | Tiers | Tag threshold |
+|-------------------------------|-------------|-----------|-------|---------------|
+| [bijou32](../bijou32/SPEC.md) | `u32::MAX`  | 5         | 0–4   | 252           |
+| bijou64 (this spec)           | `u64::MAX`  | 9         | 0–8   | 248           |
+| [bijou128](../bijou128/SPEC.md) | `u128::MAX` | 17        | 0–16  | 240           |
 
-This specification does not define these variants. They are noted here to show that the design is not ad hoc — it is a specific instance of a general construction that could be extended if the need arises.
+Each variant uses the **widest tag threshold its tier count allows**, maximising the single-byte literal range. This was a revision to the original bijou64 specification, which speculated that all variants would share threshold 248 (matching VARU64). Choosing per-variant thresholds:
+
+- Lets bijou32 encode values 248–251 as a single byte (one byte shorter than they would be at threshold 248).
+- Lets bijou128 fit all 16 multi-byte tiers within a single tag byte (`0xF0`–`0xFF`), avoiding the secondary-length-byte mechanism the original spec speculated would be necessary.
+
+The cost is that the three variants are **not wire-compatible**: a byte sequence valid under one threshold can decode to a different value (or fail to decode) under another. Picking the right variant is a deployment decision, made out of band. See each variant's SPEC for full details.
+
+A `bijou16` variant for `u16` is not currently specified; if added, it would follow the same pattern (tag threshold 254 — just `0xFE`/`0xFF` for tiers 1–2 — and max 3 bytes).
 
 # License
 

@@ -1,20 +1,27 @@
-//! Bijective variable-length encoding for unsigned 64-bit integers.
+//! Bijective variable-length encoding for unsigned 32-bit integers.
 //!
-//! bijou64 (**BIJ**ective **O**ffset **U64**) encodes `u64` values into 1–9
+//! bijou32 (**BIJ**ective **O**ffset **U32**) encodes `u32` values into 1–5
 //! bytes using a tag-byte prefix scheme derived from [VARU64], modified with
 //! per-tier offsets to achieve **structural canonicality** — each value has
-//! exactly one encoding, and each encoding has exactly one value. This is
-//! [bijective numeration] applied to VARU64's tag-byte framing.
+//! exactly one encoding, and each encoding has exactly one value.
 //!
-//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/bijou64/SPEC.md)
+//! bijou32 is the narrower sibling of [`bijou64`]: same recurrence, same
+//! big-endian payload layout, same canonical-by-construction property,
+//! adapted for the `u32` value range with only 4 multi-byte tiers needed.
+//! The tag-byte threshold is `252` (vs `bijou64`'s `248`), reserving the
+//! upper 4 tag values (`0xFC..=0xFF`) for tiers 1..=4. The wider tier-0
+//! range (`0..=251`) means tier-0-heavy distributions encode in slightly
+//! fewer bytes than `bijou64` would for the same values.
+//!
+//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/bijou32/SPEC.md)
 //! for the full format definition, design rationale, and test vectors.
 //!
 //! # Encoding
 //!
 //! The first byte determines the encoding:
 //!
-//! - `0x00..=0xF7` (0–247): the byte _is_ the value. One byte total.
-//! - `0xF8..=0xFF` (248–255): length tag. Additional bytes = `tag - 247`.
+//! - `0x00..=0xFB` (0–251): the byte _is_ the value. One byte total.
+//! - `0xFC..=0xFF` (252–255): length tag. Additional bytes = `tag - 251`.
 //!   Payload is big-endian `value - OFFSET[tier]`.
 //!
 //! The offset for each tier is the first value not representable by the
@@ -24,50 +31,45 @@
 //! ┌───────────┬──────────────────┬─────────────────────────────────────────────────┐
 //! │ Tag       │ Additional bytes │ Value range                                     │
 //! ├───────────┼──────────────────┼─────────────────────────────────────────────────┤
-//! │ 0x00-0xF7 │ 0                │ 0 - 247                                         │
-//! │ 0xF8      │ 1                │ 248 - 503                                       │
-//! │ 0xF9      │ 2                │ 504 - 66,039                                    │
-//! │ 0xFA      │ 3                │ 66,040 - 16,843,255                             │
-//! │ 0xFB      │ 4                │ 16,843,256 - 4,311,810,551                      │
-//! │ 0xFC      │ 5                │ 4,311,810,552 - 1,103,823,438,327               │
-//! │ 0xFD      │ 6                │ 1,103,823,438,328 - 282,578,800,148,983         │
-//! │ 0xFE      │ 7                │ 282,578,800,148,984 - 72,340,172,838,076,919    │
-//! │ 0xFF      │ 8                │ 72,340,172,838,076,920 - u64::MAX               │
+//! │ 0x00-0xFB │ 0                │ 0 – 251                                         │
+//! │ 0xFC      │ 1                │ 252 – 507                                       │
+//! │ 0xFD      │ 2                │ 508 – 66,043                                    │
+//! │ 0xFE      │ 3                │ 66,044 – 16,843,259                             │
+//! │ 0xFF      │ 4                │ 16,843,260 – u32::MAX                           │
 //! └───────────┴──────────────────┴─────────────────────────────────────────────────┘
 //! ```
 //!
 //! # Canonicality
 //!
 //! Unlike [VARU64], which requires a runtime check to reject overlong
-//! encodings, bijou64 achieves canonicality structurally: each tier's value
-//! range is disjoint, so no byte sequence can decode to a value representable
-//! in a shorter form. The only decoder error conditions are buffer underflow
-//! and arithmetic overflow on tier 8.
+//! encodings, bijou32 achieves canonicality structurally: each tier's value
+//! range is disjoint, so no byte sequence can decode to a value
+//! representable in a shorter form. The only decoder error conditions are
+//! buffer underflow and arithmetic overflow on tier 4.
 //!
 //! # Examples
 //!
 //! ```
 //! let mut buf = Vec::new();
-//! bijou64::encode(300, &mut buf);
-//! assert_eq!(buf, [0xF8, 0x34]); // tag 248, payload 300 - 248 = 52
+//! bijou32::encode(300, &mut buf);
+//! assert_eq!(buf, [0xFC, 0x30]); // tag 252, payload 300 - 252 = 48
 //!
-//! let (value, len) = bijou64::decode(&buf).unwrap();
+//! let (value, len) = bijou32::decode(&buf).unwrap();
 //! assert_eq!(value, 300);
 //! assert_eq!(len, 2);
 //! ```
 //!
 //! # Family
 //!
-//! bijou64 is one of three width-specialised siblings sharing the same
+//! bijou32 is one of three width-specialised siblings sharing the same
 //! recurrence, big-endian payload layout, and canonical-by-construction
 //! property. They differ only in the tag-byte threshold and tier count:
 //!
-//! - [`bijou32`] — narrower `u32` variant (1–5 bytes, threshold `252`).
+//! - [`bijou64`] — `u64` variant (1–9 bytes, threshold `248`).
 //! - [`bijou128`] — wider `u128` variant (1–17 bytes, threshold `240`).
 //!
 //! [VARU64]: https://github.com/AljoschaMeyer/varu64-rs
-//! [bijective numeration]: https://en.wikipedia.org/wiki/Bijective_numeration
-//! [`bijou32`]: https://docs.rs/bijou32
+//! [`bijou64`]: https://docs.rs/bijou64
 //! [`bijou128`]: https://docs.rs/bijou128
 
 #![no_std]
@@ -79,30 +81,34 @@ extern crate alloc;
 #[allow(unused_imports)] // vec! macro used in tests
 use alloc::{vec, vec::Vec};
 
-/// Maximum number of bytes a `bijou64` encoding can occupy.
-pub const MAX_BYTES: usize = 9;
+/// Maximum number of bytes a `bijou32` encoding can occupy.
+pub const MAX_BYTES: usize = 5;
 
 /// Tag byte threshold: values below this are encoded as a single byte.
-const TAG_THRESHOLD: u8 = 248;
+///
+/// Compare with `bijou64::TAG_THRESHOLD = 248`; bijou32 reserves only 4
+/// tag values (`0xFC..=0xFF`) since 4 multi-byte tiers suffice to span
+/// 32 bits.
+const TAG_THRESHOLD: u8 = 252;
 
-/// Number of multi-byte tiers (tags 248–255).
-const NUM_TIERS: usize = 8;
+/// Number of multi-byte tiers (tags 252–255).
+const NUM_TIERS: usize = 4;
 
 /// Computes the tier offset for tier `n`.
 ///
 /// Each tier's offset is the first value not representable by the previous
 /// tier. Recurrence: `offset(n) = offset(n-1) + 256^(n-1)` for `n >= 2`,
-/// with `offset(1) = 248` and `offset(0) = 0`.
-const fn tier_offset(n: usize) -> u64 {
+/// with `offset(1) = 252` and `offset(0) = 0`.
+const fn tier_offset(n: usize) -> u32 {
     if n == 0 {
         return 0;
     }
     if n == 1 {
-        return TAG_THRESHOLD as u64;
+        return TAG_THRESHOLD as u32;
     }
 
-    let mut result = TAG_THRESHOLD as u64;
-    let mut power = 1u64; // 256^0
+    let mut result = TAG_THRESHOLD as u32;
+    let mut power = 1u32; // 256^0
     let mut i = 2;
     while i <= n {
         power = power.saturating_mul(256);
@@ -116,57 +122,48 @@ const fn tier_offset(n: usize) -> u64 {
 ///
 /// `OFFSETS[t]` is the first value that requires tier `t` (1-indexed).
 /// Index 0 is unused (tier 0 values are encoded as the tag byte itself).
-const OFFSETS: [u64; NUM_TIERS + 1] = [
+const OFFSETS: [u32; NUM_TIERS + 1] = [
     tier_offset(0),
     tier_offset(1),
     tier_offset(2),
     tier_offset(3),
     tier_offset(4),
-    tier_offset(5),
-    tier_offset(6),
-    tier_offset(7),
-    tier_offset(8),
 ];
 
 /// Per-tier upper bounds (exclusive).
 ///
 /// A value belongs to tier `t` if `OFFSETS[t] <= value < BOUNDS[t]`.
-/// `BOUNDS[t] == OFFSETS[t + 1]` for tiers 1–7. Tier 8 extends to
-/// `u64::MAX` (the decoder handles overflow via `checked_add`).
-const BOUNDS: [u64; NUM_TIERS + 1] = [
+/// `BOUNDS[t] == OFFSETS[t + 1]` for tiers 1–3. Tier 4 extends to
+/// `u32::MAX` (the decoder handles overflow via `checked_add`).
+const BOUNDS: [u32; NUM_TIERS + 1] = [
     tier_offset(1), // tier 0 upper bound = tier 1 offset
     tier_offset(2),
     tier_offset(3),
     tier_offset(4),
-    tier_offset(5),
-    tier_offset(6),
-    tier_offset(7),
-    tier_offset(8),
-    u64::MAX, // tier 8 extends to u64::MAX
+    u32::MAX, // tier 4 extends to u32::MAX
 ];
 
-/// Returns the encoded length of `value` in bytes (1–9).
+/// Returns the encoded length of `value` in bytes (1–5).
 ///
 /// Uses `leading_zeros` (a single `lzcnt`/`clz` instruction on most
 /// architectures) to derive a candidate tier from the value's bit-width,
 /// then applies at most one comparison to correct for the per-tier
-/// offsets. This replaces the previous 8-arm if/else chain with O(1)
-/// arithmetic.
+/// offsets. This replaces a 4-arm if/else chain with O(1) arithmetic.
 ///
 /// # Examples
 ///
 /// ```
-/// assert_eq!(bijou64::encoded_len(0), 1);
-/// assert_eq!(bijou64::encoded_len(247), 1);
-/// assert_eq!(bijou64::encoded_len(248), 2);
-/// assert_eq!(bijou64::encoded_len(503), 2);
-/// assert_eq!(bijou64::encoded_len(504), 3);
-/// assert_eq!(bijou64::encoded_len(u64::MAX), 9);
+/// assert_eq!(bijou32::encoded_len(0), 1);
+/// assert_eq!(bijou32::encoded_len(251), 1);
+/// assert_eq!(bijou32::encoded_len(252), 2);
+/// assert_eq!(bijou32::encoded_len(507), 2);
+/// assert_eq!(bijou32::encoded_len(508), 3);
+/// assert_eq!(bijou32::encoded_len(u32::MAX), 5);
 /// ```
 #[inline]
 #[must_use]
-pub const fn encoded_len(value: u64) -> usize {
-    // Fast path: tier 0 values (0–247) are the most common in many
+pub const fn encoded_len(value: u32) -> usize {
+    // Fast path: tier 0 values (0–251) are the most common in many
     // workloads and need only a single well-predicted comparison.
     if value < BOUNDS[0] {
         return 1;
@@ -175,20 +172,22 @@ pub const fn encoded_len(value: u64) -> usize {
     // For multi-byte tiers, derive the tier from the value's bit-width
     // via `leading_zeros` (a single `lzcnt`/`clz` instruction on most
     // architectures), then correct with one comparison.
-    let bw = 64 - value.leading_zeros(); // u32, 8..=64 here
+    let bw = 32 - value.leading_zeros(); // u32, 8..=32 here
 
-    // Tier boundaries align to bit-widths 8, 9, 17, 25, 33, 41, 49, 57.
-    // For bw=8 -> candidate 2, bw 9..=16 -> 3, 17..=24 -> 4, etc.
-    // Formula: (bw - 1) / 8 + 2, which also gives 2 for bw=8.
+    // Same formula as bijou64: `(bw - 1) / 8 + 2`.
+    //   bw=8     -> candidate 2 (tier 1, 2 bytes total)
+    //   bw=9..16 -> candidate 3 (tier 2, 3 bytes total)
+    //   bw=17..24 -> candidate 4 (tier 3, 4 bytes total)
+    //   bw=25..32 -> candidate 5 (tier 4, 5 bytes total)
     let candidate = ((bw - 1) / 8 + 2) as usize;
 
-    // The candidate can be at most 1 too high because bijou64's tier
+    // The candidate can be at most 1 too high because bijou32's tier
     // offsets push the boundary slightly past each power-of-256.
     // One comparison corrects for boundary values.
     //
-    // SAFETY (indexing): candidate ∈ [2, 9] because bw ∈ [8, 64] after the
-    // tier-0 early return, so candidate - 2 ∈ [0, 7] — always in bounds
-    // for the 9-element BOUNDS array.
+    // SAFETY (indexing): `candidate ∈ [2, 5]` because `bw ∈ [8, 32]` after
+    // the tier-0 early return, so `candidate - 2 ∈ [0, 3]` — always in
+    // bounds for the 5-element `BOUNDS` array.
     #[allow(clippy::indexing_slicing)]
     if value < BOUNDS[candidate - 2] {
         candidate - 1
@@ -197,27 +196,27 @@ pub const fn encoded_len(value: u64) -> usize {
     }
 }
 
-/// Encodes `value` as a `bijou64`, appending bytes to `buf`.
+/// Encodes `value` as a `bijou32`, appending bytes to `buf`.
 ///
 /// # Examples
 ///
 /// ```
 /// let mut buf = Vec::new();
-/// bijou64::encode(42, &mut buf);
+/// bijou32::encode(42, &mut buf);
 /// assert_eq!(buf, [0x2A]);
 ///
 /// buf.clear();
-/// bijou64::encode(248, &mut buf);
-/// assert_eq!(buf, [0xF8, 0x00]);
+/// bijou32::encode(252, &mut buf);
+/// assert_eq!(buf, [0xFC, 0x00]);
 /// ```
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
-pub fn encode(value: u64, buf: &mut Vec<u8>) {
+pub fn encode(value: u32, buf: &mut Vec<u8>) {
     if value < BOUNDS[0] {
         buf.push((value & 0xFF) as u8);
         return;
     }
 
-    let bw = 64 - value.leading_zeros();
+    let bw = 32 - value.leading_zeros();
     let mut tier = ((bw - 1) / 8 + 1) as usize;
     if value < BOUNDS[tier - 1] {
         tier -= 1;
@@ -228,11 +227,11 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
     let pb = payload.to_be_bytes();
 
     let original_len = buf.len();
-    buf.extend_from_slice(&[tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]]);
+    buf.extend_from_slice(&[tag, pb[0], pb[1], pb[2], pb[3]]);
     buf.truncate(original_len + tier + 1);
 }
 
-/// A stack-allocated bijou64 encoding, carrying its own valid length.
+/// A stack-allocated bijou32 encoding, carrying its own valid length.
 ///
 /// Returned by [`encoded_bytes`]. Always exposes the correct byte
 /// slice via `Deref<Target = [u8]>` and `AsRef<[u8]>`, so callers can
@@ -241,12 +240,12 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
 /// # Examples
 ///
 /// ```
-/// use bijou64::encoded_bytes;
+/// use bijou32::encoded_bytes;
 ///
 /// let enc = encoded_bytes(300);
-/// assert_eq!(&*enc, &[0xF8, 0x34]);   // Deref<Target = [u8]>
+/// assert_eq!(&*enc, &[0xFC, 0x30]);   // Deref<Target = [u8]>
 /// assert_eq!(enc.len(), 2);
-/// assert_eq!(enc.as_ref(), &[0xF8, 0x34][..]);
+/// assert_eq!(enc.as_ref(), &[0xFC, 0x30][..]);
 ///
 /// // Works wherever `&[u8]` is accepted:
 /// fn send(bytes: &[u8]) -> usize { bytes.len() }
@@ -254,31 +253,25 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
 ///
 /// // Iterate the encoded bytes:
 /// let collected: Vec<u8> = enc.into_iter().collect();
-/// assert_eq!(collected, [0xF8, 0x34]);
+/// assert_eq!(collected, [0xFC, 0x30]);
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct EncodedBytes {
     buf: [u8; MAX_BYTES],
     /// Invariant: `len <= MAX_BYTES`. Stored as `u8` because the value
-    /// is always in `1..=9`; the smaller width makes `EncodedBytes`
-    /// fit in 10 bytes total and `Copy` cheaper.
+    /// is always in `1..=5`; the smaller width makes `EncodedBytes`
+    /// fit in 6 bytes total and `Copy` cheaper.
     len: u8,
 }
 
 // We implement `PartialEq`, `Eq`, `Hash`, `PartialOrd`, and `Ord` by
 // hand against the encoded byte slice (`self.as_slice()`) rather than
-// deriving them on the `(buf, len)` pair. Two reasons:
-//
-//  1. The trailing `MAX_BYTES - len` bytes of `buf` are always zero,
-//     so a derived `PartialEq` *would* compare them and give the same
-//     answer — but only because we maintain that zero-padding
-//     invariant. Comparing the live slice removes that subtle
-//     coupling.
-//
-//  2. Bijou's lex-order property (SPEC.md: "lexicographic byte order
-//     equals numeric order") is the natural ordering for these
-//     values. Making `Ord` explicitly compare `as_slice()` documents
-//     the intent at the impl site.
+// deriving them on the `(buf, len)` pair. Same rationale as bijou64:
+// the trailing `MAX_BYTES - len` bytes of `buf` are always zero, so a
+// derived `PartialEq` *would* match — but only because we maintain
+// that zero-padding invariant. Comparing the live slice removes that
+// subtle coupling, and explicitly compares via the natural lex order
+// that bijou guarantees matches numeric order.
 
 impl PartialEq for EncodedBytes {
     #[inline]
@@ -336,10 +329,6 @@ impl EncodedBytes {
     #[must_use]
     #[allow(clippy::indexing_slicing)] // len is invariant <= MAX_BYTES
     pub const fn as_slice(&self) -> &[u8] {
-        // Const slicing requires a constant range; `self.len()` is not
-        // const-usable in a slice index expression directly, but we
-        // can hand-roll a `split_at` style call. `&buf[..n]` works in
-        // const fn as of Rust 1.85+.
         self.buf.split_at(self.len as usize).0
     }
 }
@@ -399,49 +388,49 @@ impl<'a> IntoIterator for &'a EncodedBytes {
 /// # Examples
 ///
 /// ```
-/// let enc = bijou64::encoded_bytes(300);
-/// assert_eq!(&*enc, &[0xF8, 0x34]);
+/// let enc = bijou32::encoded_bytes(300);
+/// assert_eq!(&*enc, &[0xFC, 0x30]);
 ///
 /// // Use it anywhere a byte slice is accepted:
 /// let mut sink = Vec::new();
 /// sink.extend_from_slice(&enc);
-/// assert_eq!(sink, [0xF8, 0x34]);
+/// assert_eq!(sink, [0xFC, 0x30]);
 /// ```
 #[inline]
 #[must_use]
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
-pub const fn encoded_bytes(value: u64) -> EncodedBytes {
+pub const fn encoded_bytes(value: u32) -> EncodedBytes {
     if value < BOUNDS[0] {
         return EncodedBytes {
-            buf: [(value & 0xFF) as u8, 0, 0, 0, 0, 0, 0, 0, 0],
+            buf: [(value & 0xFF) as u8, 0, 0, 0, 0],
             len: 1,
         };
     }
 
-    let bw = 64 - value.leading_zeros();
+    let bw = 32 - value.leading_zeros();
     let mut tier = ((bw - 1) / 8 + 1) as usize;
     if value < BOUNDS[tier - 1] {
         tier -= 1;
     }
 
     // Shift the payload so its `tier` significant bytes occupy the
-    // high `tier` bytes of a u64. After `to_be_bytes()` those bytes
-    // land at positions 0..tier, with zeros at positions tier..8 — so
-    // the entire 9-byte array can be constructed as one fixed-shape
-    // literal that LLVM compiles to a single `bswap` + 9-byte store.
+    // high `tier` bytes of a u32. After `to_be_bytes()` those bytes
+    // land at positions 0..tier, with zeros at positions tier..4 — so
+    // the entire 5-byte array can be constructed as one fixed-shape
+    // literal that LLVM compiles to a single `bswap` + 5-byte store.
     let tag = (TAG_THRESHOLD as usize + tier - 1) as u8;
     let payload = (value - OFFSETS[tier]) << (8 * (NUM_TIERS - tier));
     let pb = payload.to_be_bytes();
 
     EncodedBytes {
-        buf: [tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]],
-        // Invariant: `tier ∈ [1, 8]` and `1 <= tier + 1 <= MAX_BYTES = 9`,
+        buf: [tag, pb[0], pb[1], pb[2], pb[3]],
+        // Invariant: `tier ∈ [1, 4]` and `2 <= tier + 1 <= MAX_BYTES = 5`,
         // so the cast cannot truncate.
         len: (tier + 1) as u8,
     }
 }
 
-/// Decodes a `bijou64` from the front of `buf`.
+/// Decodes a `bijou32` from the front of `buf`.
 ///
 /// Returns `(value, bytes_consumed)` on success.
 ///
@@ -449,80 +438,56 @@ pub const fn encoded_bytes(value: u64) -> EncodedBytes {
 ///
 /// - [`DecodeError::BufferTooShort`] if `buf` has fewer bytes than the
 ///   encoding requires.
-/// - [`DecodeError::Overflow`] if the input is a tier-8 encoding
-///   (first byte `0xFF`) whose 8-byte payload, added to the tier-8
-///   offset (approximately 7.2×10¹⁶), would exceed `u64::MAX`. See
-///   `SPEC.md` for the per-tier offset table.
+/// - [`DecodeError::Overflow`] if the input is a tier-4 encoding
+///   (first byte `0xFF`) whose 4-byte payload, added to the tier-4
+///   offset (`16,843,260`), would exceed `u32::MAX`.
 ///
 /// # Examples
 ///
 /// ```
 /// // Single-byte value
-/// let (v, n) = bijou64::decode(&[0x2A]).unwrap();
+/// let (v, n) = bijou32::decode(&[0x2A]).unwrap();
 /// assert_eq!((v, n), (42, 1));
 ///
 /// // Multi-byte value with trailing data
-/// let (v, n) = bijou64::decode(&[0xF8, 0x34, 0xFF]).unwrap();
+/// let (v, n) = bijou32::decode(&[0xFC, 0x30, 0xFF]).unwrap();
 /// assert_eq!((v, n), (300, 2));
 /// ```
 #[inline]
 #[allow(clippy::many_single_char_names)] // byte destructuring in slice patterns
-pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
+pub const fn decode(buf: &[u8]) -> Result<(u32, usize), DecodeError> {
     let Some((&tag, rest)) = buf.split_first() else {
         return Err(DecodeError::BufferTooShort);
     };
 
     if tag < TAG_THRESHOLD {
-        return Ok((tag as u64, 1));
+        return Ok((tag as u32, 1));
     }
 
     // Read big-endian payload and add tier offset. Slice-pattern matching
     // proves to the compiler that enough bytes exist in each arm, and
-    // `u64::from_be_bytes` reconstructs the payload without manual shifts.
+    // `u32::from_be_bytes` reconstructs the payload without manual shifts.
     //
-    // NOTE: tried consolidating to a single tier-dispatched while-loop
-    // pad — that regressed decode by 4–7× on Zen 5. LLVM specialises each
-    // arm here to a fixed-size copy; the consolidated form compiles to a
-    // runtime-length memcpy whose dispatch overhead dwarfs the work.
-    // See `OPTIMISATION.md`.
+    // NOTE: bijou64 documents that consolidating these into a single
+    // tier-dispatched while-loop pad regressed decode 4–7× on Zen 5 because
+    // LLVM specialises each arm here to a fixed-size copy. The same
+    // expectation applies at 32 bits — keep the per-tier arms.
     let (offset, payload, consumed) = match tag {
-        0xF8 => match rest {
-            &[a, ..] => (OFFSETS[1], u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, a]), 2),
-            _ => return Err(DecodeError::BufferTooShort),
-        },
-        0xF9 => match rest {
-            &[a, b, ..] => (OFFSETS[2], u64::from_be_bytes([0, 0, 0, 0, 0, 0, a, b]), 3),
-            _ => return Err(DecodeError::BufferTooShort),
-        },
-        0xFA => match rest {
-            &[a, b, c, ..] => (OFFSETS[3], u64::from_be_bytes([0, 0, 0, 0, 0, a, b, c]), 4),
-            _ => return Err(DecodeError::BufferTooShort),
-        },
-        0xFB => match rest {
-            &[a, b, c, d, ..] => (OFFSETS[4], u64::from_be_bytes([0, 0, 0, 0, a, b, c, d]), 5),
-            _ => return Err(DecodeError::BufferTooShort),
-        },
         0xFC => match rest {
-            &[a, b, c, d, e, ..] => (OFFSETS[5], u64::from_be_bytes([0, 0, 0, a, b, c, d, e]), 6),
+            &[a, ..] => (OFFSETS[1], u32::from_be_bytes([0, 0, 0, a]), 2),
             _ => return Err(DecodeError::BufferTooShort),
         },
         0xFD => match rest {
-            &[a, b, c, d, e, f, ..] => {
-                (OFFSETS[6], u64::from_be_bytes([0, 0, a, b, c, d, e, f]), 7)
-            }
+            &[a, b, ..] => (OFFSETS[2], u32::from_be_bytes([0, 0, a, b]), 3),
             _ => return Err(DecodeError::BufferTooShort),
         },
         0xFE => match rest {
-            &[a, b, c, d, e, f, g, ..] => {
-                (OFFSETS[7], u64::from_be_bytes([0, a, b, c, d, e, f, g]), 8)
-            }
+            &[a, b, c, ..] => (OFFSETS[3], u32::from_be_bytes([0, a, b, c]), 4),
             _ => return Err(DecodeError::BufferTooShort),
         },
-        // 0xFF — only remaining value since tag >= TAG_THRESHOLD (248)
+        // 0xFF — only remaining value since tag >= TAG_THRESHOLD (252)
         _ => match rest {
-            &[a, b, c, d, e, f, g, h, ..] => {
-                (OFFSETS[8], u64::from_be_bytes([a, b, c, d, e, f, g, h]), 9)
-            }
+            &[a, b, c, d, ..] => (OFFSETS[4], u32::from_be_bytes([a, b, c, d]), 5),
             _ => return Err(DecodeError::BufferTooShort),
         },
     };
@@ -533,7 +498,7 @@ pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
     }
 }
 
-/// Iterator over the bijou64-encoded values in `buf`.
+/// Iterator over the bijou32-encoded values in `buf`.
 ///
 /// Calling [`decode_iter`] is equivalent to writing the manual cursor
 /// loop yourself; it's a convenience for callers who'd rather work
@@ -552,15 +517,15 @@ pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
 /// # Examples
 ///
 /// ```
-/// use bijou64::{decode_iter, encode};
+/// use bijou32::{decode_iter, encode};
 ///
 /// let mut buf = Vec::new();
-/// for v in [0u64, 42, 300, 65_535] {
+/// for v in [0u32, 42, 300, 65_535] {
 ///     encode(v, &mut buf);
 /// }
 ///
 /// // Collect into a Result<Vec<_>, _> to short-circuit on the first error.
-/// let decoded: Result<Vec<u64>, _> = decode_iter(&buf).collect();
+/// let decoded: Result<Vec<u32>, _> = decode_iter(&buf).collect();
 /// assert_eq!(decoded.unwrap(), [0, 42, 300, 65_535]);
 /// ```
 #[derive(Debug)]
@@ -570,12 +535,11 @@ pub struct DecodeIter<'a> {
     fused_err: bool,
 }
 
-/// Decodes successive `bijou64`-encoded values from `buf`.
+/// Decodes successive `bijou32`-encoded values from `buf`.
 ///
-/// Returns an iterator that yields `Result<u64, DecodeError>` for each
+/// Returns an iterator that yields `Result<u32, DecodeError>` for each
 /// encoded value in `buf`, in order. See [`DecodeIter`] for the exact
-/// fused-iteration semantics. See the `decode` example for usage
-/// patterns.
+/// fused-iteration semantics.
 #[inline]
 pub const fn decode_iter(buf: &[u8]) -> DecodeIter<'_> {
     DecodeIter {
@@ -585,7 +549,7 @@ pub const fn decode_iter(buf: &[u8]) -> DecodeIter<'_> {
 }
 
 impl Iterator for DecodeIter<'_> {
-    type Item = Result<u64, DecodeError>;
+    type Item = Result<u32, DecodeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.fused_err || self.cursor.is_empty() {
@@ -624,8 +588,8 @@ impl Iterator for DecodeIter<'_> {
 
 impl core::iter::FusedIterator for DecodeIter<'_> {}
 
-/// Decodes every `bijou64`-encoded value in `buf`, returning them as
-/// a `Vec<u64>`.
+/// Decodes every `bijou32`-encoded value in `buf`, returning them as
+/// a `Vec<u32>`.
 ///
 /// Equivalent to `decode_iter(buf).collect()` but spells out the
 /// short-circuit collect pattern explicitly. The lazy iterator API
@@ -641,27 +605,27 @@ impl core::iter::FusedIterator for DecodeIter<'_> {}
 /// # Examples
 ///
 /// ```
-/// use bijou64::{decode_all, encode};
+/// use bijou32::{decode_all, encode};
 ///
 /// let mut buf = Vec::new();
-/// for v in [0u64, 42, 300, u64::MAX] {
+/// for v in [0u32, 42, 300, u32::MAX] {
 ///     encode(v, &mut buf);
 /// }
-/// assert_eq!(decode_all(&buf).unwrap(), vec![0, 42, 300, u64::MAX]);
+/// assert_eq!(decode_all(&buf).unwrap(), vec![0, 42, 300, u32::MAX]);
 /// ```
-pub fn decode_all(buf: &[u8]) -> Result<Vec<u64>, DecodeError> {
+pub fn decode_all(buf: &[u8]) -> Result<Vec<u32>, DecodeError> {
     decode_iter(buf).collect()
 }
 
-/// Errors that can occur when decoding a `bijou64`.
+/// Errors that can occur when decoding a `bijou32`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum DecodeError {
     /// The input buffer is shorter than the encoding requires.
-    #[error("buffer too short for bijou64 encoding")]
+    #[error("buffer too short for bijou32 encoding")]
     BufferTooShort,
 
-    /// The decoded value exceeds `u64::MAX` (tier 8 only).
-    #[error("bijou64 tier 8 payload overflows u64")]
+    /// The decoded value exceeds `u32::MAX` (tier 4 only).
+    #[error("bijou32 tier 4 payload overflows u32")]
     Overflow,
 }
 
@@ -678,9 +642,9 @@ mod tests {
         #[test]
         fn recurrence() {
             assert_eq!(OFFSETS[0], 0);
-            assert_eq!(OFFSETS[1], 248);
+            assert_eq!(OFFSETS[1], u32::from(TAG_THRESHOLD));
 
-            let mut power = 1u64; // 256^0
+            let mut power = 1u32; // 256^0
             for i in 2..=NUM_TIERS {
                 power *= 256;
                 assert_eq!(
@@ -693,19 +657,15 @@ mod tests {
 
         #[test]
         fn known_values() {
-            assert_eq!(OFFSETS[1], 248);
-            assert_eq!(OFFSETS[2], 504);
-            assert_eq!(OFFSETS[3], 0x1_01F8);
-            assert_eq!(OFFSETS[4], 0x101_01F8);
-            assert_eq!(OFFSETS[5], 0x1_0101_01F8);
-            assert_eq!(OFFSETS[6], 0x101_0101_01F8);
-            assert_eq!(OFFSETS[7], 0x1_0101_0101_01F8);
-            assert_eq!(OFFSETS[8], 0x101_0101_0101_01F8);
+            assert_eq!(OFFSETS[1], 252);
+            assert_eq!(OFFSETS[2], 508);
+            assert_eq!(OFFSETS[3], 66_044);
+            assert_eq!(OFFSETS[4], 16_843_260);
         }
 
         #[test]
         fn bounds_are_consistent() {
-            assert_eq!(BOUNDS[0], 248);
+            assert_eq!(BOUNDS[0], OFFSETS[1]);
             for i in 1..NUM_TIERS {
                 assert_eq!(
                     BOUNDS[i],
@@ -714,7 +674,7 @@ mod tests {
                     i + 1
                 );
             }
-            assert_eq!(BOUNDS[NUM_TIERS], u64::MAX);
+            assert_eq!(BOUNDS[NUM_TIERS], u32::MAX);
         }
     }
 
@@ -729,7 +689,7 @@ mod tests {
                 let max_val = if tier < NUM_TIERS {
                     OFFSETS[tier + 1] - 1
                 } else {
-                    u64::MAX
+                    u32::MAX
                 };
                 let expected_len = 1 + tier;
 
@@ -765,9 +725,8 @@ mod tests {
             // For each multi-byte tier, provide the tag byte plus one fewer
             // payload byte than required.
             for tier in 1..=NUM_TIERS {
-                let tag = u8::try_from(247 + tier).unwrap_or(0xFF);
+                let tag = u8::try_from(usize::from(TAG_THRESHOLD) + tier - 1).unwrap_or(0xFF);
                 let mut buf = vec![tag];
-                // tier needs `tier` payload bytes; provide `tier - 1`
                 buf.extend(core::iter::repeat_n(0x00u8, tier - 1));
 
                 assert_eq!(
@@ -781,34 +740,29 @@ mod tests {
         }
 
         #[test]
-        fn tier8_overflow() {
-            // Tag 0xFF = tier 8, payload = all 0xFF = u64::MAX
-            // OFFSETS[8] + u64::MAX overflows
-            let buf = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+        fn tier4_overflow() {
+            // Tag 0xFF = tier 4, payload = all 0xFF = u32::MAX
+            // OFFSETS[4] + u32::MAX overflows.
+            let buf = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
             assert_eq!(decode(&buf), Err(DecodeError::Overflow));
         }
 
         #[test]
-        fn tier8_overflow_exact_boundary() -> TestResult {
-            // Smallest tier 8 payload that overflows:
-            // OFFSETS[8] = 0x101_0101_0101_01F8
-            // Max valid payload = u64::MAX - OFFSETS[8] = 0xFEFE_FEFE_FEFE_FE07
+        fn tier4_overflow_exact_boundary() -> TestResult {
+            // The largest valid payload is `u32::MAX - OFFSETS[4]`.
             // One above that overflows.
-            let max_payload = u64::MAX - OFFSETS[8];
-            let overflow_payload = max_payload + 1; // = 0xFEFE_FEFE_FEFE_FE08
+            let max_payload = u32::MAX - OFFSETS[4];
+            let overflow_payload = max_payload + 1;
             let be = overflow_payload.to_be_bytes();
-            let buf = [0xFF, be[0], be[1], be[2], be[3], be[4], be[5], be[6], be[7]];
+            let buf = [0xFF, be[0], be[1], be[2], be[3]];
             assert_eq!(decode(&buf), Err(DecodeError::Overflow));
 
-            // One below: the max valid payload should decode to u64::MAX
+            // One below: the max valid payload should decode to u32::MAX
             let be_max = max_payload.to_be_bytes();
-            let buf_max = [
-                0xFF, be_max[0], be_max[1], be_max[2], be_max[3], be_max[4], be_max[5], be_max[6],
-                be_max[7],
-            ];
+            let buf_max = [0xFF, be_max[0], be_max[1], be_max[2], be_max[3]];
             let (value, consumed) = decode(&buf_max)?;
-            assert_eq!(value, u64::MAX);
-            assert_eq!(consumed, 9);
+            assert_eq!(value, u32::MAX);
+            assert_eq!(consumed, 5);
             Ok(())
         }
 
@@ -817,24 +771,18 @@ mod tests {
             let (v, n) = decode(&[0x2A, 0xDE, 0xAD])?;
             assert_eq!((v, n), (42, 1));
 
-            let (v, n) = decode(&[0xF8, 0x34, 0xBE, 0xEF])?;
+            let (v, n) = decode(&[0xFC, 0x30, 0xBE, 0xEF])?;
             assert_eq!((v, n), (300, 2));
             Ok(())
         }
 
         /// `decode` MUST advance the buffer by at least one byte on
         /// success. A `consumed == 0` would trap a naive streaming
-        /// consumer that loops `while !buf.is_empty() { let (_, n) =
-        /// decode(buf)?; buf = &buf[n..]; }` into an infinite spin.
-        ///
-        /// The current implementation guarantees this structurally
-        /// (tag < 248 returns 1; multi-byte arms return 1 + tier >= 2),
-        /// but a future refactor could easily break the property. This
-        /// test pins it across every possible first byte with enough
-        /// trailing payload that `BufferTooShort` can never fire.
+        /// consumer into an infinite spin. See bijou64's equivalent
+        /// test for the full rationale.
         #[test]
         fn decode_always_advances() -> TestResult {
-            let pad = [0u8; MAX_BYTES + 7]; // enough for any tier
+            let pad = [0u8; MAX_BYTES + 3]; // enough for any tier
             for first in 0u8..=255u8 {
                 let mut buf = Vec::with_capacity(1 + pad.len());
                 buf.push(first);
@@ -854,7 +802,7 @@ mod tests {
 
         #[test]
         fn tier0() -> TestResult {
-            for value in 0..248u64 {
+            for value in 0..252u32 {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(buf.len(), 1);
@@ -869,11 +817,11 @@ mod tests {
 
         #[test]
         fn tier1() -> TestResult {
-            for value in 248..504u64 {
+            for value in 252..508u32 {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(buf.len(), 2, "value {value} should encode in 2 bytes");
-                assert_eq!(buf[0], 0xF8);
+                assert_eq!(buf[0], 0xFC);
 
                 let (decoded, consumed) = decode(&buf)?;
                 assert_eq!(decoded, value, "round-trip failed for {value}");
@@ -884,11 +832,12 @@ mod tests {
 
         #[test]
         fn tier2() -> TestResult {
-            for value in 504..66_040u64 {
+            // Tier 2 spans 508..=66_043.
+            for value in 508..66_044u32 {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(buf.len(), 3, "value {value} should encode in 3 bytes");
-                assert_eq!(buf[0], 0xF9);
+                assert_eq!(buf[0], 0xFD);
 
                 let (decoded, consumed) = decode(&buf)?;
                 assert_eq!(decoded, value, "round-trip failed for {value}");
@@ -899,11 +848,12 @@ mod tests {
 
         #[test]
         fn tier3_exhaustive() -> TestResult {
-            for value in 66_040u64..=16_843_255u64 {
+            // Tier 3 spans 66_044..=16_843_259 — about 16.8M values, 1–2 s on host.
+            for value in 66_044u32..=16_843_259u32 {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(buf.len(), 4, "value {value} should encode in 4 bytes");
-                assert_eq!(buf[0], 0xFA);
+                assert_eq!(buf[0], 0xFE);
 
                 let (decoded, consumed) = decode(&buf)?;
                 assert_eq!(decoded, value, "round-trip failed for {value}");
@@ -914,9 +864,11 @@ mod tests {
 
         #[test]
         fn canonicality_byte_sequence_exhaustive() -> TestResult {
+            // Verify that *every* byte sequence (up to a reasonable
+            // depth) either decodes canonically or returns an error.
+            // For bijou32, "reasonable depth" can include all of tier 3
+            // (4-byte encodings, 16M cases).
             let check = |buf: &[u8]| -> TestResult {
-                // `Err(_)` (truncated / overflow) is fine here — we
-                // only need to check canonicality on successful decodes.
                 if let Ok((value, consumed)) = decode(buf) {
                     let mut re = Vec::with_capacity(MAX_BYTES);
                     encode(value, &mut re);
@@ -936,17 +888,17 @@ mod tests {
                 check(&[b])?;
             }
             for p in 0u8..=255u8 {
-                check(&[0xF8, p])?;
+                check(&[0xFC, p])?;
             }
             for p1 in 0u8..=255u8 {
                 for p2 in 0u8..=255u8 {
-                    check(&[0xF9, p1, p2])?;
+                    check(&[0xFD, p1, p2])?;
                 }
             }
             // Tier 3: 16,777,216 cases.
             for p in 0u32..(1u32 << 24) {
                 let bytes = p.to_be_bytes();
-                check(&[0xFA, bytes[1], bytes[2], bytes[3]])?;
+                check(&[0xFE, bytes[1], bytes[2], bytes[3]])?;
             }
             Ok(())
         }
@@ -957,10 +909,6 @@ mod tests {
 
         #[test]
         fn offset_triples() -> TestResult {
-            // For each tier boundary OFFSET[n], verify that:
-            //   OFFSET[n] - 1  encodes in tier n-1 (shorter)
-            //   OFFSET[n]      encodes in tier n
-            //   OFFSET[n] + 1  encodes in tier n (same length)
             for tier in 1..=NUM_TIERS {
                 let offset = OFFSETS[tier];
                 let tier_len = 1 + tier;
@@ -994,7 +942,7 @@ mod tests {
                 assert_eq!(n, tier_len);
 
                 // OFFSET[n] + 1: second value of this tier
-                if offset < u64::MAX {
+                if offset < u32::MAX {
                     buf.clear();
                     encode(offset + 1, &mut buf);
                     assert_eq!(
@@ -1014,9 +962,8 @@ mod tests {
 
         #[test]
         fn all_zero_payloads() -> TestResult {
-            // [tag, 0x00, ..., 0x00] should decode to OFFSETS[tier] for each tier
             for tier in 1..=NUM_TIERS {
-                let tag = u8::try_from(247 + tier).unwrap_or(0xFF);
+                let tag = u8::try_from(usize::from(TAG_THRESHOLD) + tier - 1).unwrap_or(0xFF);
                 let mut buf = vec![tag];
                 buf.extend(core::iter::repeat_n(0x00u8, tier));
 
@@ -1028,7 +975,6 @@ mod tests {
                 );
                 assert_eq!(consumed, 1 + tier);
 
-                // Round-trip: re-encoding should produce the same bytes
                 let mut re = Vec::new();
                 encode(value, &mut re);
                 assert_eq!(re, buf, "tier {tier} all-zeros round-trip mismatch");
@@ -1038,16 +984,15 @@ mod tests {
 
         #[test]
         fn all_ones_payloads() -> TestResult {
-            // [tag, 0xFF, ..., 0xFF] should decode to the tier's maximum value
             for tier in 1..=NUM_TIERS {
-                let tag = u8::try_from(247 + tier).unwrap_or(0xFF);
+                let tag = u8::try_from(usize::from(TAG_THRESHOLD) + tier - 1).unwrap_or(0xFF);
                 let mut buf = vec![tag];
                 buf.extend(core::iter::repeat_n(0xFFu8, tier));
 
                 let result = decode(&buf);
 
                 if tier < NUM_TIERS {
-                    // Tiers 1-7: all-ones payload = 256^tier - 1, so
+                    // Tiers 1–3: all-ones payload = 256^tier - 1, so
                     // value = OFFSETS[tier] + (256^tier - 1) = OFFSETS[tier+1] - 1
                     let (value, consumed) = result?;
                     let expected = OFFSETS[tier + 1] - 1;
@@ -1057,16 +1002,15 @@ mod tests {
                     );
                     assert_eq!(consumed, 1 + tier);
 
-                    // Round-trip
                     let mut re = Vec::new();
                     encode(value, &mut re);
                     assert_eq!(re, buf, "tier {tier} all-ones round-trip mismatch");
                 } else {
-                    // Tier 8: all-ones payload = u64::MAX, OFFSETS[8] + u64::MAX overflows
+                    // Tier 4: all-ones payload = u32::MAX, OFFSETS[4] + u32::MAX overflows
                     assert_eq!(
                         result,
                         Err(DecodeError::Overflow),
-                        "tier 8 all-ones should overflow"
+                        "tier 4 all-ones should overflow"
                     );
                 }
             }
@@ -1079,28 +1023,18 @@ mod tests {
 
         #[test]
         fn overlong_encoding_decodes_to_different_value() -> TestResult {
-            // For each tier 1..7, take a value that belongs to that tier and
-            // manually encode it in the *next* tier's format (wider tag, same
-            // numeric payload without re-adding the offset). Because the
-            // decoder adds OFFSETS[tier+1] instead of OFFSETS[tier], the
-            // decoded value must differ — the offset shift structurally
-            // prevents overlong encodings from round-tripping.
             for tier in 1..NUM_TIERS {
-                let value = OFFSETS[tier]; // first value in this tier
+                let value = OFFSETS[tier];
                 let payload = value - OFFSETS[tier]; // == 0
 
-                // Forge: use next tier's tag with the same payload bytes
                 let wider_tier = tier + 1;
-                let tag = u8::try_from(247 + wider_tier).unwrap_or(0xFF);
+                let tag = u8::try_from(usize::from(TAG_THRESHOLD) + wider_tier - 1).unwrap_or(0xFF);
                 let mut forged = vec![tag];
                 let be = payload.to_be_bytes();
-                forged.extend_from_slice(be.get(8 - wider_tier..).unwrap_or(&[]));
+                forged.extend_from_slice(be.get(4 - wider_tier..).unwrap_or(&[]));
 
                 let (decoded, _) = decode(&forged)?;
 
-                // The forged encoding should decode to OFFSETS[wider_tier],
-                // not the original value (unless they happen to be equal,
-                // which they never are since OFFSETS is strictly increasing).
                 assert_ne!(
                     decoded, value,
                     "tier {tier}: overlong encoding of {value} decoded back \
@@ -1121,14 +1055,12 @@ mod tests {
 
         #[test]
         fn consecutive_decode() -> TestResult {
-            // Encode two values back-to-back into a single buffer, then
-            // decode them sequentially using the returned `consumed` offset.
-            let values: &[(u64, u64)] = &[
+            let values: &[(u32, u32)] = &[
                 (0, 0),
                 (42, 300),
-                (248, 504),
-                (0x101_01F8, u64::MAX),
-                (u64::MAX, 0),
+                (252, 508),
+                (0x01_0001, u32::MAX),
+                (u32::MAX, 0),
             ];
 
             for &(a, b) in values {
@@ -1154,22 +1086,23 @@ mod tests {
     mod encoded_bytes {
         use super::*;
 
-        /// `encoded_bytes` agrees with `encode`: same bytes, same length.
         #[test]
         fn agrees_with_encode() {
-            let probes: &[u64] = &[
+            let probes: &[u32] = &[
                 0,
                 1,
-                247,
-                248,
-                503,
-                504,
+                251,
+                252,
+                507,
+                508,
                 65_535,
-                66_039,
-                66_040,
-                0x1_01F8,
-                0x101_01F8,
-                u64::MAX,
+                66_043,
+                66_044,
+                16_843_259,
+                16_843_260,
+                1u32 << 24,
+                u32::MAX - 1,
+                u32::MAX,
             ];
             for &v in probes {
                 let enc = encoded_bytes(v);
@@ -1180,68 +1113,54 @@ mod tests {
             }
         }
 
-        /// `Deref`, `AsRef<[u8]>`, and `as_slice` all yield identical
-        /// slices.
         #[test]
         fn deref_asref_as_slice_consistent() {
             let enc = encoded_bytes(300);
             let via_deref: &[u8] = &enc;
             let via_asref: &[u8] = enc.as_ref();
             let via_as_slice: &[u8] = enc.as_slice();
-            assert_eq!(via_deref, &[0xF8, 0x34]);
-            assert_eq!(via_asref, &[0xF8, 0x34]);
-            assert_eq!(via_as_slice, &[0xF8, 0x34]);
+            assert_eq!(via_deref, &[0xFC, 0x30]);
+            assert_eq!(via_asref, &[0xFC, 0x30]);
+            assert_eq!(via_as_slice, &[0xFC, 0x30]);
         }
 
-        /// Owned-into-iter walks only the encoded prefix, not the full
-        /// 9-byte backing array.
         #[test]
         fn into_iter_walks_only_encoded_bytes() {
             let enc = encoded_bytes(300); // 2 bytes
             let collected: Vec<u8> = enc.into_iter().collect();
-            assert_eq!(collected, [0xF8, 0x34]);
+            assert_eq!(collected, [0xFC, 0x30]);
         }
 
-        /// Borrowed-into-iter (`&enc`) yields `&u8` of just the encoded
-        /// bytes.
         #[test]
         fn ref_into_iter_yields_encoded_bytes() {
             let enc = encoded_bytes(300);
             let collected: Vec<u8> = (&enc).into_iter().copied().collect();
-            assert_eq!(collected, [0xF8, 0x34]);
+            assert_eq!(collected, [0xFC, 0x30]);
         }
 
-        /// `EncodedBytes` is Copy: passing it around doesn't move it.
         #[test]
         fn copy_semantics() {
             let enc = encoded_bytes(42);
             let dup = enc;
-            // Both bindings still usable.
             assert_eq!(&*enc, &[0x2A]);
             assert_eq!(&*dup, &[0x2A]);
         }
 
-        /// `is_empty` is always false; bijou encodings are never empty.
         #[test]
         fn is_empty_is_always_false() {
-            for v in [0u64, 1, 247, 248, u64::MAX] {
+            for v in [0u32, 1, 251, 252, u32::MAX] {
                 assert!(!encoded_bytes(v).is_empty(), "is_empty true for {v}");
             }
         }
 
-        /// `Borrow<[u8]>`: lets `EncodedBytes` be used as a
-        /// `BTreeMap` key looked up by `&[u8]`.
         #[test]
         fn borrow_impl() {
             use alloc::collections::BTreeMap;
             let mut map: BTreeMap<EncodedBytes, &'static str> = BTreeMap::new();
             map.insert(encoded_bytes(42), "the answer");
-            // Lookup via Borrow<[u8]>:
             assert_eq!(map.get(&[0x2A][..]), Some(&"the answer"));
         }
 
-        /// `Eq` + `PartialEq` work as expected: distinct values are
-        /// unequal, identical encodings are equal.
         #[test]
         fn eq_partial_eq() {
             let a = encoded_bytes(300);
@@ -1251,10 +1170,9 @@ mod tests {
             assert_ne!(a, c);
         }
 
-        /// Round-trip via `decode`.
         #[test]
         fn round_trip_via_decode() -> TestResult {
-            for v in [0u64, 247, 248, 65_535, u64::MAX] {
+            for v in [0u32, 251, 252, 65_535, 1u32 << 24, u32::MAX] {
                 let enc = encoded_bytes(v);
                 let (decoded, n) = decode(&enc)?;
                 assert_eq!(decoded, v);
@@ -1267,60 +1185,49 @@ mod tests {
     mod iter {
         use super::*;
 
-        /// `decode_iter` on an empty buffer yields nothing.
         #[test]
         fn empty_buffer() {
             let collected: Vec<_> = decode_iter(&[]).collect();
             assert!(collected.is_empty());
         }
 
-        /// Happy path: encoded N values, `decode_iter` yields the same N values.
         #[test]
         fn round_trip() -> TestResult {
-            let values: &[u64] = &[0, 1, 42, 247, 248, 503, 504, 65_535, 1u64 << 32, u64::MAX];
+            let values: &[u32] = &[0, 1, 42, 251, 252, 507, 508, 65_535, 1u32 << 24, u32::MAX];
             let mut buf = Vec::new();
             for &v in values {
                 encode(v, &mut buf);
             }
-            let collected: Result<Vec<u64>, _> = decode_iter(&buf).collect();
+            let collected: Result<Vec<u32>, _> = decode_iter(&buf).collect();
             assert_eq!(collected?, values);
             Ok(())
         }
 
-        /// Iterator fuses on error: after the first `Err`, every subsequent
-        /// `next()` returns `None`.
         #[test]
         fn fuses_after_error() {
-            // Tag 0xF8 with no payload → BufferTooShort.
-            let mut iter = decode_iter(&[0xF8]);
+            // Tag 0xFC with no payload → BufferTooShort.
+            let mut iter = decode_iter(&[0xFC]);
             assert_eq!(iter.next(), Some(Err(DecodeError::BufferTooShort)));
             assert_eq!(iter.next(), None, "iter must fuse after error");
             assert_eq!(iter.next(), None, "iter must remain fused");
         }
 
-        /// Tier-8 Overflow surfaces as an Err and fuses.
         #[test]
         fn overflow_error_then_fused() {
-            // u64::MAX would require OFFSETS[8] + all-FF, which overflows.
-            let buf = [0xFFu8; 9];
+            let buf = [0xFFu8; 5];
             let mut iter = decode_iter(&buf);
             assert_eq!(iter.next(), Some(Err(DecodeError::Overflow)));
             assert_eq!(iter.next(), None);
         }
 
-        /// Mixed success then error: the partial decoded prefix is still
-        /// visible to the caller before the error byte.
         #[test]
         fn partial_success_then_error() {
-            // [0x42, 0xF8] — first byte decodes to 0x42, second byte is
-            // a tag with no payload.
-            let mut iter = decode_iter(&[0x42, 0xF8]);
+            let mut iter = decode_iter(&[0x42, 0xFC]);
             assert_eq!(iter.next(), Some(Ok(0x42)));
             assert_eq!(iter.next(), Some(Err(DecodeError::BufferTooShort)));
             assert_eq!(iter.next(), None);
         }
 
-        /// `size_hint`: (0, Some(0)) on empty/fused, (1, Some(len)) otherwise.
         #[test]
         fn size_hint() {
             let empty = decode_iter(&[]);
@@ -1329,20 +1236,18 @@ mod tests {
             let with_data = decode_iter(&[0x42, 0x99]);
             assert_eq!(with_data.size_hint(), (1, Some(2)));
 
-            // After fusing on error:
-            let mut errored = decode_iter(&[0xF8]);
+            let mut errored = decode_iter(&[0xFC]);
             let _ = errored.next();
             assert_eq!(errored.size_hint(), (0, Some(0)));
         }
 
-        /// Iterator combinators work as expected.
         #[test]
         fn composable_with_combinators() {
             let mut buf = Vec::new();
-            for v in [10u64, 20, 30, 40, 50] {
+            for v in [10u32, 20, 30, 40, 50] {
                 encode(v, &mut buf);
             }
-            let sum: u64 = decode_iter(&buf).filter_map(Result::ok).sum();
+            let sum: u32 = decode_iter(&buf).filter_map(Result::ok).sum();
             assert_eq!(sum, 150);
 
             let first_two: Vec<_> = decode_iter(&buf).take(2).filter_map(Result::ok).collect();
@@ -1353,17 +1258,15 @@ mod tests {
     mod decode_all {
         use super::*;
 
-        /// Empty buffer decodes to an empty vector (not an error).
         #[test]
         fn empty_buffer() -> TestResult {
-            assert_eq!(decode_all(&[])?, Vec::<u64>::new());
+            assert_eq!(decode_all(&[])?, Vec::<u32>::new());
             Ok(())
         }
 
-        /// Round-trip: encode N values, `decode_all` yields the same N.
         #[test]
         fn round_trip() -> TestResult {
-            let values: &[u64] = &[0, 42, 300, 65_535, 1u64 << 32, u64::MAX];
+            let values: &[u32] = &[0, 42, 300, 65_535, 1u32 << 24, u32::MAX];
             let mut buf = Vec::new();
             for &v in values {
                 encode(v, &mut buf);
@@ -1372,34 +1275,21 @@ mod tests {
             Ok(())
         }
 
-        /// All-or-nothing: a mid-buffer error discards the
-        /// successful prefix.
         #[test]
         fn short_circuits_on_first_error() {
-            // [0x42, 0xF8]: 0x42 decodes successfully, then 0xF8 is a
-            // tag with no payload. decode_all must return the error
-            // and discard the 0x42.
-            assert_eq!(decode_all(&[0x42, 0xF8]), Err(DecodeError::BufferTooShort));
+            assert_eq!(decode_all(&[0x42, 0xFC]), Err(DecodeError::BufferTooShort));
         }
 
-        /// Tier-8 overflow propagates as the typed `Overflow` error.
         #[test]
         fn overflow_propagates() {
-            assert_eq!(decode_all(&[0xFF; 9]), Err(DecodeError::Overflow));
+            assert_eq!(decode_all(&[0xFF; 5]), Err(DecodeError::Overflow));
         }
 
-        /// `decode_all` agrees with `decode_iter().collect()` across
-        /// a few inputs.
         #[test]
         fn agrees_with_decode_iter_collect() {
-            let inputs: &[&[u8]] = &[
-                &[],
-                &[0x00],
-                &[0x42, 0xF8, 0x34],
-                &[0xF8], // truncated
-            ];
+            let inputs: &[&[u8]] = &[&[], &[0x00], &[0x42, 0xFC, 0x34], &[0xFC]];
             for &input in inputs {
-                let via_iter: Result<Vec<u64>, _> = decode_iter(input).collect();
+                let via_iter: Result<Vec<u32>, _> = decode_iter(input).collect();
                 let via_all = decode_all(input);
                 assert_eq!(via_iter, via_all, "disagreement on {input:02X?}");
             }
@@ -1414,98 +1304,58 @@ mod tests {
             let mut buf = vec![0xDE, 0xAD];
             encode(300, &mut buf);
 
-            // Original bytes preserved
             assert_eq!(&buf[..2], &[0xDE, 0xAD]);
 
-            // Appended encoding is correct
             let (value, consumed) = decode(&buf[2..])?;
             assert_eq!(value, 300);
             assert_eq!(consumed, 2);
-            assert_eq!(buf.len(), 4); // 2 prefix + 2 encoding
+            assert_eq!(buf.len(), 4);
             Ok(())
         }
 
         /// `MAX_BYTES` must equal the actual worst-case encoded length.
-        /// `u64::MAX` is the worst case, so this single input fully covers
+        /// `u32::MAX` is the worst case, so this single input fully covers
         /// the invariant. Guards against a future tier-layout change that
-        /// updates `MAX_BYTES` but not the encoder (or vice versa) — every
-        /// other test derives its expectations from `MAX_BYTES`/tiers and
-        /// would move in lockstep with such a bug.
+        /// updates `MAX_BYTES` but not the encoder (or vice versa).
         #[test]
         fn max_bytes_equals_encoded_len_of_max() {
             let mut buf = Vec::new();
-            encode(u64::MAX, &mut buf);
+            encode(u32::MAX, &mut buf);
             assert_eq!(
                 buf.len(),
                 MAX_BYTES,
-                "MAX_BYTES disagrees with encode(u64::MAX).len()"
+                "MAX_BYTES disagrees with encode(u32::MAX).len()"
             );
-            assert_eq!(encoded_len(u64::MAX), MAX_BYTES);
-            assert_eq!(encoded_bytes(u64::MAX).len(), MAX_BYTES);
+            assert_eq!(encoded_len(u32::MAX), MAX_BYTES);
+            assert_eq!(encoded_bytes(u32::MAX).len(), MAX_BYTES);
         }
     }
 
     mod test_vectors {
         use super::*;
 
-        /// Test vectors: `(value, expected_bytes)`.
-        ///
-        /// These vectors should be replicated in any second implementation
-        /// (e.g., TypeScript) to verify encoding compatibility.
-        const VECTORS: &[(u64, &[u8])] = &[
+        /// Hand-verified test vectors. Replicate these in any second
+        /// implementation to verify encoding compatibility.
+        const VECTORS: &[(u32, &[u8])] = &[
             // Tier 0: single byte
             (0, &[0x00]),
             (1, &[0x01]),
             (42, &[0x2A]),
-            (97, &[0x61]),
-            (127, &[0x7F]),
-            (128, &[0x80]),
-            (150, &[0x96]),
-            (247, &[0xF7]),
-            // Tier 1: tag 0xF8 + 1 byte
-            (248, &[0xF8, 0x00]),
-            (249, &[0xF8, 0x01]),
-            (300, &[0xF8, 0x34]),
-            (503, &[0xF8, 0xFF]),
-            // Tier 2: tag 0xF9 + 2 bytes
-            (504, &[0xF9, 0x00, 0x00]),
-            (1_000, &[0xF9, 0x01, 0xF0]),
-            (65_535, &[0xF9, 0xFE, 0x07]),
-            (66_039, &[0xF9, 0xFF, 0xFF]),
-            // Tier 3: tag 0xFA + 3 bytes
-            (0x1_01F8, &[0xFA, 0x00, 0x00, 0x00]),
-            (0x1_05B8, &[0xFA, 0x00, 0x03, 0xC0]),
-            (0x101_01F7, &[0xFA, 0xFF, 0xFF, 0xFF]),
-            // Tier 4: tag 0xFB + 4 bytes
-            (0x101_01F8, &[0xFB, 0x00, 0x00, 0x00, 0x00]),
-            (0x1_0101_01F7, &[0xFB, 0xFF, 0xFF, 0xFF, 0xFF]),
-            // Tier 5: tag 0xFC + 5 bytes
-            (0x1_0101_01F8, &[0xFC, 0x00, 0x00, 0x00, 0x00, 0x00]),
-            (0x101_0101_01F7, &[0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
-            // Tier 6: tag 0xFD + 6 bytes
-            (0x101_0101_01F8, &[0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-            (
-                0x1_0101_0101_01F7,
-                &[0xFD, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-            ),
-            // Tier 7: tag 0xFE + 7 bytes
-            (
-                0x1_0101_0101_01F8,
-                &[0xFE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-            ),
-            (
-                0x101_0101_0101_01F7,
-                &[0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-            ),
-            // Tier 8: tag 0xFF + 8 bytes
-            (
-                0x101_0101_0101_01F8,
-                &[0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-            ),
-            (
-                u64::MAX,
-                &[0xFF, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0x07],
-            ),
+            (251, &[0xFB]),
+            // Tier 1: tag 0xFC + 1 byte
+            (252, &[0xFC, 0x00]),
+            (300, &[0xFC, 0x30]),
+            (507, &[0xFC, 0xFF]),
+            // Tier 2: tag 0xFD + 2 bytes
+            (508, &[0xFD, 0x00, 0x00]),
+            (65_535, &[0xFD, 0xFE, 0x03]),
+            (66_043, &[0xFD, 0xFF, 0xFF]),
+            // Tier 3: tag 0xFE + 3 bytes
+            (66_044, &[0xFE, 0x00, 0x00, 0x00]),
+            (16_843_259, &[0xFE, 0xFF, 0xFF, 0xFF]),
+            // Tier 4: tag 0xFF + 4 bytes
+            (16_843_260, &[0xFF, 0x00, 0x00, 0x00, 0x00]),
+            (u32::MAX, &[0xFF, 0xFE, 0xFE, 0xFE, 0x03]),
         ];
 
         #[test]
@@ -1542,7 +1392,7 @@ mod tests {
         #[test]
         #[cfg_attr(miri, ignore)]
         fn round_trip() {
-            bolero::check!().with_arbitrary::<u64>().for_each(|&value| {
+            bolero::check!().with_arbitrary::<u32>().for_each(|&value| {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 let (decoded, consumed) = decode(&buf).unwrap_or_else(|e| {
@@ -1556,7 +1406,7 @@ mod tests {
         #[test]
         #[cfg_attr(miri, ignore)]
         fn encoded_len_matches() {
-            bolero::check!().with_arbitrary::<u64>().for_each(|&value| {
+            bolero::check!().with_arbitrary::<u32>().for_each(|&value| {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(encoded_len(value), buf.len());
@@ -1566,7 +1416,7 @@ mod tests {
         #[test]
         #[cfg_attr(miri, ignore)]
         fn encoded_bytes_matches() {
-            bolero::check!().with_arbitrary::<u64>().for_each(|&value| {
+            bolero::check!().with_arbitrary::<u32>().for_each(|&value| {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 let enc = encoded_bytes(value);
@@ -1580,14 +1430,10 @@ mod tests {
             bolero::check!()
                 .with_arbitrary::<Vec<u8>>()
                 .for_each(|buf| {
-                    // Should return Ok or Err, never panic
                     let _ = decode(buf);
                 });
         }
 
-        /// On every successful decode, the consumed-byte count is at
-        /// least 1 — otherwise a streaming consumer
-        /// (`while !buf.is_empty() { decode(buf) }`) would spin.
         #[test]
         #[cfg_attr(miri, ignore)]
         fn decode_always_advances() {
@@ -1600,12 +1446,11 @@ mod tests {
                 });
         }
 
-        /// `a < b ⟹ encode(a) < encode(b)` lexicographically.
         #[test]
         #[cfg_attr(miri, ignore)]
         fn lexicographic_order() {
             bolero::check!()
-                .with_arbitrary::<(u64, u64)>()
+                .with_arbitrary::<(u32, u32)>()
                 .for_each(|&(a, b)| {
                     let enc_a = encoded_bytes(a);
                     let enc_b = encoded_bytes(b);
@@ -1649,7 +1494,7 @@ mod tests {
         #[cfg_attr(miri, ignore)]
         fn decode_all_roundtrips_arbitrary_streams() {
             bolero::check!()
-                .with_arbitrary::<Vec<u64>>()
+                .with_arbitrary::<Vec<u32>>()
                 .for_each(|xs| {
                     let mut buf = Vec::new();
                     for &x in xs {
@@ -1668,7 +1513,7 @@ mod tests {
             bolero::check!()
                 .with_arbitrary::<Vec<u8>>()
                 .for_each(|buf| {
-                    let via_iter: Vec<Result<u64, DecodeError>> = decode_iter(buf).collect();
+                    let via_iter: Vec<Result<u32, DecodeError>> = decode_iter(buf).collect();
 
                     let mut manual = Vec::new();
                     let mut cursor: &[u8] = buf;

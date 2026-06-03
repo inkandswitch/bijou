@@ -72,7 +72,7 @@ Or, to get every value or the first error in one call:
 let values: Result<Vec<u64>, _> = bijou64::decode_all(&buf);
 ```
 
-See [`examples/decode.rs`](./examples/decode.rs) for a runnable
+See [`examples/decode64.rs`](./examples/decode64.rs) for a runnable
 demonstration of all three patterns.
 
 ## Encoding
@@ -109,6 +109,15 @@ worked examples, and test vectors.
 |-------------|----------------------------------------------------------|
 | `arbitrary` | `Arbitrary` impl for fuzz testing                        |
 | `bolero`    | Property-based testing with bolero (implies `arbitrary`) |
+
+## Family
+
+bijou64 is one of three width-specialised siblings sharing the same
+recurrence, big-endian payload layout, and canonical-by-construction
+property. They differ only in the tag-byte threshold and tier count:
+
+- [`bijou32`](../bijou32) — narrower `u32` variant (1–5 bytes, threshold `252`).
+- [`bijou128`](../bijou128) — wider `u128` variant (1–17 bytes, threshold `240`).
 
 ## License
 

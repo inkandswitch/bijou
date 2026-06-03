@@ -1,13 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /**
- * Cross-browser smoke tests for the published `bijou64` npm package.
+ * Cross-browser smoke tests for the published `bijou128` npm package.
  *
- * These tests deliberately exercise the package _through `window.bijou64`_
+ * These tests deliberately exercise the package _through `window.bijou128`_
  * (i.e. the same way a downstream consumer would use it) rather than
  * importing the Rust types directly. That catches regressions in any of:
  *
- * - the wasm-bindgen ABI (BigInt ↔ u64 marshalling, Uint8Array ↔ &[u8])
+ * - the wasm-bindgen ABI (BigInt ↔ u128 marshalling, Uint8Array ↔ &[u8])
  * - the wasm-bodge "web" entrypoint (base64 init path)
  * - the package.json subpath exports
  * - cross-browser BigInt + Uint8Array support
@@ -20,64 +20,60 @@ const SERVER_URL = "/e2e/server/index.html";
 
 test.beforeEach(async ({ page }: { page: Page }) => {
   await page.goto(SERVER_URL);
-  await page.waitForFunction(() => (window as any).bijou64Ready === true, {
+  await page.waitForFunction(() => (window as any).bijou128Ready === true, {
     timeout: 30_000,
   });
 });
 
-test("MAX_BYTES is 9", async ({ page }) => {
-  const max = await page.evaluate(() => (window as any).bijou64.MAX_BYTES());
-  expect(max).toBe(9);
+test("MAX_BYTES is 17", async ({ page }) => {
+  const max = await page.evaluate(() => (window as any).bijou128.MAX_BYTES());
+  expect(max).toBe(17);
 });
 
 test("encodes tier-0 values as a single byte equal to the value", async ({ page }) => {
-  // Run all three encode calls inside a single evaluate to keep the BigInt
-  // boundary inside the page (Playwright would otherwise need to serialise
-  // BigInts back across the IPC boundary, which it does not always handle
-  // cleanly across all browsers).
   const result = await page.evaluate(() => {
-    const { encode } = (window as any).bijou64;
+    const { encode } = (window as any).bijou128;
     return {
       zero: [...encode(0n)],
       mid: [...encode(42n)],
-      max: [...encode(247n)],
+      max: [...encode(239n)],
     };
   });
   expect(result.zero).toEqual([0x00]);
   expect(result.mid).toEqual([0x2a]);
-  expect(result.max).toEqual([0xf7]);
+  expect(result.max).toEqual([0xef]);
 });
 
 test("encodes tier-1 values with offset", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode } = (window as any).bijou64;
+    const { encode } = (window as any).bijou128;
     return {
-      lower: [...encode(248n)],
+      lower: [...encode(240n)],
       mid: [...encode(300n)],
-      upper: [...encode(503n)],
+      upper: [...encode(495n)],
     };
   });
-  expect(result.lower).toEqual([0xf8, 0x00]);
-  expect(result.mid).toEqual([0xf8, 0x34]);
-  expect(result.upper).toEqual([0xf8, 0xff]);
+  expect(result.lower).toEqual([0xf0, 0x00]);
+  expect(result.mid).toEqual([0xf0, 0x3c]);
+  expect(result.upper).toEqual([0xf0, 0xff]);
 });
 
-test("encodes u64::MAX as 9 bytes starting with 0xFF", async ({ page }) => {
+test("encodes u128::MAX as 17 bytes starting with 0xFF", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode } = (window as any).bijou64;
-    const bytes = encode((1n << 64n) - 1n);
+    const { encode } = (window as any).bijou128;
+    const bytes = encode((1n << 128n) - 1n);
     return { length: bytes.length, firstByte: bytes[0] };
   });
-  expect(result.length).toBe(9);
+  expect(result.length).toBe(17);
   expect(result.firstByte).toBe(0xff);
 });
 
 test("encodedLen agrees with encode().length across tier boundaries", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode, encodedLen } = (window as any).bijou64;
+    const { encode, encodedLen } = (window as any).bijou128;
     const cases: bigint[] = [
-      0n, 247n, 248n, 503n, 504n, 65_535n, 66_039n, 66_040n,
-      16_843_255n, 1n << 32n, (1n << 64n) - 2n, (1n << 64n) - 1n,
+      0n, 239n, 240n, 495n, 496n, 65_535n, 66_031n, 66_032n,
+      1n << 32n, 1n << 64n, 1n << 96n, (1n << 128n) - 2n, (1n << 128n) - 1n,
     ];
     return cases.map((v) => ({
       value: v.toString(),
@@ -92,10 +88,10 @@ test("encodedLen agrees with encode().length across tier boundaries", async ({ p
 
 test("round-trips every tier boundary", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode, decode } = (window as any).bijou64;
+    const { encode, decode } = (window as any).bijou128;
     const cases: bigint[] = [
-      0n, 1n, 247n, 248n, 503n, 504n, 65_535n, 66_039n, 66_040n,
-      16_843_255n, 1n << 32n, (1n << 64n) - 2n, (1n << 64n) - 1n,
+      0n, 1n, 239n, 240n, 495n, 496n, 65_535n, 66_031n, 66_032n,
+      1n << 32n, 1n << 64n, 1n << 96n, (1n << 128n) - 2n, (1n << 128n) - 1n,
     ];
     return cases.map((v) => {
       const bytes = encode(v);
@@ -116,22 +112,22 @@ test("round-trips every tier boundary", async ({ page }) => {
 
 test("decode reports bytesRead < input length when buffer has trailing data", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode, decode } = (window as any).bijou64;
-    const head = encode(300n); // 2 bytes
+    const { encode, decode } = (window as any).bijou128;
+    const head = encode(500n); // 3 bytes
     const buf = new Uint8Array(head.length + 3);
     buf.set(head, 0);
     buf.set([0xaa, 0xbb, 0xcc], head.length);
     const r = decode(buf);
     return { value: r.value.toString(), bytesRead: r.bytesRead, inputLength: buf.length };
   });
-  expect(result.value).toBe("300");
-  expect(result.bytesRead).toBe(2);
-  expect(result.inputLength).toBe(5);
+  expect(result.value).toBe("500");
+  expect(result.bytesRead).toBe(3);
+  expect(result.inputLength).toBe(6);
 });
 
-test("decode throws Bijou64DecodeError on empty input", async ({ page }) => {
+test("decode throws Bijou128DecodeError on empty input", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { decode } = (window as any).bijou64;
+    const { decode } = (window as any).bijou128;
     try {
       decode(new Uint8Array([]));
       return { threw: false } as const;
@@ -140,33 +136,30 @@ test("decode throws Bijou64DecodeError on empty input", async ({ page }) => {
     }
   });
   expect(result.threw).toBe(true);
-  expect(result.name).toBe("Bijou64DecodeError");
+  expect(result.name).toBe("Bijou128DecodeError");
   expect(result.message).toContain("buffer too short");
 });
 
-test("decode throws Bijou64DecodeError on truncated tier-8 input", async ({ page }) => {
+test("decode throws Bijou128DecodeError on truncated tier-16 input", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { decode } = (window as any).bijou64;
+    const { decode } = (window as any).bijou128;
     try {
-      // 0xFF needs 8 payload bytes; supply 7.
-      decode(new Uint8Array([0xff, 0, 0, 0, 0, 0, 0, 0]));
+      // 0xFF needs 16 payload bytes; supply 15.
+      decode(new Uint8Array([0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
       return { threw: false } as const;
     } catch (e: any) {
       return { threw: true, name: e.name } as const;
     }
   });
   expect(result.threw).toBe(true);
-  expect(result.name).toBe("Bijou64DecodeError");
+  expect(result.name).toBe("Bijou128DecodeError");
 });
 
-test("Bijou64DecodeError thrown is an instance of the platform Error", async ({ page }) => {
-  // Sanity-check that the JsValue conversion preserves the JS Error
-  // prototype chain — important for downstream code that relies on
-  // `instanceof Error` rather than just `.name === "Bijou64DecodeError"`.
+test("Bijou128DecodeError thrown is an instance of the platform Error", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { decode } = (window as any).bijou64;
+    const { decode } = (window as any).bijou128;
     try {
-      decode(new Uint8Array([0xf8]));
+      decode(new Uint8Array([0xf0]));
       return { threw: false } as const;
     } catch (e: any) {
       return {
@@ -188,12 +181,9 @@ test("decode throws TypeError on non-Uint8Array input (no silent truncation)", a
   // (1000 & 0xFF === 232). decode/decodeAll must reject anything that
   // isn't a real Uint8Array.
   const result = await page.evaluate(() => {
-    const { decode, decodeAll } = (window as any).bijou64;
+    const { decode, decodeAll } = (window as any).bijou128;
     const bad: unknown[] = [[1000], [0x00], null, 42, "nope"];
-    const out: { fn: string; allTypeError: boolean } = {
-      fn: "",
-      allTypeError: true,
-    };
+    const out = { fn: "", allTypeError: true };
     for (const input of bad) {
       for (const [name, f] of [
         ["decode", decode],
@@ -202,7 +192,7 @@ test("decode throws TypeError on non-Uint8Array input (no silent truncation)", a
         try {
           f(input);
           out.fn = name;
-          out.allTypeError = false; // did not throw at all
+          out.allTypeError = false;
         } catch (e: any) {
           if (!(e instanceof TypeError)) {
             out.fn = name;
@@ -216,23 +206,18 @@ test("decode throws TypeError on non-Uint8Array input (no silent truncation)", a
   expect(result.allTypeError, `failing fn: ${result.fn}`).toBe(true);
 });
 
-test("encode throws RangeError for bigint >= 2n ** 64n", async ({ page }) => {
-  // wasm-bindgen's default `bigint → u64` marshalling silently
-  // truncates via `BigInt.asUintN(64, value)`, which would map any
-  // bigint >= 2^64 to its low 64 bits and produce an arbitrary
-  // encoding. bijou's API instead rejects with a RangeError so the
-  // caller cannot accidentally violate canonicality at the boundary.
+test("encode throws RangeError for bigint >= 2n ** 128n", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode } = (window as any).bijou64;
+    const { encode } = (window as any).bijou128;
     try {
-      encode(1n << 64n); // exactly 2^64 — one past u64::MAX
+      encode(1n << 128n);
       return { threw: false } as const;
     } catch (e: any) {
       return {
         threw: true,
         name: e.name,
         isError: e instanceof Error,
-        messageHasRange: typeof e.message === "string" && e.message.includes("2**64"),
+        messageHasRange: typeof e.message === "string" && e.message.includes("2**128"),
       } as const;
     }
   });
@@ -243,13 +228,11 @@ test("encode throws RangeError for bigint >= 2n ** 64n", async ({ page }) => {
 });
 
 test("encode throws RangeError for negative bigint", async ({ page }) => {
-  // Without the range check, two's-complement wraparound would encode
-  // `-1n` as the bytes for u64::MAX — a silent footgun.
   const result = await page.evaluate(() => {
-    const { encode, encodedLen } = (window as any).bijou64;
+    const { encode, encodedLen } = (window as any).bijou128;
     const cases = [
       () => encode(-1n),
-      () => encode(-(1n << 63n)),
+      () => encode(-(1n << 127n)),
       () => encodedLen(-1n),
     ];
     return cases.map((fn) => {
@@ -268,21 +251,15 @@ test("encode throws RangeError for negative bigint", async ({ page }) => {
 });
 
 test("encode throws TypeError for non-bigint inputs", async ({ page }) => {
-  // wasm-bindgen does not enforce the &BigInt type at runtime — the JS
-  // shim happily accepts any value. We must distinguish "wrong type"
-  // from "out of range" so callers can give useful diagnostics. A plain
-  // Number, string, null, or undefined should throw TypeError, NOT
-  // RangeError (which would mislead the caller into thinking 42 is
-  // out of the [0, 2^64) range — which it obviously isn't).
   const result = await page.evaluate(() => {
-    const { encode, encodedLen } = (window as any).bijou64;
+    const { encode, encodedLen } = (window as any).bijou128;
     const cases = [
-      () => encode(42),               // Number, not bigint
-      () => encode("300"),            // String
+      () => encode(42),
+      () => encode("300"),
       () => encode(null),
       () => encode(undefined),
       () => encodedLen(42),
-      () => encodedLen({} as any),    // arbitrary object
+      () => encodedLen({} as any),
     ];
     return cases.map((fn) => {
       try {
@@ -306,69 +283,68 @@ test("encode throws TypeError for non-bigint inputs", async ({ page }) => {
   }
 });
 
-test("decodeAll returns a BigUint64Array of every value in the buffer", async ({ page }) => {
-  // Verify both the runtime type (typed array, not plain JS array) and
-  // the round-trip behaviour.
+test("decodeAll returns an Array<bigint> of every value in the buffer", async ({ page }) => {
+  // Unlike bijou64 (which returns BigUint64Array), bijou128 returns a
+  // plain Array because there is no BigUint128Array in the web platform.
   const result = await page.evaluate(() => {
-    const { encode, decodeAll } = (window as any).bijou64;
+    const { encode, decodeAll } = (window as any).bijou128;
     const merged = new Uint8Array([
       ...encode(42n),
-      ...encode(300n),
+      ...encode(500n),
       ...encode(65535n),
-      ...encode((1n << 32n)),
+      ...encode(1n << 64n),
     ]);
     const values = decodeAll(merged);
     return {
       typeName: values.constructor.name,
       length: values.length,
-      isBigUint64Array: values instanceof BigUint64Array,
-      asArray: Array.from(values).map((v) => v.toString()),
+      isArray: Array.isArray(values),
+      asArray: values.map((v: bigint) => v.toString()),
     };
   });
-  expect(result.typeName).toBe("BigUint64Array");
-  expect(result.isBigUint64Array).toBe(true);
+  expect(result.typeName).toBe("Array");
+  expect(result.isArray).toBe(true);
   expect(result.length).toBe(4);
-  expect(result.asArray).toEqual(["42", "300", "65535", "4294967296"]);
+  expect(result.asArray).toEqual(["42", "500", "65535", "18446744073709551616"]);
 });
 
-test("decodeAll on an empty buffer returns an empty BigUint64Array", async ({ page }) => {
+test("decodeAll on an empty buffer returns an empty Array", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { decodeAll } = (window as any).bijou64;
+    const { decodeAll } = (window as any).bijou128;
     const empty = decodeAll(new Uint8Array(0));
     return { typeName: empty.constructor.name, length: empty.length };
   });
-  expect(result.typeName).toBe("BigUint64Array");
+  expect(result.typeName).toBe("Array");
   expect(result.length).toBe(0);
 });
 
-test("decodeAll throws Bijou64DecodeError on a malformed element", async ({ page }) => {
-  // [0x42, 0xF8] — first byte decodes to 0x42 successfully, second
-  // byte is a tag with no payload. decodeAll must abort and surface
-  // the error, NOT silently return the partial prefix.
+test("decodeAll throws Bijou128DecodeError on a malformed element", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { decodeAll } = (window as any).bijou64;
+    const { decodeAll } = (window as any).bijou128;
     try {
-      decodeAll(new Uint8Array([0x42, 0xF8]));
+      decodeAll(new Uint8Array([0x42, 0xf0]));
       return { threw: false } as const;
     } catch (e: any) {
       return { threw: true, name: e.name, isError: e instanceof Error } as const;
     }
   });
   expect(result.threw).toBe(true);
-  expect(result.name).toBe("Bijou64DecodeError");
+  expect(result.name).toBe("Bijou128DecodeError");
   expect(result.isError).toBe(true);
 });
 
-test("encode accepts the boundary values 0n and u64::MAX exactly", async ({ page }) => {
-  // The validation must not be off by one — 0n and (2^64 - 1) are
-  // both valid inputs.
+test("encode accepts the boundary values 0n and u128::MAX exactly", async ({ page }) => {
   const result = await page.evaluate(() => {
-    const { encode } = (window as any).bijou64;
+    const { encode } = (window as any).bijou128;
     return {
       zero: [...encode(0n)],
-      max: [...encode((1n << 64n) - 1n)],
+      max: [...encode((1n << 128n) - 1n)],
     };
   });
   expect(result.zero).toEqual([0x00]);
-  expect(result.max).toEqual([0xff, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0x07]);
+  expect(result.max).toEqual([
+    0xff, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe,
+    0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe,
+    0x0f,
+  ]);
 });

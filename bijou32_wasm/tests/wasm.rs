@@ -1,54 +1,43 @@
-//! Wasm-target integration tests for `bijou64_wasm`.
+//! Wasm-target integration tests for `bijou32_wasm`.
 //!
 //! Compiled to `wasm32-unknown-unknown` by `wasm-pack test --node` and run
 //! in Node.js. This layer exercises the Rust ↔ wasm-bindgen ABI directly
 //! (without going through the wasm-bodge dist build). Cross-environment
 //! coverage of the actual `dist/` package lives at the JS layer:
 //!
-//! - `test:js:node`    — Mocha against `dist/esm/node.js` (CJS path is
-//!   covered by `dist/cjs/node.cjs`)
-//! - `test:js:browser` — Playwright against `dist/esm/web.js` across
+//! - `test:js:32:node`    — Mocha against `dist/esm/node.js`
+//! - `test:js:32:browser` — Playwright against `dist/esm/web.js` across
 //!   chromium / firefox / webkit
 //!
 //! Run locally:
 //!
 //! ```sh
-//! wasm-pack test --node bijou64_wasm   # this file, Rust ABI in Node
-//! test:js                               # node + browsers, JS surface against `dist/`
+//! wasm-pack test --node bijou32_wasm
 //! ```
 
 #![cfg(target_family = "wasm")]
 #![allow(clippy::missing_panics_doc, clippy::unwrap_used)]
 
-use bijou64_wasm::{
+use bijou32_wasm::{
     decode::{decode, decode_all},
     encode::{encode, encoded_len},
     max_bytes,
 };
-use js_sys::BigInt;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
 
-/// Build a `BigInt` from a Rust `u64`. The wasm-bindgen `From<u64> for
-/// BigInt` impl is exactly the right thing here — no truncation, no
-/// loss of precision, no exposure to the wraparound semantics we're
-/// guarding against in the public API.
-fn bi(v: u64) -> BigInt {
-    BigInt::from(v)
+/// Build a JS number from a Rust `u32`.
+fn n(v: u32) -> JsValue {
+    JsValue::from_f64(f64::from(v))
 }
 
-/// Build a `BigInt` from a decimal string. Used for values outside the
-/// `u64` range — there is no `From<i64>` shortcut for negatives and we
-/// want to test exactly `2**64` and similar boundaries.
-fn bi_str(s: &str) -> BigInt {
-    BigInt::new(&JsValue::from_str(s)).expect("valid bigint literal")
+/// Build a JS number from a Rust `f64` — used for fractional, NaN,
+/// out-of-range, and negative-number cases.
+fn nf(v: f64) -> JsValue {
+    JsValue::from_f64(v)
 }
 
 /// Pull `name` off any throwable so we can assert on it.
-///
-/// Accepts anything `Clone + Into<JsValue>` so callers can pass the
-/// raw `WasmBigintError` returned from `encode`/`encodedLen` directly,
-/// without having to convert it themselves.
 fn js_error_name<E: Clone + Into<JsValue>>(err: &E) -> Option<String> {
     let v: JsValue = err.clone().into();
     let e: &js_sys::Error = v.dyn_ref()?;
@@ -68,57 +57,55 @@ fn u8s(bytes: &[u8]) -> JsValue {
 }
 
 #[wasm_bindgen_test]
-fn max_bytes_is_nine() {
-    assert_eq!(max_bytes(), 9);
+fn max_bytes_is_five() {
+    assert_eq!(max_bytes(), 5);
 }
 
 #[wasm_bindgen_test]
 fn tier_0_single_byte_encoding() {
-    // For values < 248 the byte _is_ the value.
-    assert_eq!(encode(&bi(0)).unwrap(), vec![0x00]);
-    assert_eq!(encode(&bi(42)).unwrap(), vec![0x2A]);
-    assert_eq!(encode(&bi(247)).unwrap(), vec![0xF7]);
+    // For values < 252 the byte _is_ the value.
+    assert_eq!(encode(&n(0)).unwrap(), vec![0x00]);
+    assert_eq!(encode(&n(42)).unwrap(), vec![0x2A]);
+    assert_eq!(encode(&n(251)).unwrap(), vec![0xFB]);
 }
 
 #[wasm_bindgen_test]
 fn tier_1_uses_offset() {
-    // Tier 1: tag 0xF8, payload = value - 248.
-    assert_eq!(encode(&bi(248)).unwrap(), vec![0xF8, 0x00]);
-    assert_eq!(encode(&bi(300)).unwrap(), vec![0xF8, 0x34]);
-    assert_eq!(encode(&bi(503)).unwrap(), vec![0xF8, 0xFF]);
+    // Tier 1: tag 0xFC, payload = value - 252.
+    assert_eq!(encode(&n(252)).unwrap(), vec![0xFC, 0x00]);
+    assert_eq!(encode(&n(300)).unwrap(), vec![0xFC, 0x30]);
+    assert_eq!(encode(&n(507)).unwrap(), vec![0xFC, 0xFF]);
 }
 
 #[wasm_bindgen_test]
-fn u64_max_uses_full_nine_bytes() {
-    let bytes = encode(&bi(u64::MAX)).unwrap();
-    assert_eq!(bytes.len(), 9);
+fn u32_max_uses_full_five_bytes() {
+    let bytes = encode(&n(u32::MAX)).unwrap();
+    assert_eq!(bytes.len(), 5);
     assert_eq!(bytes[0], 0xFF);
 }
 
 #[wasm_bindgen_test]
 fn encoded_len_matches_encode_len() {
-    // The two should agree across every tier boundary plus a few interior
-    // points. If they diverge for any input, the format is internally
-    // inconsistent.
-    let cases = [
+    let cases: &[u32] = &[
         0,
-        247,
-        248,
-        503,
-        504,
+        251,
+        252,
+        507,
+        508,
         65_535,
-        66_039,
-        66_040,
-        16_843_255,
-        1_u64 << 32,
-        u64::MAX - 1,
-        u64::MAX,
+        66_043,
+        66_044,
+        16_843_259,
+        16_843_260,
+        1u32 << 24,
+        u32::MAX - 1,
+        u32::MAX,
     ];
 
-    for v in cases {
-        let bv = bi(v);
-        let computed = encoded_len(&bv).unwrap();
-        let actual = encode(&bv).unwrap().len();
+    for &v in cases {
+        let jv = n(v);
+        let computed = encoded_len(&jv).unwrap();
+        let actual = encode(&jv).unwrap().len();
         assert_eq!(
             computed, actual,
             "encoded_len({v}) = {computed} but encode produced {actual} bytes",
@@ -128,27 +115,25 @@ fn encoded_len_matches_encode_len() {
 
 #[wasm_bindgen_test]
 fn decode_round_trip() {
-    // Spot-check each tier boundary plus u64::MAX. Exhaustive coverage
-    // lives in the host-side property tests; here we just verify the JS
-    // glue doesn't lose bits at the boundary.
-    let cases: &[u64] = &[
+    let cases: &[u32] = &[
         0,
         1,
-        247,
-        248,
-        503,
-        504,
+        251,
+        252,
+        507,
+        508,
         65_535,
-        66_039,
-        66_040,
-        16_843_255,
-        1_u64 << 32,
-        u64::MAX - 1,
-        u64::MAX,
+        66_043,
+        66_044,
+        16_843_259,
+        16_843_260,
+        1u32 << 24,
+        u32::MAX - 1,
+        u32::MAX,
     ];
 
     for &v in cases {
-        let bytes = encode(&bi(v)).unwrap();
+        let bytes = encode(&n(v)).unwrap();
         let result = decode(&u8s(&bytes)).unwrap();
         assert_eq!(result.value(), v, "round-trip failed for {v}");
         assert_eq!(result.bytes_read(), bytes.len());
@@ -157,9 +142,7 @@ fn decode_round_trip() {
 
 #[wasm_bindgen_test]
 fn decode_partial_buffer_reports_bytes_read() {
-    // bytesRead should be the encoding length, not the input length —
-    // this is what allows stream-decoding by repeatedly slicing.
-    let mut buf = encode(&bi(300)).unwrap(); // 2 bytes
+    let mut buf = encode(&n(300)).unwrap(); // 2 bytes
     buf.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
     let result = decode(&u8s(&buf)).unwrap();
     assert_eq!(result.value(), 300);
@@ -173,14 +156,14 @@ fn decode_empty_input_errors() {
 
 #[wasm_bindgen_test]
 fn decode_truncated_tier_1_errors() {
-    // Tag 0xF8 needs 1 payload byte — supply only the tag.
-    assert!(decode(&u8s(&[0xF8])).is_err());
+    // Tag 0xFC needs 1 payload byte — supply only the tag.
+    assert!(decode(&u8s(&[0xFC])).is_err());
 }
 
 #[wasm_bindgen_test]
-fn decode_truncated_tier_8_errors() {
-    // Tag 0xFF needs 8 payload bytes — supply 7.
-    assert!(decode(&u8s(&[0xFF, 0, 0, 0, 0, 0, 0, 0])).is_err());
+fn decode_truncated_tier_4_errors() {
+    // Tag 0xFF needs 4 payload bytes — supply 3.
+    assert!(decode(&u8s(&[0xFF, 0, 0, 0])).is_err());
 }
 
 // ---- input-type guard tests (non-Uint8Array rejection) --------------------
@@ -198,9 +181,8 @@ fn decode_rejects_plain_array() {
 
 #[wasm_bindgen_test]
 fn decode_rejects_out_of_range_array_element_without_truncation() {
-    // [1000] as a plain Array. The dangerous case: the old behaviour
-    // silently decoded this as value 232 (1000 & 0xFF). It must now
-    // throw a TypeError, never silently truncate.
+    // [1000] as a plain Array. The old behaviour silently decoded this
+    // as value 232 (1000 & 0xFF). It must now throw, never truncate.
     let plain = js_sys::Array::of1(&JsValue::from(1000u32));
     let err = decode(plain.as_ref()).expect_err("out-of-range Array element must be rejected");
     assert_eq!(js_value_error_name(&err).as_deref(), Some("TypeError"));
@@ -215,7 +197,6 @@ fn decode_all_rejects_plain_array() {
 
 #[wasm_bindgen_test]
 fn decode_rejects_non_array_inputs() {
-    // null, a number, and a string are all wrong-type.
     for bad in [
         JsValue::NULL,
         JsValue::from(42u32),
@@ -226,58 +207,70 @@ fn decode_rejects_non_array_inputs() {
     }
 }
 
-// ---- Range-check tests for the bigint → u64 boundary ----------------------
+// ---- Range-check tests for the number → u32 boundary ----------------------
 
 #[wasm_bindgen_test]
-fn encode_rejects_value_equal_to_two_to_the_sixty_fourth() {
-    // 2^64 — exactly one past u64::MAX. Without the validation, this
+fn encode_rejects_value_equal_to_two_to_the_thirty_second() {
+    // 2^32 — exactly one past u32::MAX. Without the validation, this
     // would silently truncate to 0 and encode as [0x00].
-    let too_big = bi_str("18446744073709551616");
-    let err = encode(&too_big).expect_err("must reject 2^64");
+    let err = encode(&nf(4_294_967_296.0)).expect_err("must reject 2^32");
     assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
 }
 
 #[wasm_bindgen_test]
 fn encode_rejects_negative_one() {
-    // -1n. Without validation, two's-complement wraparound encodes this
-    // as u64::MAX — a real footgun for content-addressed protocols.
-    let neg_one = bi_str("-1");
-    let err = encode(&neg_one).expect_err("must reject -1n");
+    // -1. Without validation, JS's `>>> 0` cast encodes this as
+    // u32::MAX — a real footgun for content-addressed protocols.
+    let err = encode(&nf(-1.0)).expect_err("must reject -1");
     assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
 }
 
 #[wasm_bindgen_test]
 fn encode_rejects_large_negative() {
-    let neg = bi_str("-9223372036854775808"); // -2^63
-    let err = encode(&neg).expect_err("must reject -2^63");
+    let err = encode(&nf(-2_147_483_648.0)).expect_err("must reject -2^31");
     assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
+}
+
+#[wasm_bindgen_test]
+fn encode_rejects_fractional() {
+    // Fractional values should be rejected as TypeError, not
+    // RangeError — they are nominally in range but not integers.
+    let err = encode(&nf(1.5)).expect_err("must reject 1.5");
+    assert_eq!(js_error_name(&err).as_deref(), Some("TypeError"));
+}
+
+#[wasm_bindgen_test]
+fn encode_rejects_nan_and_infinity() {
+    for v in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let err = encode(&nf(v)).expect_err("must reject NaN/Infinity");
+        assert_eq!(
+            js_error_name(&err).as_deref(),
+            Some("TypeError"),
+            "v = {v:?}"
+        );
+    }
 }
 
 #[wasm_bindgen_test]
 fn encoded_len_rejects_out_of_range() {
-    let too_big = bi_str("18446744073709551616");
-    let err = encoded_len(&too_big).expect_err("must reject 2^64");
+    let err = encoded_len(&nf(4_294_967_296.0)).expect_err("must reject 2^32");
     assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
 
-    let neg = bi_str("-1");
-    let err = encoded_len(&neg).expect_err("must reject -1n");
+    let err = encoded_len(&nf(-1.0)).expect_err("must reject -1");
     assert_eq!(js_error_name(&err).as_deref(), Some("RangeError"));
 }
 
 #[wasm_bindgen_test]
-fn encode_accepts_u64_max_exactly() {
-    // The largest accepted value: u64::MAX = 2^64 - 1.
-    let max = bi_str("18446744073709551615");
-    let bytes = encode(&max).expect("u64::MAX must be accepted");
-    assert_eq!(bytes.len(), 9);
+fn encode_accepts_u32_max_exactly() {
+    // The largest accepted value: u32::MAX = 2^32 - 1.
+    let bytes = encode(&n(u32::MAX)).expect("u32::MAX must be accepted");
+    assert_eq!(bytes.len(), 5);
     assert_eq!(bytes[0], 0xFF);
 }
 
 #[wasm_bindgen_test]
 fn encode_accepts_zero_exactly() {
-    // The smallest accepted value: 0.
-    let zero = bi_str("0");
-    let bytes = encode(&zero).expect("0 must be accepted");
+    let bytes = encode(&n(0)).expect("0 must be accepted");
     assert_eq!(bytes, vec![0x00]);
 }
 
@@ -291,27 +284,24 @@ fn decode_all_empty_returns_empty() {
 
 #[wasm_bindgen_test]
 fn decode_all_multi_value_roundtrip() {
-    // Encode three values back-to-back, decode_all should recover them all.
     let mut buf = Vec::new();
-    for v in [42u64, 300, 65_535] {
-        buf.extend_from_slice(&encode(&bi(v)).unwrap());
+    for v in [42u32, 300, 65_535] {
+        buf.extend_from_slice(&encode(&n(v)).unwrap());
     }
     let result = decode_all(&u8s(&buf)).expect("must decode all");
-    assert_eq!(result, vec![42u64, 300, 65_535]);
+    assert_eq!(result, vec![42u32, 300, 65_535]);
 }
 
 #[wasm_bindgen_test]
 fn decode_all_propagates_error() {
-    // [0x42, 0xF8] — the first byte decodes, the second is a tag without
+    // [0x42, 0xFC] — the first byte decodes, the second is a tag without
     // payload. decode_all must surface the error and not return the partial
-    // prefix. The error's JS-side `name === "DecodeError"` is verified
-    // in the Playwright e2e suite; here we just confirm the boundary
-    // returns Err.
-    assert!(decode_all(&u8s(&[0x42, 0xF8])).is_err());
+    // prefix.
+    assert!(decode_all(&u8s(&[0x42, 0xFC])).is_err());
 }
 
 #[wasm_bindgen_test]
 fn decode_all_propagates_overflow() {
-    // Tier-8 all-ones overflows.
-    assert!(decode_all(&u8s(&[0xFFu8; 9])).is_err());
+    // Tier-4 all-ones overflows.
+    assert!(decode_all(&u8s(&[0xFFu8; 5])).is_err());
 }

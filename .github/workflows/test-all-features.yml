@@ -33,8 +33,14 @@ jobs:
       - name: Test all features (host)
         run: cargo test --workspace --all-features
 
+      - name: Check no_std (bijou32)
+        run: cargo check --package bijou32 --no-default-features
+
       - name: Check no_std (bijou64)
         run: cargo check --package bijou64 --no-default-features
+
+      - name: Check no_std (bijou128)
+        run: cargo check --package bijou128 --no-default-features
 
       - name: Check wasm32 (workspace)
         run: cargo check --workspace --target wasm32-unknown-unknown
