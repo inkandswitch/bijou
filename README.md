@@ -84,6 +84,24 @@ The workspace targets stable Rust (see `rust-version` in
 `Cargo.toml`) and supports `wasm32-unknown-unknown` via the
 toolchain shipped in the flake.
 
+## Other implementations
+
+The community has ported bijou to several languages and ecosystems. These are
+independent projects, not maintained here — but they target the same wire
+format, so an encoder in one language interoperates with a decoder in
+another:
+
+| Implementation                                                                                | Language          | Notes                                                                |
+|-----------------------------------------------------------------------------------------------|-------------------|----------------------------------------------------------------------|
+| [LostKobrakai/bijou64](https://github.com/LostKobrakai/bijou64)                               | Elixir            | `bijou64` port ([published on Hex](https://hex.pm/packages/bijou64)) |
+| [MichaelMure/go-bijou](https://github.com/MichaelMure/go-bijou)                               | Go                | `bijou64` port                                                       |
+| [scottchiefbaker/perl-Encode-Bijou64](https://github.com/scottchiefbaker/perl-Encode-Bijou64) | Perl              | `bijou64` ([on CPAN](https://metacpan.org/dist/Encode-Bijou64))      |
+| [Joel-hanson/bijou64](https://github.com/Joel-hanson/bijou64)                                 | Java (+ Rust JNI) | `bijou64` Kafka serializer/deserializer                              |
+
+Building another one? Open a PR adding it here! The per-crate `SPEC.md`
+files and the test vectors in each crate's test suite are the reference
+for compatibility.
+
 ## License
 
 Code is dual-licensed under [MIT](./LICENSE-MIT) OR
