@@ -86,8 +86,8 @@ toolchain shipped in the flake.
 
 ## Other implementations
 
-The community has ported bijou to several languages and ecosystems. These are
-independent projects, not maintained here — but they target the same wire
+The community has ported the `bijou64` wire format to several languages and ecosystems. These are
+independent projects, not maintained here — but they target the same `bijou64`
 format, so an encoder in one language interoperates with a decoder in
 another:
 
