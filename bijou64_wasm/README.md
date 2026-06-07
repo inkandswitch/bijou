@@ -23,9 +23,19 @@ MAX_BYTES();                          // 9
 `u64` crosses the boundary as JS `bigint`. `decodeAll` returns a typed
 `BigUint64Array` (denser than a plain array of `bigint`s).
 
-For downstream libraries shipping their own init strategy, import from
-`bijou64/slim` and call `initSync({ module: ... })` yourself — see the
-[wasm-bodge slim docs](https://github.com/alexjg/wasm-bodge#the-slim-escape-hatch).
+## Subpath imports
+
+Beyond the default entry, the package exposes a few subpaths:
+
+- `bijou64/slim` — bring-your-own init. Import this and call
+  `initSync({ module: ... })` yourself; nothing auto-loads the wasm.
+  See the [wasm-bodge slim docs](https://github.com/alexjg/wasm-bodge#the-slim-escape-hatch).
+- `bijou64/debug` — same API, but backed by an unoptimized wasm with
+  DWARF preserved, so Chrome DevTools can step through Rust source. Much
+  larger; use only while debugging. A `bijou64/debug/slim` variant exists too.
+- `bijou64/wasm` and `bijou64/wasm-base64` — the raw `.wasm` and a
+  base64-inlined module, for custom loaders.
+- `bijou64/iife` — a classic `<script>`-tag build exposing a global.
 
 ## License
 
