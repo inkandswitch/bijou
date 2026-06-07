@@ -55,6 +55,8 @@
     "./dist/esm/debug-workerd.js"
   ],
   "files": [
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
     "dist"
   ],
   "exports": {
