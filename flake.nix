@@ -244,6 +244,22 @@
             echo "✓ wasm32 check passed"
           '';
 
+          "bodge:all" = cmd "Build all bijou wasm packages with wasm-bodge (release + /debug variants)" ''
+            set -e
+            for crate in bijou32_wasm bijou64_wasm bijou128_wasm; do
+              echo "===> wasm-bodge build $crate..."
+              ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/$crate/dist"
+              ${wasm-bodge}/bin/wasm-bodge build \
+                --crate-path "$WORKSPACE_ROOT/$crate" \
+                --package-json "$WORKSPACE_ROOT/$crate/package.json" \
+                --out-dir "$WORKSPACE_ROOT/$crate/dist" \
+                --debug-profile wasm-debug
+            done
+            echo ""
+            echo "✓ All bijou wasm packages built with wasm-bodge"
+            "wasm:sizes"
+          '';
+
           "bodge" = cmd "Build bijou64_wasm into a universal NPM package via wasm-bodge" ''
             set -e
             ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijou64_wasm/dist"
@@ -251,7 +267,8 @@
             ${wasm-bodge}/bin/wasm-bodge build \
               --crate-path "$WORKSPACE_ROOT/bijou64_wasm" \
               --package-json "$WORKSPACE_ROOT/bijou64_wasm/package.json" \
-              --out-dir "$WORKSPACE_ROOT/bijou64_wasm/dist"
+              --out-dir "$WORKSPACE_ROOT/bijou64_wasm/dist" \
+              --debug-profile wasm-debug
             echo ""
             echo "✓ bijou64_wasm built — output in bijou64_wasm/dist/"
           '';
@@ -263,7 +280,8 @@
             ${wasm-bodge}/bin/wasm-bodge build \
               --crate-path "$WORKSPACE_ROOT/bijou32_wasm" \
               --package-json "$WORKSPACE_ROOT/bijou32_wasm/package.json" \
-              --out-dir "$WORKSPACE_ROOT/bijou32_wasm/dist"
+              --out-dir "$WORKSPACE_ROOT/bijou32_wasm/dist" \
+              --debug-profile wasm-debug
             echo ""
             echo "✓ bijou32_wasm built — output in bijou32_wasm/dist/"
           '';
@@ -275,9 +293,50 @@
             ${wasm-bodge}/bin/wasm-bodge build \
               --crate-path "$WORKSPACE_ROOT/bijou128_wasm" \
               --package-json "$WORKSPACE_ROOT/bijou128_wasm/package.json" \
-              --out-dir "$WORKSPACE_ROOT/bijou128_wasm/dist"
+              --out-dir "$WORKSPACE_ROOT/bijou128_wasm/dist" \
+              --debug-profile wasm-debug
             echo ""
             echo "✓ bijou128_wasm built — output in bijou128_wasm/dist/"
+          '';
+
+          "wasm:sizes" = cmd "Print wasm bundle sizes for all bijou wasm packages" ''
+            set -e
+
+            format_size() {
+              local size=$1
+              if [ "$size" -gt 1048576 ]; then
+                echo "$(echo "scale=2; $size / 1048576" | ${pkgs.bc}/bin/bc) MB"
+              elif [ "$size" -gt 1024 ]; then
+                echo "$(echo "scale=2; $size / 1024" | ${pkgs.bc}/bin/bc) KB"
+              else
+                echo "$size B"
+              fi
+            }
+
+            rows=""
+            for dir in bijou32_wasm bijou64_wasm bijou128_wasm; do
+              wasm_file=$(ls "$WORKSPACE_ROOT/$dir/dist/wasm_bindgen/web/"*_bg.wasm 2>/dev/null | head -1)
+              if [ -n "$wasm_file" ] && [ -f "$wasm_file" ]; then
+                name=$(basename "$dir")
+                raw_size=$(${pkgs.coreutils}/bin/stat -c%s "$wasm_file" 2>/dev/null || echo "0")
+                gzip_size=$(${pkgs.gzip}/bin/gzip -c "$wasm_file" | ${pkgs.coreutils}/bin/wc -c)
+                raw_fmt=$(format_size "$raw_size")
+                gz_fmt=$(format_size "$gzip_size")
+                rows="$rows$name|$raw_fmt|$gz_fmt\n"
+              fi
+            done
+
+            echo ""
+            echo "┌───────────────────────────────────┬────────────┬────────────┐"
+            echo "│ Package                           │        Raw │    Gzipped │"
+            echo "├───────────────────────────────────┼────────────┼────────────┤"
+
+            printf "$rows" | while IFS='|' read -r name raw gz; do
+              printf "│ %-33s │ %10s │ %10s │\n" "$name" "$raw" "$gz"
+            done
+
+            echo "└───────────────────────────────────┴────────────┴────────────┘"
+            echo ""
           '';
 
           "test:js" = cmd "Run bijou64_wasm JS-package tests in Node + browsers (rebuilds dist via bodge)" ''
