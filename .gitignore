@@ -16,6 +16,9 @@ rust_out
 # nix direnv
 .direnv
 
+# lean / lake build artifacts
+/lean/.lake/
+
 # wasm / npm artifacts
 **/dist/
 **/node_modules/
