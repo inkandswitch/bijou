@@ -54,6 +54,11 @@ unused_extern_crates = "deny"
 
 unsafe_code = "forbid"
 
+# `kani` is a known cfg, set by the Kani verifier when it compiles the
+# `#[cfg(kani)]` harnesses in bijou64/src/kani_proofs.rs. Register it so
+# normal builds don't warn (which would fail `-D warnings` in CI).
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
 [workspace.lints.clippy]
 dbg_macro = "warn"
 expect_used = "warn"

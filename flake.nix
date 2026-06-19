@@ -177,6 +177,36 @@
         wasm = command-utils.wasm.${system};
         cmd = command-utils.cmd.${system};
 
+        # Lean 4 toolchain for the formal proofs in `lean/`. Taken from
+        # nixos-unstable for a recent compiler; `lean/lean-toolchain` is
+        # pinned to the same version so elan users (non-Nix contributors)
+        # get an identical toolchain.
+        lean4 = unstable.lean4;
+
+        # Hermetic proof check. The Lean project has no external Lake
+        # dependencies (no Mathlib), so `lake build` works in the Nix
+        # sandbox without vendoring.
+        lean-proofs = pkgs.stdenv.mkDerivation {
+          name = "bijou-lean-proofs";
+          src = ./lean;
+          nativeBuildInputs = [ lean4 ];
+
+          buildPhase = ''
+            export HOME="$TMPDIR"
+            lake build
+          '';
+
+          installPhase = "touch $out";
+        };
+
+        # Phase 2 verification (Aeneas + Kani) is intentionally NOT a
+        # hermetic Nix check. The Aeneas-translated proofs in
+        # `lean-aeneas/` depend on the Aeneas Lean library + Mathlib
+        # (fetched by Lake via `elan`, needs network + a different Lean
+        # toolchain than `lean/`); Kani is not packaged for NixOS. Both
+        # are exposed as dev-shell commands instead — see `proofs:aeneas`
+        # and `proofs:kani`, and `.ignore/aeneas/SPIKE.md`.
+
         # Python environment for benchmark chart generation (analyze.py)
         bench-charts-python = pkgs.python3.withPackages (ps: [
           ps.matplotlib
@@ -445,48 +475,94 @@
             ${pkgs.pnpm}/bin/pnpm exec playwright show-report
           '';
 
-          "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package)" ''
+          "proofs" = cmd "Check the Lean 4 proofs in lean/" ''
+            set -e
+            cd "$WORKSPACE_ROOT/lean"
+            ${lean4}/bin/lake build
+            echo ""
+            echo "✓ Lean proofs OK"
+          '';
+
+          "proofs:aeneas" = cmd "Check the Aeneas-translated proofs in lean-aeneas/ (Phase 2; needs network on first run for Mathlib + Aeneas)" ''
+            set -e
+            cd "$WORKSPACE_ROOT/lean-aeneas"
+            # elan reads lean-aeneas/lean-toolchain (Lean 4.30.0-rc2, to
+            # match the Aeneas Lean library) and provisions it on demand.
+            # First run fetches deps and the Mathlib olean cache.
+            if [ ! -d .lake/packages/mathlib ]; then
+              echo "===> First run: resolving deps (Aeneas + Mathlib)..."
+              ${pkgs.elan}/bin/lake update
+              ${pkgs.elan}/bin/lake exe cache get || true
+            fi
+            ${pkgs.elan}/bin/lake build
+            echo ""
+            echo "✓ Aeneas refinement proofs OK"
+          '';
+
+          "proofs:kani" = cmd "Run the Kani harnesses for bijou64::decode (requires upstream Kani; not packaged for NixOS)" ''
+            set -e
+            if ! command -v cargo-kani >/dev/null 2>&1; then
+              echo "cargo-kani not found on PATH."
+              echo ""
+              echo "Kani is not packaged for NixOS. Run these harnesses with"
+              echo "upstream Kani on another platform or in the Kani container:"
+              echo ""
+              echo "    cargo kani -p bijou64"
+              echo ""
+              echo "Harnesses live in bijou64/src/kani_proofs.rs (cfg(kani))."
+              exit 1
+            fi
+            cargo kani -p bijou64
+            echo ""
+            echo "✓ Kani harnesses OK"
+          '';
+
+          "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package, Lean proofs)" ''
             set -e
 
-            echo "===> [1/7] Checking formatting..."
+            echo "===> [1/8] Checking formatting..."
             ${pkgs.cargo}/bin/cargo fmt --check
             echo "✓ Formatting OK"
             echo ""
 
-            echo "===> [2/7] Running Clippy..."
+            echo "===> [2/8] Running Clippy..."
             ${pkgs.cargo}/bin/cargo clippy --workspace --all-targets --all-features -- -D warnings
             echo "✓ Clippy OK"
             echo ""
 
-            echo "===> [3/7] Running host tests..."
+            echo "===> [3/8] Running host tests..."
             ${pkgs.cargo}/bin/cargo test --workspace --all-features
             echo "✓ Host tests OK"
             echo ""
 
-            echo "===> [4/7] Checking no_std..."
+            echo "===> [4/8] Checking no_std..."
             ${pkgs.cargo}/bin/cargo check --package bijou32 --no-default-features
             ${pkgs.cargo}/bin/cargo check --package bijou64 --no-default-features
             ${pkgs.cargo}/bin/cargo check --package bijou128 --no-default-features
             echo "✓ no_std OK"
             echo ""
 
-            echo "===> [5/7] Checking wasm32 build..."
+            echo "===> [5/8] Checking wasm32 build..."
             ${pkgs.cargo}/bin/cargo check --workspace --target wasm32-unknown-unknown
             echo "✓ wasm32 OK"
             echo ""
 
-            echo "===> [6/7] Running wasm-pack tests in Node.js..."
+            echo "===> [6/8] Running wasm-pack tests in Node.js..."
             ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou32_wasm
             ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou64_wasm
             ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou128_wasm
             echo "✓ wasm-pack tests OK"
             echo ""
 
-            echo "===> [7/7] Running JS-package tests (Node + browsers)..."
+            echo "===> [7/8] Running JS-package tests (Node + browsers)..."
             "test:js:32"
             "test:js"
             "test:js:128"
             echo "✓ JS-package tests OK"
+            echo ""
+
+            echo "===> [8/8] Checking Lean proofs..."
+            proofs
             echo ""
 
             echo "✓ All CI checks passed"
@@ -533,6 +609,10 @@
           inherit gungraun-runner wasm-bodge;
         };
 
+        checks = {
+          inherit lean-proofs;
+        };
+
         devShells.default = pkgs.mkShell {
           name = "bijou_shell";
 
@@ -544,6 +624,8 @@
              ++ [
                rust-toolchain
                nightly-rustfmt
+
+              lean4 # Lean 4 + lake, for the formal proofs in lean/
 
               pkgs.binaryen
               pkgs.esbuild # wasm-bodge spawns esbuild as a subprocess for bundling

@@ -68,9 +68,10 @@ toolchain and dev tooling.
 nix develop          # enter the dev shell (prints a command menu)
 build                # cargo build --workspace
 test                 # cargo test --workspace
-ci                   # fmt + clippy + test + no_std + wasm32
+ci                   # fmt + clippy + test + no_std + wasm32 + Lean proofs
 bench:shootout       # criterion shootout vs other varints
 bench:gungraun       # gungraun instruction-count benchmarks
+proofs               # check the Lean 4 proofs in lean/
 ```
 
 Without Nix:
@@ -83,6 +84,45 @@ cargo test --workspace --all-features
 The workspace targets stable Rust (see `rust-version` in
 `Cargo.toml`) and supports `wasm32-unknown-unknown` via the
 toolchain shipped in the flake.
+
+## Formal proofs
+
+The [`lean/`](./lean) directory contains a Lean 4 model of the format,
+parametrized over the tier count so one development covers all three
+width variants. Machine-checked theorems include:
+
+- _Round-trip_: decoding an encoding returns the original value.
+- _Canonicality by construction_: any byte string the decoder accepts
+  is exactly the canonical encoding of the value it returns — there is
+  no overlong encoding to reject.
+- _Bijectivity_: `encode` is injective, and fully-consumed buffers
+  decoding to the same value are identical.
+- _Order preservation_: lexicographic byte order equals numeric order
+  (a strict total order on encodings).
+- _Framing_: encoding length is determined by the first byte alone
+  (O(1) skipping), never exceeds `maxBytes` (9/5/17), and overflow can
+  occur only at the top tier (tag `0xFF`).
+
+Every test vector in the three `SPEC.md` documents is also checked by
+reduction. Run the proofs with `proofs` inside the dev shell, or
+hermetically via `nix build .#checks.<system>.lean-proofs`.
+
+This model describes the specified _format_. Connecting it to the
+_actual Rust_ is a second, in-progress layer:
+
+- **Aeneas** ([`lean-aeneas/`](./lean-aeneas)) translates `bijou64`'s
+  Rust to Lean via Charon and proves it refines the model above.
+  `encode` and `encoded_len` translate cleanly; run with `proofs:aeneas`
+  (needs network for Mathlib + Aeneas on first build).
+- **Kani** (`bijou64/src/kani_proofs.rs`) bounded-model-checks `decode`,
+  whose slice patterns are outside Aeneas's current support. It verifies
+  totality, canonicality (no overlong encodings), round-trip, and the
+  error conditions. Run with `proofs:kani` (needs upstream Kani, which
+  is not packaged for NixOS).
+
+Both Phase-2 layers run outside the hermetic Nix `ci` (heavy toolchains,
+network, non-NixOS Kani). Until they fully land, "the Rust matches the
+model" also rests on shared SPEC vectors and `bolero` property tests.
 
 ## Other implementations
 

@@ -665,6 +665,12 @@ pub enum DecodeError {
     Overflow,
 }
 
+/// Kani proof harnesses for `decode` (verified here because Aeneas
+/// cannot translate its slice rest-patterns). Compiled only under
+/// `--cfg kani`; see the module for how to run them.
+#[cfg(kani)]
+mod kani_proofs;
+
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::needless_range_loop, clippy::panic)]
 mod tests {
