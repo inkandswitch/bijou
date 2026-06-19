@@ -97,14 +97,32 @@ width variants. Machine-checked theorems include:
   no overlong encoding to reject.
 - _Bijectivity_: `encode` is injective, and fully-consumed buffers
   decoding to the same value are identical.
-- _Order preservation_: lexicographic byte order equals numeric order.
+- _Order preservation_: lexicographic byte order equals numeric order
+  (a strict total order on encodings).
+- _Framing_: encoding length is determined by the first byte alone
+  (O(1) skipping), never exceeds `maxBytes` (9/5/17), and overflow can
+  occur only at the top tier (tag `0xFF`).
 
 Every test vector in the three `SPEC.md` documents is also checked by
 reduction. Run the proofs with `proofs` inside the dev shell, or
-hermetically via `nix build .#checks.<system>.lean-proofs`. The proofs
-describe the specified format, not the Rust implementation; the Rust
-crates are checked against the same SPEC vectors and property-tested
-with `bolero`.
+hermetically via `nix build .#checks.<system>.lean-proofs`.
+
+This model describes the specified _format_. Connecting it to the
+_actual Rust_ is a second, in-progress layer:
+
+- **Aeneas** ([`lean-aeneas/`](./lean-aeneas)) translates `bijou64`'s
+  Rust to Lean via Charon and proves it refines the model above.
+  `encode` and `encoded_len` translate cleanly; run with `proofs:aeneas`
+  (needs network for Mathlib + Aeneas on first build).
+- **Kani** (`bijou64/src/kani_proofs.rs`) bounded-model-checks `decode`,
+  whose slice patterns are outside Aeneas's current support. It verifies
+  totality, canonicality (no overlong encodings), round-trip, and the
+  error conditions. Run with `proofs:kani` (needs upstream Kani, which
+  is not packaged for NixOS).
+
+Both Phase-2 layers run outside the hermetic Nix `ci` (heavy toolchains,
+network, non-NixOS Kani). Until they fully land, "the Rust matches the
+model" also rests on shared SPEC vectors and `bolero` property tests.
 
 ## Other implementations
 

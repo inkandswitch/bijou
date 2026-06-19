@@ -26,6 +26,11 @@ inductive DecodeError where
   | overflow
 deriving DecidableEq, Repr
 
+-- Needed so the decode test vectors in `Bijou.Instances` (whose results
+-- are `Except DecodeError (Nat × Nat)`) can be checked with `#guard`.
+-- Lean core derives `DecidableEq` for `Except` only on demand.
+deriving instance DecidableEq for Except
+
 namespace Family
 
 variable (F : Family)
@@ -90,6 +95,56 @@ theorem encode_bytes_lt {v : Nat} (hv : v < 256 ^ F.tiers) :
       have h3 : 0 < F.tierOf v := F.tierOf_pos (by omega)
       rw [F.offset_succ, F.capacity_eq_pow h3] at h2
       exact beBytes_lt_256 (by omega) b h
+
+/-- Values below the threshold encode as the single byte equal to the
+value (SPEC: "values 0–247 are encoded as a single byte equal to the
+value"). -/
+theorem encode_lt_threshold {v : Nat} (h : v < F.threshold) : F.encode v = [v] := by
+  simp [encode, h]
+
+/-- Every encoding is at least one byte long. -/
+theorem encodedLen_pos (v : Nat) : 1 ≤ F.encodedLen v := by
+  simp only [encodedLen]
+  split <;> omega
+
+/-- Maximum encoding length, as a parameter of the family: `tiers + 1`
+bytes (9 for bijou64, 5 for bijou32, 17 for bijou128). -/
+def maxBytes : Nat := F.tiers + 1
+
+/-- The encoding never exceeds `maxBytes` (SPEC: "maximum encoding
+length is 9 bytes"). -/
+theorem encodedLen_le (v : Nat) : F.encodedLen v ≤ F.maxBytes := by
+  have := F.tierOf_le v
+  simp only [encodedLen, maxBytes]
+  split <;> omega
+
+/-- The total encoding length, recovered from the tag byte alone. -/
+def lenFromTag (tag : Nat) : Nat :=
+  if tag < F.threshold then 1 else tag - F.threshold + 2
+
+/-- Length is determined entirely by the first byte: the count of bytes
+a successful `decode` consumes is a function of the tag alone, with no
+inspection of the payload. This is the SPEC design goal that enables
+`O(1)` skipping and streaming framing. -/
+theorem decode_consumed_from_tag {tag : Nat} {rest : List Nat} {v n : Nat}
+    (h : F.decode (tag :: rest) = .ok (v, n)) : n = F.lenFromTag tag := by
+  simp only [decode] at h
+  simp only [lenFromTag]
+  by_cases htag : tag < F.threshold
+  · rw [if_pos htag] at h ⊢
+    simp only [Except.ok.injEq, Prod.mk.injEq] at h
+    omega
+  · rw [if_neg htag] at h ⊢
+    by_cases hlen : tag - F.threshold + 1 ≤ rest.length
+    · rw [if_pos hlen] at h
+      by_cases hov :
+          F.offset (tag - F.threshold + 1) + fromBe (rest.take (tag - F.threshold + 1))
+            < 256 ^ F.tiers
+      · rw [if_pos hov] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        omega
+      · rw [if_neg hov] at h; simp at h
+    · rw [if_neg hlen] at h; simp at h
 
 end Family
 

@@ -64,4 +64,16 @@ theorem encode_lex_iff {v₁ v₂ : Nat}
         exact absurd hlex (Lex.irrefl _)
       | inr hgt => exact absurd hlex (Lex.asymm (F.lex_encode_of_lt h₁ hgt))
 
+/-- Any two in-range encodings are comparable: byte order is total, so
+encoded values can be sorted directly on their bytes. -/
+theorem encode_lex_trichotomy {v₁ v₂ : Nat}
+    (h₁ : v₁ < 256 ^ F.tiers) (h₂ : v₂ < 256 ^ F.tiers) :
+    Lex (F.encode v₁) (F.encode v₂)
+      ∨ F.encode v₁ = F.encode v₂
+      ∨ Lex (F.encode v₂) (F.encode v₁) := by
+  rcases Nat.lt_trichotomy v₁ v₂ with h | h | h
+  · exact Or.inl (F.lex_encode_of_lt h₂ h)
+  · exact Or.inr (Or.inl (by rw [h]))
+  · exact Or.inr (Or.inr (F.lex_encode_of_lt h₁ h))
+
 end Bijou.Family

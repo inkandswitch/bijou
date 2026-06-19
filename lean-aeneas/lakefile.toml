@@ -1,0 +1,17 @@
+name = "bijouAeneas"
+defaultTargets = ["BijouAeneas"]
+
+# The Aeneas Lean library (runtime for Charon/Aeneas-generated code).
+# It transitively requires Mathlib v4.30.0-rc2, which is why this project
+# is separate from the deliberately Mathlib-free `lean/` model and pins a
+# different toolchain (see lean-toolchain). Rev must match the Aeneas
+# binary used to generate BijouAeneas/Generated.lean — see that file's
+# header and ../.ignore/aeneas/SPIKE.md.
+[[require]]
+name = "Aeneas"
+git = "https://github.com/AeneasVerif/aeneas"
+rev = "bf13c42e7c34d07fc396baffad39c93023b12914"
+subDir = "backends/lean"
+
+[[lean_lib]]
+name = "BijouAeneas"

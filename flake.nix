@@ -199,6 +199,14 @@
           installPhase = "touch $out";
         };
 
+        # Phase 2 verification (Aeneas + Kani) is intentionally NOT a
+        # hermetic Nix check. The Aeneas-translated proofs in
+        # `lean-aeneas/` depend on the Aeneas Lean library + Mathlib
+        # (fetched by Lake via `elan`, needs network + a different Lean
+        # toolchain than `lean/`); Kani is not packaged for NixOS. Both
+        # are exposed as dev-shell commands instead — see `proofs:aeneas`
+        # and `proofs:kani`, and `.ignore/aeneas/SPIKE.md`.
+
         # Python environment for benchmark chart generation (analyze.py)
         bench-charts-python = pkgs.python3.withPackages (ps: [
           ps.matplotlib
@@ -473,6 +481,40 @@
             ${lean4}/bin/lake build
             echo ""
             echo "✓ Lean proofs OK"
+          '';
+
+          "proofs:aeneas" = cmd "Check the Aeneas-translated proofs in lean-aeneas/ (Phase 2; needs network on first run for Mathlib + Aeneas)" ''
+            set -e
+            cd "$WORKSPACE_ROOT/lean-aeneas"
+            # elan reads lean-aeneas/lean-toolchain (Lean 4.30.0-rc2, to
+            # match the Aeneas Lean library) and provisions it on demand.
+            # First run fetches deps and the Mathlib olean cache.
+            if [ ! -d .lake/packages/mathlib ]; then
+              echo "===> First run: resolving deps (Aeneas + Mathlib)..."
+              ${pkgs.elan}/bin/lake update
+              ${pkgs.elan}/bin/lake exe cache get || true
+            fi
+            ${pkgs.elan}/bin/lake build
+            echo ""
+            echo "✓ Aeneas refinement proofs OK"
+          '';
+
+          "proofs:kani" = cmd "Run the Kani harnesses for bijou64::decode (requires upstream Kani; not packaged for NixOS)" ''
+            set -e
+            if ! command -v cargo-kani >/dev/null 2>&1; then
+              echo "cargo-kani not found on PATH."
+              echo ""
+              echo "Kani is not packaged for NixOS. Run these harnesses with"
+              echo "upstream Kani on another platform or in the Kani container:"
+              echo ""
+              echo "    cargo kani -p bijou64"
+              echo ""
+              echo "Harnesses live in bijou64/src/kani_proofs.rs (cfg(kani))."
+              exit 1
+            fi
+            cargo kani -p bijou64
+            echo ""
+            echo "✓ Kani harnesses OK"
           '';
 
           "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package, Lean proofs)" ''

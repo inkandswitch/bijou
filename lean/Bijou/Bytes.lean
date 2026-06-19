@@ -138,6 +138,22 @@ theorem Lex.asymm {as bs : List Nat} (h : Lex as bs) : ¬Lex bs as := by
     | head h2 => omega
     | tail h2 => exact ih h2
 
+/-- `Lex` is transitive. With `irrefl` and `asymm`, this makes it a
+strict order — so sorting byte strings by `Lex` is well-defined. -/
+theorem Lex.trans {as bs cs : List Nat} (h₁ : Lex as bs) : Lex bs cs → Lex as cs := by
+  induction h₁ generalizing cs with
+  | nil => intro h₂; cases h₂ <;> exact Lex.nil
+  | head hab =>
+    intro h₂
+    cases h₂ with
+    | head hbc => exact Lex.head (by omega)
+    | tail _ => exact Lex.head hab
+  | tail _ ih =>
+    intro h₂
+    cases h₂ with
+    | head hbc => exact Lex.head hbc
+    | tail h₂' => exact Lex.tail (ih h₂')
+
 /-- Big-endian encoding is strictly monotone with respect to
 lexicographic order: numeric order and byte order agree. -/
 theorem beBytes_lex_beBytes {w m n : Nat} (hn : n < 256 ^ w) (h : m < n) :

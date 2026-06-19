@@ -130,4 +130,70 @@ theorem decode_canonical {bs₁ bs₂ : List Nat} {v : Nat}
   rw [List.take_length] at c₁ c₂
   rw [c₁, c₂]
 
+/-- Overflow is signalled only at the maximal tag `255` (`0xFF`) — the
+top tier. Lower tiers cannot overflow, because their entire value range
+sits below `256 ^ tiers`. This is the SPEC's "Minimal Decoder
+Obligations": the overflow check is needed only for the widest tier. -/
+theorem decode_overflow_max_tag {tag : Nat} {rest : List Nat}
+    (hbytes : ∀ b ∈ tag :: rest, b < 256)
+    (h : F.decode (tag :: rest) = .error .overflow) :
+    tag = 255 := by
+  have htag256 : tag < 256 := hbytes tag (List.mem_cons_self ..)
+  have hthr : F.threshold = 256 - F.tiers := rfl
+  have htiers := F.tiers_pos
+  have htierslt := F.tiers_lt
+  simp only [decode] at h
+  by_cases htag : tag < F.threshold
+  · rw [if_pos htag] at h; simp at h
+  · rw [if_neg htag] at h
+    by_cases hlen : tag - F.threshold + 1 ≤ rest.length
+    · rw [if_pos hlen] at h
+      by_cases hov :
+          F.offset (tag - F.threshold + 1) + fromBe (rest.take (tag - F.threshold + 1))
+            < 256 ^ F.tiers
+      · rw [if_pos hov] at h; simp at h
+      · -- Overflow branch: the decoded value is ≥ 256 ^ tiers.
+        have htpos : 0 < tag - F.threshold + 1 := by omega
+        have htle : tag - F.threshold + 1 ≤ F.tiers := by omega
+        have hnov : 256 ^ F.tiers
+            ≤ F.offset (tag - F.threshold + 1) + fromBe (rest.take (tag - F.threshold + 1)) :=
+          Nat.not_lt.mp hov
+        have htlen : (rest.take (tag - F.threshold + 1)).length = tag - F.threshold + 1 := by
+          simp only [List.length_take]; omega
+        have hpb : ∀ b ∈ rest.take (tag - F.threshold + 1), b < 256 := fun b hb =>
+          hbytes b (List.mem_cons_of_mem _ (mem_of_mem_take hb))
+        have hpay : fromBe (rest.take (tag - F.threshold + 1)) < 256 ^ (tag - F.threshold + 1) := by
+          have := fromBe_lt hpb
+          rwa [htlen] at this
+        -- A tier strictly below the top fits entirely under `256 ^ tiers`,
+        -- so it cannot overflow. Hence the tier must be the top one.
+        have hfull : ¬ tag - F.threshold + 1 < F.tiers := by
+          intro htlt
+          have hsucc : F.offset (tag - F.threshold + 1 + 1)
+              = F.offset (tag - F.threshold + 1) + 256 ^ (tag - F.threshold + 1) := by
+            rw [F.offset_succ, F.capacity_eq_pow htpos]
+          have hmono : F.offset (tag - F.threshold + 1 + 1) ≤ F.offset F.tiers :=
+            F.offset_le_offset (by omega)
+          have htop : F.offset F.tiers < 256 ^ F.tiers := F.offset_lt_pow F.tiers_pos
+          omega
+        omega
+    · rw [if_neg hlen] at h; simp at h
+
+/-- The bijection, packaged. On the value domain `[0, 256 ^ tiers)`:
+`encode` is injective; `decode` recovers the value it encoded
+(round-trip); and `decode` accepts nothing but canonical encodings.
+Together these state that `encode` is a bijection from the value domain
+onto the set of decodable byte strings. (Stated elementarily so the
+development stays Mathlib-free.) -/
+theorem encode_bijection :
+    (∀ {v₁ v₂ : Nat}, v₁ < 256 ^ F.tiers → v₂ < 256 ^ F.tiers →
+        F.encode v₁ = F.encode v₂ → v₁ = v₂)
+    ∧ (∀ {v : Nat}, v < 256 ^ F.tiers →
+        F.decode (F.encode v) = .ok (v, (F.encode v).length))
+    ∧ (∀ {bs : List Nat} {v n : Nat}, (∀ b ∈ bs, b < 256) → F.decode bs = .ok (v, n) →
+        v < 256 ^ F.tiers ∧ bs.take n = F.encode v) :=
+  ⟨fun h₁ h₂ h => F.encode_injective h₁ h₂ h,
+   fun hv => F.decode_encode' hv,
+   fun hb h => ⟨(F.decode_ok hb h).1, (F.decode_ok hb h).2.2⟩⟩
+
 end Bijou.Family
