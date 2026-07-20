@@ -10,52 +10,72 @@ order matches numeric order), and there is no `std` requirement.
 
 ## Crates
 
-| Crate                                  | Integer | Max bytes | Description                                                |
-|----------------------------------------|---------|-----------|------------------------------------------------------------|
-| [`bijou32`](./bijou32)                 | `u32`   | 5         | The narrowest variant. Tag threshold 252.                  |
-| [`bijou32_wasm`](./bijou32_wasm)       | `u32`   | 5         | Wasm/JS bindings for `bijou32` (npm package `bijou32`).    |
-| [`bijou64`](./bijou64)                 | `u64`   | 9         | The reference implementation. Tag threshold 248.           |
-| [`bijou64_wasm`](./bijou64_wasm)       | `u64`   | 9         | Wasm/JS bindings for `bijou64` (npm package `bijou64`).    |
-| [`bijou128`](./bijou128)               | `u128`  | 17        | Same scheme widened to 128 bits. Tag threshold 240.        |
-| [`bijou128_wasm`](./bijou128_wasm)     | `u128`  | 17        | Wasm/JS bindings for `bijou128` (npm package `bijou128`).  |
+Everything ships from two crates:
 
-The three width variants are **not wire-compatible** — they use
-different tag thresholds (252 vs 248 vs 240) so each can reach its
-maximum in the smallest number of bytes. Pick the width that matches
-your value domain; don't mix encodings on the same wire without an
-out-of-band signal.
+| Crate                          | Contents                                                                 |
+|--------------------------------|--------------------------------------------------------------------------|
+| [`bijoux`](./bijoux)           | All format implementations + `Encode`/`Decode` traits on the integers    |
+| [`bijoux_wasm`](./bijoux_wasm) | Wasm/JS bindings, one npm package (`@inkandswitch/bijoux`)               |
 
-The wasm crates also differ in their JS boundary type:
+Within `bijoux`, each width is a module gated by a feature (all enabled
+by default):
 
-- `bijou32` uses plain JS `number` (since `u32::MAX < Number.MAX_SAFE_INTEGER`)
-- `bijou64` and `bijou128` use `bigint`
-- `decodeAll` returns `Uint32Array` (bijou32), `BigUint64Array` (bijou64), or `Array<bigint>` (bijou128, since the web platform has no `BigUint128Array`)
+| Module / feature       | Integer | Max bytes | Tag threshold | Spec                                 |
+|------------------------|---------|-----------|---------------|--------------------------------------|
+| `bijoux::bijou32`, `u32`  | `u32`   | 5         | 252           | [specs/bijou32.md](./bijoux/specs/bijou32.md)   |
+| `bijoux::bijou64`, `u64`  | `u64`   | 9         | 248           | [specs/bijou64.md](./bijoux/specs/bijou64.md)   |
+| `bijoux::bijou128`, `u128` | `u128`  | 17        | 240           | [specs/bijou128.md](./bijoux/specs/bijou128.md) |
+
+The width variants are **not wire-compatible** — they use different tag
+thresholds so each can reach its maximum in the smallest number of
+bytes. Pick the width that matches your value domain; don't mix
+encodings on the same wire without an out-of-band signal.
+
+On the JS side, exports are width-suffixed (`encodeU64`, `decodeU32`,
+…); `u32` uses plain `number`, `u64`/`u128` use `bigint`, and
+`decodeAll*` returns `Uint32Array` / `BigUint64Array` /
+`Array<bigint>` respectively (the web platform has no
+`BigUint128Array`).
+
+> [!NOTE]
+> The previous per-width crates (`bijou32`, `bijou64` 0.2.x,
+> `bijou128`) are superseded by `bijoux`. Migrate by depending on
+> `bijoux` and prefixing paths (`bijou64::encode` →
+> `bijoux::bijou64::encode`), or use the traits.
 
 ## Quick start
 
 ```rust
-// Encode
+use bijoux::{Decode, Encode};
+
+// Encode: traits are implemented directly on the integer types
 let mut buf = Vec::new();
-bijou64::encode(300, &mut buf);
+300u64.encode(&mut buf);
 assert_eq!(buf, [0xF8, 0x34]);
 
 // Decode
-let (value, len) = bijou64::decode(&buf).unwrap();
+let (value, len) = u64::decode(&buf).unwrap();
 assert_eq!(value, 300);
 assert_eq!(len, 2);
 ```
 
-For 32-bit and 128-bit values, the API is identical:
+Free functions per width are available too, and the API is identical
+across widths:
 
 ```rust
+// 64-bit
+let mut buf = Vec::new();
+bijoux::bijou64::encode(300, &mut buf);
+assert_eq!(buf, [0xF8, 0x34]);
+
 // 32-bit
 let mut buf = Vec::new();
-bijou32::encode(300, &mut buf);
+bijoux::bijou32::encode(300, &mut buf);
 assert_eq!(buf, [0xFC, 0x30]);
 
 // 128-bit
 let mut buf = Vec::new();
-bijou128::encode(500, &mut buf);
+bijoux::bijou128::encode(500, &mut buf);
 assert_eq!(buf, [0xF1, 0x00, 0x04]);
 ```
 
@@ -98,13 +118,13 @@ another:
 | [scottchiefbaker/perl-Encode-Bijou64](https://github.com/scottchiefbaker/perl-Encode-Bijou64) | Perl              | `bijou64` ([on CPAN](https://metacpan.org/dist/Encode-Bijou64))      |
 | [Joel-hanson/bijou64](https://github.com/Joel-hanson/bijou64)                                 | Java (+ Rust JNI) | `bijou64` Kafka serializer/deserializer                              |
 
-Building another one? Open a PR adding it here! The per-crate `SPEC.md`
-files and the test vectors in each crate's test suite are the reference
-for compatibility.
+Building another one? Open a PR adding it here! The specs in
+[`bijoux/specs/`](./bijoux/specs) and the test vectors in the test
+suite are the reference for compatibility.
 
 ## License
 
 Code is dual-licensed under [MIT](./LICENSE-MIT) OR
 [Apache-2.0](./LICENSE-APACHE).
-The encoding specifications (`SPEC.md` in each crate) are licensed
-under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+The encoding specifications ([`bijoux/specs/`](./bijoux/specs)) are
+licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

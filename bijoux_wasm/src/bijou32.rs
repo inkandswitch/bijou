@@ -12,8 +12,6 @@
 //! JS `number` values rather than `bigint` — no `BigInt`-shimming, no
 //! out-of-range checks against `2**53`, no surprise truncation.
 
-
-
 use wasm_bindgen::prelude::*;
 
 pub mod decode;

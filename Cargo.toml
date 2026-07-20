@@ -1,11 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
-  "bijou32_wasm",
-  "bijou64_wasm",
-  "bijou128_wasm",
   "bijou_census",  # internal tooling, not published
   "bijoux",
+  "bijoux_wasm",
 ]
 
 [workspace.package]
@@ -17,10 +15,8 @@ authors = ["Brooklyn Zelenka <hello@brooklynzelenka.com>"]
 
 [workspace.dependencies]
 # Internal crates
-bijou32_wasm = { version = "0.1", path = "bijou32_wasm", default-features = false }
-bijou64_wasm = { version = "0.1", path = "bijou64_wasm", default-features = false }
-bijou128_wasm = { version = "0.1", path = "bijou128_wasm", default-features = false }
 bijoux = { version = "0.3", path = "bijoux", default-features = false }
+bijoux_wasm = { version = "0.1", path = "bijoux_wasm", default-features = false }
 
 # External crates
 arbitrary = "1.4"
@@ -123,12 +119,6 @@ overflow-checks = true
 strip = "none"
 
 # The release profile strips symbols workspace-wide; we inherit from release,
-# so re-enable DWARF retention for the three Wasm-binding crates explicitly.
-[profile.wasm-debug.package.bijou32_wasm]
-strip = "none"
-
-[profile.wasm-debug.package.bijou64_wasm]
-strip = "none"
-
-[profile.wasm-debug.package.bijou128_wasm]
+# so re-enable DWARF retention for the Wasm-binding crate explicitly.
+[profile.wasm-debug.package.bijoux_wasm]
 strip = "none"

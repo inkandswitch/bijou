@@ -114,39 +114,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bijou128_wasm"
-version = "0.1.0"
-dependencies = [
- "bijoux",
- "js-sys",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
-name = "bijou32_wasm"
-version = "0.1.0"
-dependencies = [
- "bijoux",
- "js-sys",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
-name = "bijou64_wasm"
-version = "0.1.0"
-dependencies = [
- "bijoux",
- "js-sys",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "bijou_census"
 version = "0.1.0"
 
@@ -167,6 +134,17 @@ dependencies = [
  "varu64",
  "vu128",
  "vu64",
+]
+
+[[package]]
+name = "bijoux_wasm"
+version = "0.1.0"
+dependencies = [
+ "bijoux",
+ "js-sys",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]

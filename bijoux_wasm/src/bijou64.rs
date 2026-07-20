@@ -7,8 +7,6 @@
 //! more idiomatic shape for utility libraries in 2026 (better tree-shaking,
 //! cleaner TypeScript inference, no fake namespacing).
 
-
-
 use wasm_bindgen::prelude::*;
 
 pub mod decode;

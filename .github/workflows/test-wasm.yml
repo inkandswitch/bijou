@@ -1,7 +1,7 @@
 name: Test Wasm
 
 # Three layers of wasm coverage, each run for every wasm crate in the
-# workspace (bijou32_wasm, bijou64_wasm, bijou128_wasm):
+# workspace (bijoux_wasm — all widths in one crate):
 #
 # 1. `wasm-pack test --node` exercises the Rust ↔ wasm-bindgen boundary
 #    on the wasm32-unknown-unknown target inside Node.js. Fast, no
@@ -33,13 +33,13 @@ env:
 jobs:
   # Fast Rust-side integration tests on wasm32 in Node.js.
   # macOS included so we catch any darwin-specific wasm-bindgen quirks.
-  # Matrix over all three wasm crates so a regression in one is visible.
+  # Single wasm crate (bijoux_wasm) carrying all three widths.
   wasm-pack-node:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        crate: [bijou32_wasm, bijou64_wasm, bijou128_wasm]
+        crate: [bijoux_wasm]
 
     name: wasm-pack test ${{ matrix.crate }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -70,14 +70,13 @@ jobs:
   # Playwright runs work but are slow and the bug surface is similar
   # enough that ubuntu-latest suffices for CI.
   #
-  # Matrix over all three wasm crates: each one ships its own
-  # `package.json`, `dist/`, and Playwright config, so a regression in
-  # one crate's wasm-bodge build doesn't mask another's.
+  # Single wasm crate (bijoux_wasm): one `package.json`, one `dist/`,
+  # one Playwright config covering all three widths.
   js-package:
     strategy:
       fail-fast: false
       matrix:
-        crate: [bijou32_wasm, bijou64_wasm, bijou128_wasm]
+        crate: [bijoux_wasm]
 
     name: JS-package tests ${{ matrix.crate }}
     runs-on: ubuntu-latest
@@ -128,7 +127,7 @@ jobs:
         # `flake.lock`'s wasm-bodge-src node.
         run: |
           cargo install --git https://github.com/alexjg/wasm-bodge \
-            --rev 58e0d9b2c3b749d81df7813e380432d04a904f23 \
+            --rev 2700e4b60ccfd346bdace2b3af78141a1a9511e8 \
             --locked
 
       - name: Build ${{ matrix.crate }} with wasm-bodge

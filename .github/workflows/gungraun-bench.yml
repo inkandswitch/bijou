@@ -5,11 +5,11 @@ on:
     branches:
       - main
     paths:
-      - "bijou64/**"
+      - "bijoux/**"
       - ".github/workflows/gungraun-bench.yml"
   pull_request:
     paths:
-      - "bijou64/**"
+      - "bijoux/**"
       - ".github/workflows/gungraun-bench.yml"
   workflow_dispatch:
 
@@ -40,11 +40,11 @@ jobs:
       - name: Install gungraun-runner
         run: |
           version=$(cargo metadata --format-version=1 --no-deps \
-            | jq -r '.packages[] | select(.name == "bijou64") | .dependencies[] | select(.name == "gungraun") | .req')
+            | jq -r '.packages[] | select(.name == "bijoux") | .dependencies[] | select(.name == "gungraun") | .req')
           cargo install gungraun-runner --version "${version}"
 
       - name: Run gungraun benchmarks
-        run: cargo bench -p bijou64 --bench gungraun_shootout
+        run: cargo bench -p bijoux --bench gungraun_shootout
 
       - name: Upload gungraun results
         uses: actions/upload-artifact@v4

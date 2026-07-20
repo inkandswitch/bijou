@@ -1,6 +1,0 @@
-# esbuild ships a prebuilt platform binary via its `@esbuild/*` optional
-# deps, so its install script is unnecessary here. Marking it reviewed-and-
-# disallowed (`false`) under `allowBuilds` clears the ERR_PNPM_IGNORED_BUILDS
-# failure under pnpm v11 (`ignoredBuiltDependencies` was removed in v11).
-allowBuilds:
-  esbuild: false

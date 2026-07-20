@@ -25,8 +25,8 @@ jobs:
         with:
           cache: true
 
-      - name: Run bijou64 shootout benchmarks
-        run: cargo bench --package bijou64 --bench shootout -- --noplot
+      - name: Run bijoux shootout benchmarks
+        run: cargo bench --package bijoux --bench shootout -- --noplot
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
