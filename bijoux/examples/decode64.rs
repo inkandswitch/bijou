@@ -24,7 +24,7 @@
 //!    Works in any Rust environment; useful when you want to interleave
 //!    other reads between bijou decodes.
 
-use bijoux::bijou64::{DecodeError, decode, decode_all, decode_iter, encode};
+use bijoux::u64::{DecodeError, decode, decode_all, decode_iter, encode};
 
 fn main() -> Result<(), DecodeError> {
     let values: &[u64] = &[0, 1, 42, 247, 248, 503, 504, 65_535, 1u64 << 32, u64::MAX];

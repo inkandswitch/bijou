@@ -1,14 +1,11 @@
 # bijoux
 
-_Bijoux_, plural of [bijou] — the umbrella crate for the bijou family of
-bijective, length-prefixed variable-length integer encodings.
+_Bijoux_, plural of [bijou] — bijective, length-prefixed variable-length
+integer encodings, one canonical format per integer type.
 
-Each bijou format crate (`bijou64`, and in future `bijou32`, `bijou128`,
-the signed `bijou64s`, …) defines one canonical encoding for one integer
-type, exposed as free functions. `bijoux` layers the `Encode` / `Decode`
-traits directly onto those integer types, so you can write
-`300u64.encode(&mut buf)` or code generic over any bijou-encodable
-integer.
+Each width is a module gated by a feature (all enabled by default), and
+the `Encode` / `Decode` traits are implemented directly on the integer
+types:
 
 ```rust
 use bijoux::{Decode, Encode};
@@ -18,22 +15,30 @@ let mut buf = Vec::new();
 
 let (value, consumed) = u64::decode(&buf).unwrap();
 assert_eq!((value, consumed), (300, 2));
+
+// Or via the per-width free functions:
+bijoux::u64::encode(300, &mut buf);
 ```
 
-Each width lives behind a feature flag (all enabled by default) pulling
-in the corresponding format crate:
+| Module / feature | Wire format | Max bytes | Spec                       |
+|------------------|-------------|-----------|----------------------------|
+| `bijoux::u32`    | bijou32     | 5         | [specs/bijou32.md](./specs/bijou32.md)   |
+| `bijoux::u64`    | bijou64     | 9         | [specs/bijou64.md](./specs/bijou64.md)   |
+| `bijoux::u128`   | bijou128    | 17        | [specs/bijou128.md](./specs/bijou128.md) |
 
-| Feature | Impl for | Delegates to |
-|---------|----------|--------------|
-| `u64`   | `u64`    | `bijou64`    |
+A signed `bijoux::i64` (wire format "bijou64s": zigzag over the bijou64
+tier scheme) is planned.
 
-Depend on the individual format crates instead if you want a single
-width with no facade, or the `*_wasm` crates for the npm packages.
+> [!TIP]
+> Prefer fully-qualified paths (`bijoux::u64::encode`) or the traits
+> over `use bijoux::u64;` — importing a module named `u64` shadows the
+> primitive type in that scope.
 
 `no_std` (uses `alloc`), `#![forbid(unsafe_code)]`.
 
 ## License
 
-MIT OR Apache-2.0
+Code is MIT OR Apache-2.0. The encoding specifications
+([`specs/`](./specs)) are CC BY-SA 4.0.
 
 [bijou]: https://github.com/inkandswitch/bijou

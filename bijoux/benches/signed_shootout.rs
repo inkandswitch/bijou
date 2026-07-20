@@ -386,7 +386,7 @@ fn pre_encode_bijou_zigzag(values: &[i64]) -> (Vec<u8>, Vec<usize>) {
     let mut offsets = Vec::with_capacity(values.len());
     for &v in values {
         offsets.push(buf.len());
-        bijoux::bijou64::encode(zigzag(v), &mut buf);
+        bijoux::u64::encode(zigzag(v), &mut buf);
     }
     (buf, offsets)
 }
@@ -396,7 +396,7 @@ fn pre_encode_bijou_twos(values: &[i64]) -> (Vec<u8>, Vec<usize>) {
     let mut offsets = Vec::with_capacity(values.len());
     for &v in values {
         offsets.push(buf.len());
-        bijoux::bijou64::encode(v as u64, &mut buf);
+        bijoux::u64::encode(v as u64, &mut buf);
     }
     (buf, offsets)
 }
@@ -481,7 +481,7 @@ fn bench_encode(c: &mut Criterion) {
                 || Vec::with_capacity(BATCH * 9),
                 |mut buf| {
                     for &v in values {
-                        bijoux::bijou64::encode(zigzag(v), &mut buf);
+                        bijoux::u64::encode(zigzag(v), &mut buf);
                     }
                     buf
                 },
@@ -494,7 +494,7 @@ fn bench_encode(c: &mut Criterion) {
                 || Vec::with_capacity(BATCH * 9),
                 |mut buf| {
                     for &v in values {
-                        bijoux::bijou64::encode(v as u64, &mut buf);
+                        bijoux::u64::encode(v as u64, &mut buf);
                     }
                     buf
                 },
@@ -578,7 +578,7 @@ fn bench_decode(c: &mut Criterion) {
             b.iter(|| {
                 let mut sum = 0i64;
                 for &off in &zz_off {
-                    let (u, _) = bijoux::bijou64::decode(&zz_buf[off..]).unwrap();
+                    let (u, _) = bijoux::u64::decode(&zz_buf[off..]).unwrap();
                     sum = sum.wrapping_add(unzigzag(u));
                 }
                 sum
@@ -589,7 +589,7 @@ fn bench_decode(c: &mut Criterion) {
             b.iter(|| {
                 let mut sum = 0i64;
                 for &off in &tc_off {
-                    let (u, _) = bijoux::bijou64::decode(&tc_buf[off..]).unwrap();
+                    let (u, _) = bijoux::u64::decode(&tc_buf[off..]).unwrap();
                     sum = sum.wrapping_add(u as i64);
                 }
                 sum
@@ -672,7 +672,7 @@ fn bench_stream_decode(c: &mut Criterion) {
                 let mut pos = 0;
                 let mut sum = 0i64;
                 while pos < zz_buf.len() {
-                    let (u, n) = bijoux::bijou64::decode(&zz_buf[pos..]).unwrap();
+                    let (u, n) = bijoux::u64::decode(&zz_buf[pos..]).unwrap();
                     sum = sum.wrapping_add(unzigzag(u));
                     pos += n;
                 }
@@ -685,7 +685,7 @@ fn bench_stream_decode(c: &mut Criterion) {
                 let mut pos = 0;
                 let mut sum = 0i64;
                 while pos < tc_buf.len() {
-                    let (u, n) = bijoux::bijou64::decode(&tc_buf[pos..]).unwrap();
+                    let (u, n) = bijoux::u64::decode(&tc_buf[pos..]).unwrap();
                     sum = sum.wrapping_add(u as i64);
                     pos += n;
                 }
@@ -768,7 +768,7 @@ fn bench_encoded_bytes(c: &mut Criterion) {
             b.iter(|| {
                 let mut total = 0usize;
                 for &v in values {
-                    total += bijoux::bijou64::encoded_len(zigzag(v));
+                    total += bijoux::u64::encoded_len(zigzag(v));
                 }
                 total
             });
@@ -778,7 +778,7 @@ fn bench_encoded_bytes(c: &mut Criterion) {
             b.iter(|| {
                 let mut total = 0usize;
                 for &v in values {
-                    total += bijoux::bijou64::encoded_len(v as u64);
+                    total += bijoux::u64::encoded_len(v as u64);
                 }
                 total
             });

@@ -1,7 +1,7 @@
 //! Decode
 
 use alloc::{string::ToString, vec::Vec};
-use bijoux::bijou32::DecodeError;
+use bijoux::u128::DecodeError;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 /// the input bytes is exactly the footgun we must not ship, so we
 /// inspect the raw value ourselves and reject anything that isn't a
 /// genuine `Uint8Array`. This mirrors the wrong-type guard
-/// [`super::encode`] applies to its numeric argument.
+/// [`super::encode`] applies to its `bigint` argument.
 ///
 /// The public TypeScript parameter type is still `Uint8Array` (set via
 /// `unchecked_param_type` on the exports below), so typed callers are
@@ -41,7 +41,7 @@ fn bytes_from_js(bytes: &JsValue) -> Result<Vec<u8>, WasmInputError> {
 #[derive(Debug, Clone, Copy, Error)]
 pub enum WasmInputError {
     /// Caller passed a value that isn't a JS `Uint8Array`.
-    #[error("bijou32: expected a Uint8Array")]
+    #[error("bijou128: expected a Uint8Array")]
     WrongType,
 }
 
@@ -51,97 +51,102 @@ impl From<WasmInputError> for JsValue {
     }
 }
 
-/// Decodes a `bijou32` from the front of `bytes`.
+/// Decodes a `bijou128` from the front of `bytes`.
 ///
-/// Returns a [`WasmDecoded32`] carrying the value plus the
+/// Returns a [`WasmDecoded128`] carrying the value plus the
 /// number of bytes consumed (so the caller can stream-decode by
 /// slicing).
 ///
 /// # Errors
 ///
 /// Throws a JS native `TypeError` if `bytes` is not a `Uint8Array`.
-/// Throws a JS `Error` with `name === "Bijou32DecodeError"` if `bytes`
+/// Throws a JS `Error` with `name === "Bijou128DecodeError"` if `bytes`
 /// is too short for the encoding indicated by its tag byte, or if a
-/// tier-4 payload would overflow `u32`. See [`WasmDecodeError`].
+/// tier-16 payload would overflow `u128`. See [`WasmDecodeError`].
 ///
 /// # JS
 ///
 /// ```js
-/// import { decodeU32 } from "@inkandswitch/bijoux";
-/// const { value, bytesRead } = decodeU32(new Uint8Array([0xFC, 0x30, 0xFF]));
-/// // value === 300, bytesRead === 2
-/// decodeU32([0xFC, 0x30]); // throws TypeError (plain Array, not Uint8Array)
+/// import { decodeU128 } from "@inkandswitch/bijoux";
+/// const { value, bytesRead } = decodeU128(new Uint8Array([0xF1, 0x00, 0x04, 0xFF]));
+/// // value === 500n, bytesRead === 3
+/// decodeU128([0xF1, 0x00, 0x04]); // throws TypeError (plain Array, not Uint8Array)
 /// ```
-#[wasm_bindgen(js_name = decodeU32)]
-pub fn decode_u32(
+#[wasm_bindgen(js_name = decodeU128)]
+pub fn decode_u128(
     #[wasm_bindgen(unchecked_param_type = "Uint8Array")] bytes: &JsValue,
-) -> Result<WasmDecoded32, JsValue> {
+) -> Result<WasmDecoded128, JsValue> {
     let bytes = bytes_from_js(bytes)?;
-    let (value, bytes_read) = bijoux::bijou32::decode(&bytes).map_err(WasmDecodeError::from)?;
-    Ok(WasmDecoded32 { value, bytes_read })
+    let (value, bytes_read) = bijoux::u128::decode(&bytes).map_err(WasmDecodeError::from)?;
+    Ok(WasmDecoded128 { value, bytes_read })
 }
 
-/// Decodes every `bijou32`-encoded value in `bytes`, returning them as
-/// a `Uint32Array`.
+/// Decodes every `bijou128`-encoded value in `bytes`, returning them as
+/// a JS `Array<bigint>`.
 ///
-/// Equivalent to calling [`decode_u32`] in a loop, advancing by
-/// `bytesRead` after each call until the buffer is empty. Returning
-/// `Vec<u32>` lets wasm-bindgen marshal the result as a typed
-/// `Uint32Array`, which is denser and faster than a JS array of
-/// `Number`s for large batches.
+/// Unlike `bijou64_wasm::decodeAll` (which returns a `BigUint64Array`),
+/// there is no `BigUint128Array` in the web platform. Returning
+/// `js_sys::Array` of `bigint`s is the natural mapping for `Vec<u128>` —
+/// it preserves the full 128-bit range with zero precision loss at the
+/// cost of one allocation per element on the JS side.
+///
+/// Equivalent to calling [`decode_u128`] in a loop, advancing by
+/// `bytesRead` after each call until the buffer is empty.
 ///
 /// # Errors
 ///
 /// Throws a JS native `TypeError` if `bytes` is not a `Uint8Array`.
-/// Throws a JS `Error` with `name === "Bijou32DecodeError"` (same
-/// shape as [`decode_u32`]) if any element fails to decode. The
+/// Throws a JS `Error` with `name === "Bijou128DecodeError"` (same
+/// shape as [`decode_u128`]) if any element fails to decode. The
 /// partial-prefix decoded so far is *not* returned — the operation
 /// is all-or-nothing.
 ///
 /// # JS
 ///
 /// ```js
-/// import { encodeU32, decodeAllU32 } from "@inkandswitch/bijoux";
-/// const buf = new Uint8Array([...encodeU32(42), ...encodeU32(300), ...encodeU32(65535)]);
-/// const values = decodeAllU32(buf);
-/// // values is Uint32Array([42, 300, 65535])
+/// import { encodeU128, decodeAllU128 } from "@inkandswitch/bijoux";
+/// const buf = new Uint8Array([...encodeU128(42n), ...encodeU128(500n), ...encodeU128(65535n)]);
+/// const values = decodeAllU128(buf);
+/// // values is [42n, 500n, 65535n]
 /// ```
-#[wasm_bindgen(js_name = decodeAllU32)]
-pub fn decode_all_u32(
+#[wasm_bindgen(js_name = decodeAllU128)]
+pub fn decode_all_u128(
     #[wasm_bindgen(unchecked_param_type = "Uint8Array")] bytes: &JsValue,
-) -> Result<Vec<u32>, JsValue> {
+) -> Result<js_sys::Array, JsValue> {
     let bytes = bytes_from_js(bytes)?;
-    let mut out = Vec::new();
-    for result in bijoux::bijou32::decode_iter(&bytes) {
-        out.push(result.map_err(WasmDecodeError::from)?);
+    let out = js_sys::Array::new();
+    for result in bijoux::u128::decode_iter(&bytes) {
+        let value: u128 = result.map_err(WasmDecodeError::from)?;
+        out.push(&JsValue::from(value));
     }
     Ok(out)
 }
 
-/// A successfully-decoded bijou32 value plus its byte length.
+/// A successfully-decoded bijou128 value plus its byte length.
 ///
-/// Returned by [`decode_u32`]. Exposes `value` (the decoded `u32`, JS
-/// `number`) and `bytesRead` (a JS `number`) as getters. We model this
+/// Returned by [`decode_u128`]. Exposes `value` (the decoded `u128`, JS
+/// `bigint`) and `bytesRead` (a JS `number`) as getters. We model this
 /// as a Rust-exported struct rather than constructing a plain JS
 /// object via [`js_sys::Object`] because the struct gives us a real
 /// TypeScript type on the JS side at zero extra runtime cost.
-#[wasm_bindgen(js_name = Decoded32)]
-#[derive(Debug, Clone, Copy)]
-pub struct WasmDecoded32 {
-    value: u32,
+#[wasm_bindgen(js_name = Decoded128)]
+#[derive(Debug, Clone)]
+#[allow(missing_copy_implementations)] // intentional per the wasm-bindgen blog post
+pub struct WasmDecoded128 {
+    value: u128,
     bytes_read: usize,
 }
 
-#[wasm_bindgen(js_class = Decoded32)]
-impl WasmDecoded32 {
+#[wasm_bindgen(js_class = Decoded128)]
+impl WasmDecoded128 {
     /// The decoded value.
     #[must_use]
     #[wasm_bindgen(getter)]
-    pub fn value(&self) -> u32 {
+    pub fn value(&self) -> u128 {
         self.value
     }
 
-    /// Number of bytes consumed from the input slice (1..=5).
+    /// Number of bytes consumed from the input slice (1..=17).
     #[must_use]
     #[wasm_bindgen(getter, js_name = bytesRead)]
     pub fn bytes_read(&self) -> usize {
@@ -150,9 +155,9 @@ impl WasmDecoded32 {
 }
 
 /// Decode failure surfaced to JS as an `Error` whose `name` is
-/// `"Bijou32DecodeError"`.
+/// `"Bijou128DecodeError"`.
 ///
-/// We wrap [`bijoux::bijou32::DecodeError`] in a newtype so we can implement
+/// We wrap [`bijoux::u128::DecodeError`] in a newtype so we can implement
 /// `From<…> for JsValue` without an orphan-rule headache and so that the
 /// error retains its typed shape for any downstream Rust consumer that
 /// re-uses this crate.
@@ -169,7 +174,7 @@ impl From<WasmDecodeError> for DecodeError {
 impl From<WasmDecodeError> for JsValue {
     fn from(err: WasmDecodeError) -> Self {
         let js_err = js_sys::Error::new(&err.to_string());
-        js_err.set_name("Bijou32DecodeError");
+        js_err.set_name("Bijou128DecodeError");
         js_err.into()
     }
 }

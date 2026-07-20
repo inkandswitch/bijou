@@ -19,6 +19,6 @@
 
 extern crate alloc;
 
-pub mod bijou128;
-pub mod bijou32;
-pub mod bijou64;
+pub mod u128;
+pub mod u32;
+pub mod u64;

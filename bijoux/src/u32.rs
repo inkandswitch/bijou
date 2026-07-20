@@ -51,10 +51,10 @@
 //!
 //! ```
 //! let mut buf = Vec::new();
-//! bijoux::bijou32::encode(300, &mut buf);
+//! bijoux::u32::encode(300, &mut buf);
 //! assert_eq!(buf, [0xFC, 0x30]); // tag 252, payload 300 - 252 = 48
 //!
-//! let (value, len) = bijoux::bijou32::decode(&buf).unwrap();
+//! let (value, len) = bijoux::u32::decode(&buf).unwrap();
 //! assert_eq!(value, 300);
 //! assert_eq!(len, 2);
 //! ```
@@ -149,12 +149,12 @@ const BOUNDS: [u32; NUM_TIERS + 1] = [
 /// # Examples
 ///
 /// ```
-/// assert_eq!(bijoux::bijou32::encoded_len(0), 1);
-/// assert_eq!(bijoux::bijou32::encoded_len(251), 1);
-/// assert_eq!(bijoux::bijou32::encoded_len(252), 2);
-/// assert_eq!(bijoux::bijou32::encoded_len(507), 2);
-/// assert_eq!(bijoux::bijou32::encoded_len(508), 3);
-/// assert_eq!(bijoux::bijou32::encoded_len(u32::MAX), 5);
+/// assert_eq!(bijoux::u32::encoded_len(0), 1);
+/// assert_eq!(bijoux::u32::encoded_len(251), 1);
+/// assert_eq!(bijoux::u32::encoded_len(252), 2);
+/// assert_eq!(bijoux::u32::encoded_len(507), 2);
+/// assert_eq!(bijoux::u32::encoded_len(508), 3);
+/// assert_eq!(bijoux::u32::encoded_len(u32::MAX), 5);
 /// ```
 #[inline]
 #[must_use]
@@ -198,11 +198,11 @@ pub const fn encoded_len(value: u32) -> usize {
 ///
 /// ```
 /// let mut buf = Vec::new();
-/// bijoux::bijou32::encode(42, &mut buf);
+/// bijoux::u32::encode(42, &mut buf);
 /// assert_eq!(buf, [0x2A]);
 ///
 /// buf.clear();
-/// bijoux::bijou32::encode(252, &mut buf);
+/// bijoux::u32::encode(252, &mut buf);
 /// assert_eq!(buf, [0xFC, 0x00]);
 /// ```
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
@@ -236,7 +236,7 @@ pub fn encode(value: u32, buf: &mut Vec<u8>) {
 /// # Examples
 ///
 /// ```
-/// use bijoux::bijou32::encoded_bytes;
+/// use bijoux::u32::encoded_bytes;
 ///
 /// let enc = encoded_bytes(300);
 /// assert_eq!(&*enc, &[0xFC, 0x30]);   // Deref<Target = [u8]>
@@ -384,7 +384,7 @@ impl<'a> IntoIterator for &'a EncodedBytes {
 /// # Examples
 ///
 /// ```
-/// let enc = bijoux::bijou32::encoded_bytes(300);
+/// let enc = bijoux::u32::encoded_bytes(300);
 /// assert_eq!(&*enc, &[0xFC, 0x30]);
 ///
 /// // Use it anywhere a byte slice is accepted:
@@ -442,11 +442,11 @@ pub const fn encoded_bytes(value: u32) -> EncodedBytes {
 ///
 /// ```
 /// // Single-byte value
-/// let (v, n) = bijoux::bijou32::decode(&[0x2A]).unwrap();
+/// let (v, n) = bijoux::u32::decode(&[0x2A]).unwrap();
 /// assert_eq!((v, n), (42, 1));
 ///
 /// // Multi-byte value with trailing data
-/// let (v, n) = bijoux::bijou32::decode(&[0xFC, 0x30, 0xFF]).unwrap();
+/// let (v, n) = bijoux::u32::decode(&[0xFC, 0x30, 0xFF]).unwrap();
 /// assert_eq!((v, n), (300, 2));
 /// ```
 #[inline]
@@ -513,7 +513,7 @@ pub const fn decode(buf: &[u8]) -> Result<(u32, usize), DecodeError> {
 /// # Examples
 ///
 /// ```
-/// use bijoux::bijou32::{decode_iter, encode};
+/// use bijoux::u32::{decode_iter, encode};
 ///
 /// let mut buf = Vec::new();
 /// for v in [0u32, 42, 300, 65_535] {
@@ -601,7 +601,7 @@ impl core::iter::FusedIterator for DecodeIter<'_> {}
 /// # Examples
 ///
 /// ```
-/// use bijoux::bijou32::{decode_all, encode};
+/// use bijoux::u32::{decode_all, encode};
 ///
 /// let mut buf = Vec::new();
 /// for v in [0u32, 42, 300, u32::MAX] {

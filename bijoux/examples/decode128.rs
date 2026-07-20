@@ -24,7 +24,7 @@
 //!    Works in any Rust environment; useful when you want to interleave
 //!    other reads between bijou decodes.
 
-use bijoux::bijou128::{DecodeError, decode, decode_all, decode_iter, encode};
+use bijoux::u128::{DecodeError, decode, decode_all, decode_iter, encode};
 
 fn main() -> Result<(), DecodeError> {
     let values: &[u128] = &[

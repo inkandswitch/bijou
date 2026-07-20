@@ -22,9 +22,9 @@ by default):
 
 | Module / feature       | Integer | Max bytes | Tag threshold | Spec                                 |
 |------------------------|---------|-----------|---------------|--------------------------------------|
-| `bijoux::bijou32`, `u32`  | `u32`   | 5         | 252           | [specs/bijou32.md](./bijoux/specs/bijou32.md)   |
-| `bijoux::bijou64`, `u64`  | `u64`   | 9         | 248           | [specs/bijou64.md](./bijoux/specs/bijou64.md)   |
-| `bijoux::bijou128`, `u128` | `u128`  | 17        | 240           | [specs/bijou128.md](./bijoux/specs/bijou128.md) |
+| `bijoux::u32`, feature `u32`  | `u32`   | 5         | 252           | [specs/bijou32.md](./bijoux/specs/bijou32.md)   |
+| `bijoux::u64`, feature `u64`  | `u64`   | 9         | 248           | [specs/bijou64.md](./bijoux/specs/bijou64.md)   |
+| `bijoux::u128`, feature `u128` | `u128`  | 17        | 240           | [specs/bijou128.md](./bijoux/specs/bijou128.md) |
 
 The width variants are **not wire-compatible** — they use different tag
 thresholds so each can reach its maximum in the smallest number of
@@ -41,7 +41,7 @@ On the JS side, exports are width-suffixed (`encodeU64`, `decodeU32`,
 > The previous per-width crates (`bijou32`, `bijou64` 0.2.x,
 > `bijou128`) are superseded by `bijoux`. Migrate by depending on
 > `bijoux` and prefixing paths (`bijou64::encode` →
-> `bijoux::bijou64::encode`), or use the traits.
+> `bijoux::u64::encode`), or use the traits.
 
 ## Quick start
 
@@ -65,17 +65,17 @@ across widths:
 ```rust
 // 64-bit
 let mut buf = Vec::new();
-bijoux::bijou64::encode(300, &mut buf);
+bijoux::u64::encode(300, &mut buf);
 assert_eq!(buf, [0xF8, 0x34]);
 
 // 32-bit
 let mut buf = Vec::new();
-bijoux::bijou32::encode(300, &mut buf);
+bijoux::u32::encode(300, &mut buf);
 assert_eq!(buf, [0xFC, 0x30]);
 
 // 128-bit
 let mut buf = Vec::new();
-bijoux::bijou128::encode(500, &mut buf);
+bijoux::u128::encode(500, &mut buf);
 assert_eq!(buf, [0xF1, 0x00, 0x04]);
 ```
 

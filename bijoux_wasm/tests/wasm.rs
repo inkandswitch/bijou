@@ -16,7 +16,7 @@
 
 mod u32 {
 
-    use bijoux_wasm::bijou32::{
+    use bijoux_wasm::u32::{
         decode::{decode_all_u32, decode_u32},
         encode::{encode_u32, encoded_len_u32},
         max_bytes_u32,
@@ -308,7 +308,7 @@ mod u32 {
 
 mod u64 {
 
-    use bijoux_wasm::bijou64::{
+    use bijoux_wasm::u64::{
         decode::{decode_all_u64, decode_u64},
         encode::{encode_u64, encoded_len_u64},
         max_bytes_u64,
@@ -608,7 +608,7 @@ mod u64 {
 
 mod u128 {
 
-    use bijoux_wasm::bijou128::{
+    use bijoux_wasm::u128::{
         decode::{decode_all_u128, decode_u128},
         encode::{encode_u128, encoded_len_u128},
         max_bytes_u128,

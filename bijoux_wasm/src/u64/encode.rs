@@ -4,9 +4,9 @@ use alloc::{string::ToString, vec::Vec};
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
-/// Failure modes for the `bigint → u128` validation that runs at the
+/// Failure modes for the `bigint → u64` validation that runs at the
 /// wasm boundary of every function that takes a `bigint` argument
-/// (currently [`encode_u128`] and [`encoded_len_u128`]).
+/// (currently [`encode_u64`] and [`encoded_len_u64`]).
 ///
 /// Two variants, matching JS platform conventions exactly:
 ///
@@ -18,11 +18,11 @@ use wasm_bindgen::prelude::*;
 ///   Lowered to a JS native `TypeError` via [`js_sys::TypeError::new`].
 ///
 /// * [`Self::OutOfRange`] — the caller passed a real `bigint` but its
-///   value is outside `[0n, 2n ** 128n)`. wasm-bindgen's default
-///   `bigint → u128` marshalling would silently truncate via
-///   `BigInt.asUintN(128, v)`, which we explicitly avoid: bijou's
+///   value is outside `[0n, 2n ** 64n)`. wasm-bindgen's default
+///   `bigint → u64` marshalling would silently truncate via
+///   `BigInt.asUintN(64, v)`, which we explicitly avoid: bijou's
 ///   structural canonicality requires that an encoded byte sequence
-///   correspond to exactly one `u128`, which is impossible if the
+///   correspond to exactly one `u64`, which is impossible if the
 ///   producer can feed us a `bigint` outside the range and have it
 ///   silently wrap. Lowered to a JS native `RangeError` via
 ///   [`js_sys::RangeError::new`].
@@ -36,11 +36,11 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug, Clone, Copy, Error)]
 pub enum WasmBigintError {
     /// Caller passed a value that isn't a JS `bigint`.
-    #[error("bijou128: expected a bigint")]
+    #[error("bijou64: expected a bigint")]
     WrongType,
 
-    /// Caller passed a `bigint` outside `[0n, 2n ** 128n)`.
-    #[error("bijou128: bigint value must be in [0, 2**128)")]
+    /// Caller passed a `bigint` outside `[0n, 2n ** 64n)`.
+    #[error("bijou64: bigint value must be in [0, 2**64)")]
     OutOfRange,
 }
 
@@ -53,51 +53,49 @@ impl From<WasmBigintError> for JsValue {
     }
 }
 
-/// Converts a `&js_sys::BigInt` to a `u128`, surfacing wrong-type and
+/// Converts a `&js_sys::BigInt` to a `u64`, surfacing wrong-type and
 /// out-of-range failures as typed [`WasmBigintError`] variants.
 ///
-/// Internally the range check goes through `u128::try_from(JsValue)`,
-/// which uses wasm-bindgen's two-word bigint marshalling (lower 64 bits
-/// via `__wbindgen_bigint_get_as_i64`, upper 64 bits via `>> 64n`,
-/// validated to fit in 64 bits before being recombined). Any
-/// out-of-range `bigint` — including negatives — fails the high-word
-/// fit check and is rejected.
-fn bigint_to_u128(value: &js_sys::BigInt) -> Result<u128, WasmBigintError> {
+/// Internally the range check goes through `u64::try_from(JsValue)`,
+/// which calls `__wbindgen_bigint_get_as_i64` and then verifies that
+/// round-tripping the result back to `BigInt` yields the original
+/// value — exactly the check we want.
+fn bigint_to_u64(value: &js_sys::BigInt) -> Result<u64, WasmBigintError> {
     let js_value = JsValue::from(value.clone());
 
     if !js_value.is_bigint() {
         return Err(WasmBigintError::WrongType);
     }
 
-    u128::try_from(js_value).map_err(|_| WasmBigintError::OutOfRange)
+    u64::try_from(js_value).map_err(|_| WasmBigintError::OutOfRange)
 }
 
-/// Returns the encoded length of `value` in bytes (1..=17).
+/// Returns the encoded length of `value` in bytes (1..=9).
 ///
 /// # Errors
 ///
 /// Throws a JS native [`TypeError`](js_sys::TypeError) if `value` is
 /// not a `bigint`, or a JS native [`RangeError`](js_sys::RangeError)
-/// if `value` is outside `[0n, 2n ** 128n)`. See [`WasmBigintError`].
+/// if `value` is outside `[0n, 2n ** 64n)`. See [`WasmBigintError`].
 ///
 /// # JS
 ///
 /// ```js
-/// import { encodedLenU128 } from "@inkandswitch/bijoux";
-/// encodedLenU128(0n);          // 1
-/// encodedLenU128(239n);        // 1
-/// encodedLenU128(240n);        // 2
-/// encodedLenU128((1n << 128n) - 1n); // 17 (u128::MAX)
-/// encodedLenU128(1n << 128n);  // throws RangeError
-/// encodedLenU128(-1n);         // throws RangeError
-/// encodedLenU128(42);          // throws TypeError (Number, not bigint)
+/// import { encodedLenU64 } from "@inkandswitch/bijoux";
+/// encodedLenU64(0n);          // 1
+/// encodedLenU64(247n);        // 1
+/// encodedLenU64(248n);        // 2
+/// encodedLenU64((1n << 64n) - 1n); // 9 (u64::MAX)
+/// encodedLenU64(1n << 64n);   // throws RangeError
+/// encodedLenU64(-1n);         // throws RangeError
+/// encodedLenU64(42);          // throws TypeError (Number, not bigint)
 /// ```
-#[wasm_bindgen(js_name = encodedLenU128)]
-pub fn encoded_len_u128(value: &js_sys::BigInt) -> Result<usize, WasmBigintError> {
-    Ok(bijoux::bijou128::encoded_len(bigint_to_u128(value)?))
+#[wasm_bindgen(js_name = encodedLenU64)]
+pub fn encoded_len_u64(value: &js_sys::BigInt) -> Result<usize, WasmBigintError> {
+    Ok(bijoux::u64::encoded_len(bigint_to_u64(value)?))
 }
 
-/// Encodes `value` as a fresh `Uint8Array` (1..=17 bytes).
+/// Encodes `value` as a fresh `Uint8Array` (1..=9 bytes).
 ///
 /// The Rust side allocates a `Vec<u8>` and `wasm-bindgen` copies it into
 /// a JS-managed `Uint8Array` on the way out. This matches the natural
@@ -108,22 +106,22 @@ pub fn encoded_len_u128(value: &js_sys::BigInt) -> Result<usize, WasmBigintError
 ///
 /// Throws a JS native [`TypeError`](js_sys::TypeError) if `value` is
 /// not a `bigint`, or a JS native [`RangeError`](js_sys::RangeError)
-/// if `value` is outside `[0n, 2n ** 128n)`. See [`WasmBigintError`].
+/// if `value` is outside `[0n, 2n ** 64n)`. See [`WasmBigintError`].
 ///
 /// # JS
 ///
 /// ```js
-/// import { encodeU128 } from "@inkandswitch/bijoux";
-/// encodeU128(42n);        // Uint8Array([0x2A])
-/// encodeU128(500n);       // Uint8Array([0xF1, 0x00, 0x04])
-/// encodeU128(1n << 128n); // throws RangeError
-/// encodeU128(-1n);        // throws RangeError
-/// encodeU128(42);         // throws TypeError (Number, not bigint)
+/// import { encodeU64 } from "@inkandswitch/bijoux";
+/// encodeU64(42n);       // Uint8Array([0x2A])
+/// encodeU64(300n);      // Uint8Array([0xF8, 0x34])
+/// encodeU64(1n << 64n); // throws RangeError
+/// encodeU64(-1n);       // throws RangeError
+/// encodeU64(42);        // throws TypeError (Number, not bigint)
 /// ```
-#[wasm_bindgen(js_name = encodeU128)]
-pub fn encode_u128(value: &js_sys::BigInt) -> Result<Vec<u8>, WasmBigintError> {
-    let v = bigint_to_u128(value)?;
-    let mut buf = Vec::with_capacity(bijoux::bijou128::MAX_BYTES);
-    bijoux::bijou128::encode(v, &mut buf);
+#[wasm_bindgen(js_name = encodeU64)]
+pub fn encode_u64(value: &js_sys::BigInt) -> Result<Vec<u8>, WasmBigintError> {
+    let v = bigint_to_u64(value)?;
+    let mut buf = Vec::with_capacity(bijoux::u64::MAX_BYTES);
+    bijoux::u64::encode(v, &mut buf);
     Ok(buf)
 }
