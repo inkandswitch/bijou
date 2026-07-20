@@ -1,7 +1,7 @@
 //! Decode
 
 use alloc::{string::ToString, vec::Vec};
-use bijou128::DecodeError;
+use bijoux::bijou128::DecodeError;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
@@ -77,7 +77,7 @@ pub fn decode(
     #[wasm_bindgen(unchecked_param_type = "Uint8Array")] bytes: &JsValue,
 ) -> Result<WasmDecoded, JsValue> {
     let bytes = bytes_from_js(bytes)?;
-    let (value, bytes_read) = bijou128::decode(&bytes).map_err(WasmDecodeError::from)?;
+    let (value, bytes_read) = bijoux::bijou128::decode(&bytes).map_err(WasmDecodeError::from)?;
     Ok(WasmDecoded { value, bytes_read })
 }
 
@@ -115,7 +115,7 @@ pub fn decode_all(
 ) -> Result<js_sys::Array, JsValue> {
     let bytes = bytes_from_js(bytes)?;
     let out = js_sys::Array::new();
-    for result in bijou128::decode_iter(&bytes) {
+    for result in bijoux::bijou128::decode_iter(&bytes) {
         let value: u128 = result.map_err(WasmDecodeError::from)?;
         out.push(&JsValue::from(value));
     }
@@ -157,7 +157,7 @@ impl WasmDecoded {
 /// Decode failure surfaced to JS as an `Error` whose `name` is
 /// `"Bijou128DecodeError"`.
 ///
-/// We wrap [`bijou128::DecodeError`] in a newtype so we can implement
+/// We wrap [`bijoux::bijou128::DecodeError`] in a newtype so we can implement
 /// `From<…> for JsValue` without an orphan-rule headache and so that the
 /// error retains its typed shape for any downstream Rust consumer that
 /// re-uses this crate.

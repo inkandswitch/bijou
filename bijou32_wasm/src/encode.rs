@@ -107,7 +107,7 @@ fn jsvalue_to_u32(value: &JsValue) -> Result<u32, WasmNumberError> {
 /// ```
 #[wasm_bindgen(js_name = encodedLen)]
 pub fn encoded_len(value: &JsValue) -> Result<usize, WasmNumberError> {
-    Ok(bijou32::encoded_len(jsvalue_to_u32(value)?))
+    Ok(bijoux::bijou32::encoded_len(jsvalue_to_u32(value)?))
 }
 
 /// Encodes `value` as a fresh `Uint8Array` (1..=5 bytes).
@@ -137,7 +137,7 @@ pub fn encoded_len(value: &JsValue) -> Result<usize, WasmNumberError> {
 #[wasm_bindgen]
 pub fn encode(value: &JsValue) -> Result<Vec<u8>, WasmNumberError> {
     let v = jsvalue_to_u32(value)?;
-    let mut buf = Vec::with_capacity(bijou32::MAX_BYTES);
-    bijou32::encode(v, &mut buf);
+    let mut buf = Vec::with_capacity(bijoux::bijou32::MAX_BYTES);
+    bijoux::bijou32::encode(v, &mut buf);
     Ok(buf)
 }

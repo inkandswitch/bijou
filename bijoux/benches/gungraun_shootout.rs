@@ -100,7 +100,7 @@ fn boundary_values() -> Vec<u64> {
 fn pre_encode_bijou64(values: &[u64]) -> Vec<u8> {
     let mut buf = Vec::with_capacity(values.len() * 5);
     for &v in values {
-        bijou64::encode(v, &mut buf);
+        bijoux::bijou64::encode(v, &mut buf);
     }
     buf
 }
@@ -158,7 +158,7 @@ fn pre_encode_leb128(values: &[u64]) -> Vec<u8> {
 fn encode_bijou64(values: Vec<u64>) -> Vec<u8> {
     let mut buf = Vec::with_capacity(values.len() * 9);
     for &v in black_box(&values) {
-        bijou64::encode(v, &mut buf);
+        bijoux::bijou64::encode(v, &mut buf);
     }
     buf
 }
@@ -235,7 +235,7 @@ fn decode_bijou64(buf: Vec<u8>) -> u64 {
     let mut pos = 0;
     let mut sum = 0u64;
     while pos < buf.len() {
-        let (v, n) = bijou64::decode(&buf[pos..]).unwrap();
+        let (v, n) = bijoux::bijou64::decode(&buf[pos..]).unwrap();
         sum = sum.wrapping_add(v);
         pos += n;
     }
@@ -347,7 +347,7 @@ fn decode_leb128(buf: Vec<u8>) -> u64 {
 fn encoded_size_bijou64(values: Vec<u64>) -> usize {
     let mut total = 0usize;
     for &v in black_box(&values) {
-        total += bijou64::encoded_len(v);
+        total += bijoux::bijou64::encoded_len(v);
     }
     total
 }

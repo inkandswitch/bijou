@@ -18,7 +18,7 @@ rust-version.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bijou32 = { workspace = true }
+bijoux = { workspace = true, features = ["u32"] }
 js-sys = { workspace = true }
 thiserror = { workspace = true }
 wasm-bindgen = { workspace = true }

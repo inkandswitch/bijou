@@ -1,12 +1,11 @@
 [workspace]
 resolver = "3"
 members = [
-  "bijou32",
   "bijou32_wasm",
-  "bijou64",
   "bijou64_wasm",
-  "bijou128",
   "bijou128_wasm",
+  "bijou_census",  # internal tooling, not published
+  "bijoux",
 ]
 
 [workspace.package]
@@ -14,24 +13,23 @@ edition = "2024"
 rust-version = "1.90"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/inkandswitch/bijou"
-authors = [
-  "Brooklyn Zelenka <hello@brooklynzelenka.com>"
-]
+authors = ["Brooklyn Zelenka <hello@brooklynzelenka.com>"]
 
 [workspace.dependencies]
 # Internal crates
-bijou32 = { version = "0.1", path = "bijou32", default-features = false }
 bijou32_wasm = { version = "0.1", path = "bijou32_wasm", default-features = false }
-bijou64 = { version = "0.2", path = "bijou64", default-features = false }
 bijou64_wasm = { version = "0.1", path = "bijou64_wasm", default-features = false }
-bijou128 = { version = "0.1", path = "bijou128", default-features = false }
 bijou128_wasm = { version = "0.1", path = "bijou128_wasm", default-features = false }
+bijoux = { version = "0.3", path = "bijoux", default-features = false }
 
 # External crates
 arbitrary = "1.4"
 bolero = "0.13.4"
 criterion = { version = "0.5", default-features = false }
-criterion_pprof = { package = "pprof", version = "0.15", default-features = false, features = ["criterion", "flamegraph"] }
+criterion_pprof = { package = "pprof", version = "0.15", default-features = false, features = [
+  "criterion",
+  "flamegraph",
+] }
 js-sys = { version = "=0.3.95", default-features = false }
 rand = { version = "0.8.5", default-features = false }
 testresult = "0.4.1"
@@ -70,7 +68,7 @@ wildcard_enum_match_arm = "warn"
 
 all = { level = "deny", priority = -1 }
 cargo = { level = "deny", priority = -1 }
-multiple_crate_versions = "allow" # various transitive deps
+multiple_crate_versions = "allow"            # various transitive deps
 pedantic = { level = "deny", priority = -1 }
 
 [profile.release]

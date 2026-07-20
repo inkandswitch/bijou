@@ -110,7 +110,7 @@ fn pre_encode_bijou64(values: &[u64]) -> (Vec<u8>, Vec<usize>) {
     let mut offsets = Vec::with_capacity(values.len());
     for &v in values {
         offsets.push(buf.len());
-        bijou64::encode(v, &mut buf);
+        bijoux::bijou64::encode(v, &mut buf);
     }
     (buf, offsets)
 }
@@ -174,7 +174,7 @@ fn bench_encode(c: &mut Criterion) {
                 || Vec::with_capacity(BATCH * 9),
                 |mut buf| {
                     for &v in values {
-                        bijou64::encode(v, &mut buf);
+                        bijoux::bijou64::encode(v, &mut buf);
                     }
                     buf
                 },
@@ -256,7 +256,7 @@ fn bench_decode(c: &mut Criterion) {
             b.iter(|| {
                 let mut sum = 0u64;
                 for &off in &bijou_off {
-                    let (v, _) = bijou64::decode(&bijou_buf[off..]).unwrap();
+                    let (v, _) = bijoux::bijou64::decode(&bijou_buf[off..]).unwrap();
                     sum = sum.wrapping_add(v);
                 }
                 sum
@@ -329,7 +329,7 @@ fn bench_encoded_size(c: &mut Criterion) {
             b.iter(|| {
                 let mut total = 0usize;
                 for &v in values {
-                    total += bijou64::encoded_len(v);
+                    total += bijoux::bijou64::encoded_len(v);
                 }
                 total
             });
@@ -379,7 +379,7 @@ fn bench_stream_decode(c: &mut Criterion) {
                 let mut pos = 0;
                 let mut sum = 0u64;
                 while pos < bijou_buf.len() {
-                    let (v, n) = bijou64::decode(&bijou_buf[pos..]).unwrap();
+                    let (v, n) = bijoux::bijou64::decode(&bijou_buf[pos..]).unwrap();
                     sum = sum.wrapping_add(v);
                     pos += n;
                 }
@@ -472,7 +472,7 @@ fn bench_canonical_decode(c: &mut Criterion) {
             b.iter(|| {
                 let mut sum = 0u64;
                 for &off in &bijou_off {
-                    let (v, _) = bijou64::decode(&bijou_buf[off..]).unwrap();
+                    let (v, _) = bijoux::bijou64::decode(&bijou_buf[off..]).unwrap();
                     sum = sum.wrapping_add(v);
                 }
                 sum

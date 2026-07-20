@@ -32,5 +32,5 @@ pub mod encode;
 #[must_use]
 #[wasm_bindgen(js_name = MAX_BYTES)]
 pub fn max_bytes() -> usize {
-    bijou32::MAX_BYTES
+    bijoux::bijou32::MAX_BYTES
 }

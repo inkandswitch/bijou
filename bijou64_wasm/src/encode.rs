@@ -92,7 +92,7 @@ fn bigint_to_u64(value: &js_sys::BigInt) -> Result<u64, WasmBigintError> {
 /// ```
 #[wasm_bindgen(js_name = encodedLen)]
 pub fn encoded_len(value: &js_sys::BigInt) -> Result<usize, WasmBigintError> {
-    Ok(bijou64::encoded_len(bigint_to_u64(value)?))
+    Ok(bijoux::bijou64::encoded_len(bigint_to_u64(value)?))
 }
 
 /// Encodes `value` as a fresh `Uint8Array` (1..=9 bytes).
@@ -121,7 +121,7 @@ pub fn encoded_len(value: &js_sys::BigInt) -> Result<usize, WasmBigintError> {
 #[wasm_bindgen]
 pub fn encode(value: &js_sys::BigInt) -> Result<Vec<u8>, WasmBigintError> {
     let v = bigint_to_u64(value)?;
-    let mut buf = Vec::with_capacity(bijou64::MAX_BYTES);
-    bijou64::encode(v, &mut buf);
+    let mut buf = Vec::with_capacity(bijoux::bijou64::MAX_BYTES);
+    bijoux::bijou64::encode(v, &mut buf);
     Ok(buf)
 }
