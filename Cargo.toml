@@ -64,6 +64,7 @@ wildcard_enum_match_arm = "warn"
 
 all = { level = "deny", priority = -1 }
 cargo = { level = "deny", priority = -1 }
+module_name_repetitions = "allow"            # deliberate: width-suffixed type names (u64::EncodedU64)
 multiple_crate_versions = "allow"            # various transitive deps
 pedantic = { level = "deny", priority = -1 }
 

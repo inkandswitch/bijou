@@ -60,14 +60,13 @@ harness = false
 required-features = ["u64"]
 
 [features]
-default = ["u32", "u64", "u128"]
+default = ["i64", "u32", "u64", "u128"]
 arbitrary = ["dep:arbitrary"]
 bolero = ["dep:bolero", "arbitrary"]
+i64 = ["u64"]                           # zigzag over the bijou64 tier machinery
 u32 = []
 u64 = []
 u128 = []
-# Future widths (signed variants) slot in as sibling features:
-# i64 = []
 
 [lints]
 workspace = true

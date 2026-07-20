@@ -252,10 +252,10 @@ pub fn encode(value: u32, buf: &mut Vec<u8>) {
 /// assert_eq!(collected, [0xFC, 0x30]);
 /// ```
 #[derive(Debug, Clone, Copy)]
-pub struct EncodedBytes {
+pub struct EncodedU32 {
     buf: [u8; MAX_BYTES],
     /// Invariant: `len <= MAX_BYTES`. Stored as `u8` because the value
-    /// is always in `1..=5`; the smaller width makes `EncodedBytes`
+    /// is always in `1..=5`; the smaller width makes `EncodedU32`
     /// fit in 6 bytes total and `Copy` cheaper.
     len: u8,
 }
@@ -269,30 +269,30 @@ pub struct EncodedBytes {
 // subtle coupling, and explicitly compares via the natural lex order
 // that bijou guarantees matches numeric order.
 
-impl PartialEq for EncodedBytes {
+impl PartialEq for EncodedU32 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
 }
 
-impl Eq for EncodedBytes {}
+impl Eq for EncodedU32 {}
 
-impl core::hash::Hash for EncodedBytes {
+impl core::hash::Hash for EncodedU32 {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state);
     }
 }
 
-impl PartialOrd for EncodedBytes {
+impl PartialOrd for EncodedU32 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for EncodedBytes {
+impl Ord for EncodedU32 {
     #[inline]
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // Bijou's lex-order property: byte-lex order = numeric order.
@@ -300,7 +300,7 @@ impl Ord for EncodedBytes {
     }
 }
 
-impl EncodedBytes {
+impl EncodedU32 {
     /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
     #[inline]
     #[must_use]
@@ -329,7 +329,7 @@ impl EncodedBytes {
     }
 }
 
-impl core::ops::Deref for EncodedBytes {
+impl core::ops::Deref for EncodedU32 {
     type Target = [u8];
 
     #[inline]
@@ -338,21 +338,21 @@ impl core::ops::Deref for EncodedBytes {
     }
 }
 
-impl AsRef<[u8]> for EncodedBytes {
+impl AsRef<[u8]> for EncodedU32 {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.as_slice()
     }
 }
 
-impl core::borrow::Borrow<[u8]> for EncodedBytes {
+impl core::borrow::Borrow<[u8]> for EncodedU32 {
     #[inline]
     fn borrow(&self) -> &[u8] {
         self.as_slice()
     }
 }
 
-impl IntoIterator for EncodedBytes {
+impl IntoIterator for EncodedU32 {
     type Item = u8;
     type IntoIter = core::iter::Take<core::array::IntoIter<u8, MAX_BYTES>>;
 
@@ -362,7 +362,7 @@ impl IntoIterator for EncodedBytes {
     }
 }
 
-impl<'a> IntoIterator for &'a EncodedBytes {
+impl<'a> IntoIterator for &'a EncodedU32 {
     type Item = &'a u8;
     type IntoIter = core::slice::Iter<'a, u8>;
 
@@ -371,7 +371,7 @@ impl<'a> IntoIterator for &'a EncodedBytes {
     }
 }
 
-/// Encodes `value` as a stack-allocated [`EncodedBytes`].
+/// Encodes `value` as a stack-allocated [`EncodedU32`].
 ///
 /// This is the alloc-free encoding entry point — the returned value
 /// dereferences directly to a `&[u8]` of the correct length, so the
@@ -395,9 +395,9 @@ impl<'a> IntoIterator for &'a EncodedBytes {
 #[inline]
 #[must_use]
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
-pub const fn encoded_bytes(value: u32) -> EncodedBytes {
+pub const fn encoded_bytes(value: u32) -> EncodedU32 {
     if value < BOUNDS[0] {
-        return EncodedBytes {
+        return EncodedU32 {
             buf: [(value & 0xFF) as u8, 0, 0, 0, 0],
             len: 1,
         };
@@ -418,7 +418,7 @@ pub const fn encoded_bytes(value: u32) -> EncodedBytes {
     let payload = (value - OFFSETS[tier]) << (8 * (NUM_TIERS - tier));
     let pb = payload.to_be_bytes();
 
-    EncodedBytes {
+    EncodedU32 {
         buf: [tag, pb[0], pb[1], pb[2], pb[3]],
         // Invariant: `tier ∈ [1, 4]` and `2 <= tier + 1 <= MAX_BYTES = 5`,
         // so the cast cannot truncate.
@@ -1152,7 +1152,7 @@ mod tests {
         #[test]
         fn borrow_impl() {
             use alloc::collections::BTreeMap;
-            let mut map: BTreeMap<EncodedBytes, &'static str> = BTreeMap::new();
+            let mut map: BTreeMap<EncodedU32, &'static str> = BTreeMap::new();
             map.insert(encoded_bytes(42), "the answer");
             assert_eq!(map.get(&[0x2A][..]), Some(&"the answer"));
         }

@@ -22,6 +22,7 @@ by default):
 
 | Module / feature       | Integer | Max bytes | Tag threshold | Spec                                 |
 |------------------------|---------|-----------|---------------|--------------------------------------|
+| `bijoux::i64`, feature `i64`  | `i64`   | 9         | 248 (zigzag)  | [specs/bijou64s.md](./bijoux/specs/bijou64s.md) |
 | `bijoux::u32`, feature `u32`  | `u32`   | 5         | 252           | [specs/bijou32.md](./bijoux/specs/bijou32.md)   |
 | `bijoux::u64`, feature `u64`  | `u64`   | 9         | 248           | [specs/bijou64.md](./bijoux/specs/bijou64.md)   |
 | `bijoux::u128`, feature `u128` | `u128`  | 17        | 240           | [specs/bijou128.md](./bijoux/specs/bijou128.md) |

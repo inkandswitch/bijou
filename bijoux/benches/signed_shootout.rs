@@ -386,7 +386,7 @@ fn pre_encode_bijou_zigzag(values: &[i64]) -> (Vec<u8>, Vec<usize>) {
     let mut offsets = Vec::with_capacity(values.len());
     for &v in values {
         offsets.push(buf.len());
-        bijoux::u64::encode(zigzag(v), &mut buf);
+        bijoux::i64::encode(v, &mut buf);
     }
     (buf, offsets)
 }
@@ -476,12 +476,12 @@ fn bench_encode(c: &mut Criterion) {
         let mut group = c.benchmark_group(format!("signed_encode/{dist_name}"));
         group.throughput(Throughput::Elements(BATCH as u64));
 
-        group.bench_function(BenchmarkId::new("bijou64+zigzag", ""), |b| {
+        group.bench_function(BenchmarkId::new("bijou64s", ""), |b| {
             b.iter_batched(
                 || Vec::with_capacity(BATCH * 9),
                 |mut buf| {
                     for &v in values {
-                        bijoux::u64::encode(zigzag(v), &mut buf);
+                        bijoux::i64::encode(v, &mut buf);
                     }
                     buf
                 },
@@ -574,12 +574,12 @@ fn bench_decode(c: &mut Criterion) {
         let (vu_buf, vu_off) = pre_encode_vu128(values);
         let (leb_buf, leb_off) = pre_encode_leb128(values);
 
-        group.bench_function(BenchmarkId::new("bijou64+zigzag", ""), |b| {
+        group.bench_function(BenchmarkId::new("bijou64s", ""), |b| {
             b.iter(|| {
                 let mut sum = 0i64;
                 for &off in &zz_off {
-                    let (u, _) = bijoux::u64::decode(&zz_buf[off..]).unwrap();
-                    sum = sum.wrapping_add(unzigzag(u));
+                    let (v, _) = bijoux::i64::decode(&zz_buf[off..]).unwrap();
+                    sum = sum.wrapping_add(v);
                 }
                 sum
             });
@@ -667,13 +667,13 @@ fn bench_stream_decode(c: &mut Criterion) {
         let (vu_buf, _) = pre_encode_vu128(values);
         let (leb_buf, _) = pre_encode_leb128(values);
 
-        group.bench_function(BenchmarkId::new("bijou64+zigzag", ""), |b| {
+        group.bench_function(BenchmarkId::new("bijou64s", ""), |b| {
             b.iter(|| {
                 let mut pos = 0;
                 let mut sum = 0i64;
                 while pos < zz_buf.len() {
-                    let (u, n) = bijoux::u64::decode(&zz_buf[pos..]).unwrap();
-                    sum = sum.wrapping_add(unzigzag(u));
+                    let (v, n) = bijoux::i64::decode(&zz_buf[pos..]).unwrap();
+                    sum = sum.wrapping_add(v);
                     pos += n;
                 }
                 sum
@@ -764,11 +764,11 @@ fn bench_encoded_bytes(c: &mut Criterion) {
     for (dist_name, values) in &sets {
         group.throughput(Throughput::Elements(BATCH as u64));
 
-        group.bench_function(BenchmarkId::new("bijou64+zigzag", dist_name), |b| {
+        group.bench_function(BenchmarkId::new("bijou64s", dist_name), |b| {
             b.iter(|| {
                 let mut total = 0usize;
                 for &v in values {
-                    total += bijoux::u64::encoded_len(zigzag(v));
+                    total += bijoux::i64::encoded_len(v);
                 }
                 total
             });

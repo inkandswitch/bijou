@@ -22,12 +22,17 @@ bijoux::u64::encode(300, &mut buf);
 
 | Module / feature | Wire format | Max bytes | Spec                       |
 |------------------|-------------|-----------|----------------------------|
+| `bijoux::i64`    | bijou64s    | 9         | [specs/bijou64s.md](./specs/bijou64s.md) |
 | `bijoux::u32`    | bijou32     | 5         | [specs/bijou32.md](./specs/bijou32.md)   |
 | `bijoux::u64`    | bijou64     | 9         | [specs/bijou64.md](./specs/bijou64.md)   |
 | `bijoux::u128`   | bijou128    | 17        | [specs/bijou128.md](./specs/bijou128.md) |
 
-A signed `bijoux::i64` (wire format "bijou64s": zigzag over the bijou64
-tier scheme) is planned.
+The signed format (`bijoux::i64`) is standard [zigzag] over the bijou64
+tier scheme: 1 byte for `[-124, +123]`, canonical, but byte order is
+zigzag order rather than numeric order — don't use it for memcomparable
+keys.
+
+[zigzag]: https://protobuf.dev/programming-guides/encoding/#signed-ints
 
 > [!TIP]
 > Prefer fully-qualified paths (`bijoux::u64::encode`) or the traits
