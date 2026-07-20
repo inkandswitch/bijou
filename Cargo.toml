@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
-  "bijou_census",  # internal tooling, not published
+  "bijou_census", # internal tooling, not published
   "bijoux",
   "bijoux_wasm",
 ]
