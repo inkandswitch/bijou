@@ -45,5 +45,8 @@ jobs:
       - name: Check no_std (u128)
         run: cargo check --package bijoux --no-default-features --features u128
 
+      - name: Check no_std (signed widths)
+        run: cargo check --package bijoux --no-default-features --features i32,i64,i128
+
       - name: Check wasm32 (workspace)
         run: cargo check --workspace --target wasm32-unknown-unknown

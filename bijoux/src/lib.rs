@@ -44,6 +44,10 @@
 
 extern crate alloc;
 
+#[cfg(feature = "i128")]
+pub mod i128;
+#[cfg(feature = "i32")]
+pub mod i32;
 #[cfg(feature = "i64")]
 pub mod i64;
 #[cfg(feature = "u128")]

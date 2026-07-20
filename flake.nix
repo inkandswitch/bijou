@@ -238,6 +238,7 @@
             ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u32 -v
             ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u64 -v
             ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u128 -v
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features i32,i64,i128 -v
             echo ""
             echo "✓ no_std check passed"
           '';

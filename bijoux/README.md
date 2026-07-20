@@ -22,7 +22,9 @@ bijoux::u64::encode(300, &mut buf);
 
 | Module / feature | Wire format | Max bytes | Spec                       |
 |------------------|-------------|-----------|----------------------------|
+| `bijoux::i32`    | bijou32s    | 5         | [specs/bijou32s.md](./specs/bijou32s.md) |
 | `bijoux::i64`    | bijou64s    | 9         | [specs/bijou64s.md](./specs/bijou64s.md) |
+| `bijoux::i128`   | bijou128s   | 17        | [specs/bijou128s.md](./specs/bijou128s.md) |
 | `bijoux::u32`    | bijou32     | 5         | [specs/bijou32.md](./specs/bijou32.md)   |
 | `bijoux::u64`    | bijou64     | 9         | [specs/bijou64.md](./specs/bijou64.md)   |
 | `bijoux::u128`   | bijou128    | 17        | [specs/bijou128.md](./specs/bijou128.md) |

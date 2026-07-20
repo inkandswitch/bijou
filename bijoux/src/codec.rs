@@ -182,6 +182,80 @@ impl Decode for u128 {
     }
 }
 
+#[cfg(feature = "i32")]
+impl Encode for i32 {
+    type Encoded = crate::i32::EncodedI32;
+
+    const MAX_BYTES: usize = crate::i32::MAX_BYTES;
+
+    #[inline]
+    fn encoded_len(self) -> usize {
+        crate::i32::encoded_len(self)
+    }
+
+    #[inline]
+    fn encode(self, buf: &mut Vec<u8>) {
+        crate::i32::encode(self, buf);
+    }
+
+    #[inline]
+    fn encoded_bytes(self) -> crate::i32::EncodedI32 {
+        crate::i32::encoded_bytes(self)
+    }
+}
+
+#[cfg(feature = "i32")]
+impl Decode for i32 {
+    type Error = crate::i32::DecodeError;
+
+    #[inline]
+    fn decode(bytes: &[u8]) -> Result<(i32, usize), crate::i32::DecodeError> {
+        crate::i32::decode(bytes)
+    }
+
+    #[inline]
+    fn decode_all(bytes: &[u8]) -> Result<Vec<i32>, crate::i32::DecodeError> {
+        crate::i32::decode_all(bytes)
+    }
+}
+
+#[cfg(feature = "i128")]
+impl Encode for i128 {
+    type Encoded = crate::i128::EncodedI128;
+
+    const MAX_BYTES: usize = crate::i128::MAX_BYTES;
+
+    #[inline]
+    fn encoded_len(self) -> usize {
+        crate::i128::encoded_len(self)
+    }
+
+    #[inline]
+    fn encode(self, buf: &mut Vec<u8>) {
+        crate::i128::encode(self, buf);
+    }
+
+    #[inline]
+    fn encoded_bytes(self) -> crate::i128::EncodedI128 {
+        crate::i128::encoded_bytes(self)
+    }
+}
+
+#[cfg(feature = "i128")]
+impl Decode for i128 {
+    type Error = crate::i128::DecodeError;
+
+    #[inline]
+    fn decode(bytes: &[u8]) -> Result<(i128, usize), crate::i128::DecodeError> {
+        crate::i128::decode(bytes)
+    }
+
+    #[inline]
+    fn decode_all(bytes: &[u8]) -> Result<Vec<i128>, crate::i128::DecodeError> {
+        crate::i128::decode_all(bytes)
+    }
+}
+
 #[cfg(feature = "i64")]
 impl Encode for i64 {
     type Encoded = crate::i64::EncodedI64;

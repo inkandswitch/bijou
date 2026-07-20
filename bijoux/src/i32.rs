@@ -1,0 +1,260 @@
+//! Bijective variable-length encoding for signed 32-bit integers.
+//!
+//! bijou32s composes the standard [zigzag] bijection with the
+//! [`bijou32`](crate::u32) wire format:
+//!
+//! ```text
+//! encode(n) = bijou32_encode(zigzag(n))      zigzag(n) = (n << 1) ^ (n >> 31)
+//! ```
+//!
+//! Small-magnitude values of either sign get short encodings; all
+//! structural properties (canonicality, length from the first byte,
+//! 1–5 byte range) are inherited from bijou32.
+//!
+//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/bijoux/specs/bijou32s.md)
+//! for the full format definition and test vectors.
+//!
+//! # Encoding
+//!
+//! Single-byte window: `[-126, +125]` (bijou32's 252 single-byte codes,
+//! interleaved around zero).
+//!
+//! # Ordering caveat
+//!
+//! Byte-lexicographic order is **zigzag order, not numeric order**
+//! (`0, -1, 1, -2, 2, …`). See [`crate::i64`]'s module docs for the
+//! full discussion; it applies identically here.
+//!
+//! # Examples
+//!
+//! ```
+//! let mut buf = Vec::new();
+//! bijoux::i32::encode(-1, &mut buf);
+//! assert_eq!(buf, [0x01]);
+//!
+//! let (value, len) = bijoux::i32::decode(&buf).unwrap();
+//! assert_eq!((value, len), (-1, 1));
+//! ```
+//!
+//! [zigzag]: https://protobuf.dev/programming-guides/encoding/#signed-ints
+
+pub use crate::u32::{DecodeError, MAX_BYTES};
+
+use alloc::vec::Vec;
+
+/// Stack-only encoded form of a bijou32s value. An alias of
+/// [`crate::u32::EncodedU32`] (the byte container is identical); its
+/// `Ord` compares in **zigzag order, not numeric order**.
+pub type EncodedI32 = crate::u32::EncodedU32;
+
+/// Map an `i32` onto a `u32` by interleaving around zero:
+/// `0, -1, 1, -2, 2, … → 0, 1, 2, 3, 4, …`.
+#[inline]
+#[must_use]
+#[allow(clippy::cast_sign_loss)] // reinterpreting the bits is the point
+pub const fn zigzag(n: i32) -> u32 {
+    ((n << 1) ^ (n >> 31)) as u32
+}
+
+/// Inverse of [`zigzag`].
+#[inline]
+#[must_use]
+#[allow(clippy::cast_possible_wrap)] // the wrap is the point
+pub const fn unzigzag(u: u32) -> i32 {
+    ((u >> 1) as i32) ^ -((u & 1) as i32)
+}
+
+/// Returns the number of bytes needed to encode `value` (1..=5).
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(bijoux::i32::encoded_len(0), 1);
+/// assert_eq!(bijoux::i32::encoded_len(-126), 1);
+/// assert_eq!(bijoux::i32::encoded_len(125), 1);
+/// assert_eq!(bijoux::i32::encoded_len(126), 2);
+/// assert_eq!(bijoux::i32::encoded_len(i32::MIN), 5);
+/// ```
+#[inline]
+#[must_use]
+pub const fn encoded_len(value: i32) -> usize {
+    crate::u32::encoded_len(zigzag(value))
+}
+
+/// Encodes `value`, appending the bytes to `buf`.
+#[inline]
+pub fn encode(value: i32, buf: &mut Vec<u8>) {
+    crate::u32::encode(zigzag(value), buf);
+}
+
+/// Encodes `value` without allocating, returning an [`EncodedI32`].
+#[inline]
+#[must_use]
+pub const fn encoded_bytes(value: i32) -> EncodedI32 {
+    crate::u32::encoded_bytes(zigzag(value))
+}
+
+/// Decodes one value from the front of `buf`, returning it along with
+/// the number of bytes consumed.
+///
+/// # Errors
+///
+/// Returns [`DecodeError::BufferTooShort`] on truncated input, or
+/// [`DecodeError::Overflow`] if a 5-byte payload exceeds the `u32`
+/// (zigzag) range.
+#[inline]
+pub const fn decode(buf: &[u8]) -> Result<(i32, usize), DecodeError> {
+    match crate::u32::decode(buf) {
+        Ok((value, consumed)) => Ok((unzigzag(value), consumed)),
+        Err(err) => Err(err),
+    }
+}
+
+/// Returns a lazy iterator decoding every value in `buf`; fuses after
+/// the first error.
+#[must_use]
+pub const fn decode_iter(buf: &[u8]) -> DecodeIter<'_> {
+    DecodeIter {
+        inner: crate::u32::decode_iter(buf),
+    }
+}
+
+/// Lazy decoding iterator returned by [`decode_iter`].
+#[derive(Debug)]
+pub struct DecodeIter<'a> {
+    inner: crate::u32::DecodeIter<'a>,
+}
+
+impl Iterator for DecodeIter<'_> {
+    type Item = Result<i32, DecodeError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.inner.next() {
+            Some(Ok(value)) => Some(Ok(unzigzag(value))),
+            Some(Err(err)) => Some(Err(err)),
+            None => None,
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl core::iter::FusedIterator for DecodeIter<'_> {}
+
+/// Decodes every value in `buf` as a `Vec<i32>` (all-or-nothing).
+///
+/// # Errors
+///
+/// Returns the first [`DecodeError`] encountered.
+pub fn decode_all(buf: &[u8]) -> Result<Vec<i32>, DecodeError> {
+    decode_iter(buf).collect()
+}
+
+#[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
+mod tests {
+    use super::*;
+
+    const VECTORS: &[(i32, &[u8])] = &[
+        (0, &[0x00]),
+        (-1, &[0x01]),
+        (1, &[0x02]),
+        (125, &[0xFA]),        // zigzag = 250
+        (-126, &[0xFB]),       // zigzag = 251, last 1-byte
+        (126, &[0xFC, 0x00]),  // zigzag = 252, first 2-byte
+        (-127, &[0xFC, 0x01]), // zigzag = 253
+        (253, &[0xFC, 0xFE]),
+        (-254, &[0xFC, 0xFF]),
+        (254, &[0xFD, 0x00, 0x00]),
+        (i32::MAX, &[0xFF, 0xFE, 0xFE, 0xFE, 0x02]),
+        (i32::MIN, &[0xFF, 0xFE, 0xFE, 0xFE, 0x03]),
+    ];
+
+    #[test]
+    fn spec_vectors_round_trip() {
+        for &(value, expected) in VECTORS {
+            let mut buf = Vec::new();
+            encode(value, &mut buf);
+            assert_eq!(buf, expected, "encode({value})");
+            assert_eq!(encoded_len(value), expected.len());
+            assert_eq!(decode(expected).unwrap(), (value, expected.len()));
+        }
+    }
+
+    #[test]
+    fn definitional_equivalence_and_extremes() {
+        for value in [
+            0i32,
+            -1,
+            1,
+            -126,
+            125,
+            -127,
+            126,
+            -33_022,
+            33_021,
+            i32::MIN,
+            i32::MAX,
+            i32::MIN + 1,
+            i32::MAX - 1,
+        ] {
+            let z = zigzag(value);
+            assert_eq!(unzigzag(z), value);
+            assert_eq!(
+                encoded_bytes(value).as_slice(),
+                crate::u32::encoded_bytes(z).as_slice()
+            );
+            let (decoded, consumed) = decode(encoded_bytes(value).as_slice()).unwrap();
+            assert_eq!(decoded, value);
+            assert_eq!(consumed, encoded_len(value));
+        }
+        assert_eq!(zigzag(i32::MIN), u32::MAX);
+        assert_eq!(encoded_len(i32::MIN), MAX_BYTES);
+        assert_eq!(encoded_len(i32::MAX), MAX_BYTES);
+    }
+
+    #[test]
+    fn errors_propagate() {
+        assert_eq!(decode(&[]), Err(DecodeError::BufferTooShort));
+        assert_eq!(decode(&[0xFC]), Err(DecodeError::BufferTooShort));
+        assert_eq!(
+            decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+            Err(DecodeError::Overflow)
+        );
+    }
+
+    #[test]
+    fn decode_iter_and_all() {
+        let mut buf = Vec::new();
+        for v in [-2i32, -1, 0, 1, 2, i32::MIN, i32::MAX] {
+            encode(v, &mut buf);
+        }
+        assert_eq!(
+            decode_all(&buf).unwrap(),
+            [-2, -1, 0, 1, 2, i32::MIN, i32::MAX]
+        );
+    }
+
+    #[cfg(feature = "bolero")]
+    mod property {
+        use super::*;
+
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn round_trip() {
+            bolero::check!().with_arbitrary::<i32>().for_each(|&value| {
+                let mut buf = Vec::new();
+                encode(value, &mut buf);
+                let (decoded, consumed) = decode(&buf).unwrap_or_else(|e| {
+                    panic!("round-trip decode failed for {value}: {e}");
+                });
+                assert_eq!(decoded, value);
+                assert_eq!(consumed, buf.len());
+                assert_eq!(encoded_len(value), buf.len());
+            });
+        }
+    }
+}
