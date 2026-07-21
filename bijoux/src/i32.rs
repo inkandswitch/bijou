@@ -57,6 +57,9 @@ use alloc::vec::Vec;
 /// mutually consistent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
+// Same container, signed interpretation: bijou32s is defined as
+// zigzag ∘ bijou32, so this wraps the unsigned encoder's output and
+// adds only the type-level domain distinction (see module docs).
 pub struct EncodedI32(crate::u32::EncodedU32);
 
 impl EncodedI32 {

@@ -57,6 +57,9 @@ use alloc::vec::Vec;
 /// mutually consistent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
+// Same container, signed interpretation: bijou128s is defined as
+// zigzag ∘ bijou128, so this wraps the unsigned encoder's output and
+// adds only the type-level domain distinction (see module docs).
 pub struct EncodedI128(crate::u128::EncodedU128);
 
 impl EncodedI128 {
