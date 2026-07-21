@@ -1,10 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-  "bijou_census", # internal tooling, not published
-  "bijoux",
-  "bijoux_wasm",
-]
+members = ["bijoux", "bijoux_wasm"]
 
 [workspace.package]
 edition = "2024"

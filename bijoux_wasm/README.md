@@ -24,11 +24,16 @@ decodeU64(encodeU64(300n)); // Decoded64 { value: 300n, bytesRead: 2 }
 | `U32`  | `number`     | `Uint32Array`         | 5         |
 | `U64`  | `bigint`     | `BigUint64Array`      | 9         |
 | `U128` | `bigint`     | `Array<bigint>`       | 17        |
+| `I32`  | `number`     | `Int32Array`          | 5         |
+| `I64`  | `bigint`     | `BigInt64Array`       | 9         |
+| `I128` | `bigint`     | `Array<bigint>`       | 17        |
 
 Each width exposes `encode*`, `decode*`, `decodeAll*`, `encodedLen*`,
-`MAX_BYTES_*()`, and a `Decoded{32,64,128}` result class. Decode errors
-throw `Error` with `name === "Bijou{32,64,128}DecodeError"`; wrong-type
-and out-of-range inputs throw native `TypeError` / `RangeError`.
+`MAX_BYTES_*()`, and a `Decoded{U,I}{32,64,128}`-family result class.
+Decode errors throw `Error` with `name === "Bijou{32,64,128}{,s}DecodeError"`
+(the `s` suffix for the signed formats); wrong-type and out-of-range
+inputs throw native `TypeError` / `RangeError`. Signed range checks are
+two-sided (e.g. `encodeI64` accepts `[-(2n ** 63n), 2n ** 63n)`).
 
 Built into a universal npm package via [wasm-bodge] (`bodge` in the dev
 shell). Tests: `wasm:test:node` (Rust ↔ wasm-bindgen ABI),

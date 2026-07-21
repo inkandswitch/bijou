@@ -900,3 +900,201 @@ mod u128 {
         assert!(decode_all_u128(&u8s(&[0xFFu8; 17])).is_err());
     }
 }
+
+mod i32_signed {
+    use bijoux_wasm::i32::{
+        decode::{decode_all_i32, decode_i32},
+        encode::{encode_i32, encoded_len_i32},
+        max_bytes_i32,
+    };
+    use wasm_bindgen::{JsCast, JsValue};
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    fn n(v: f64) -> JsValue {
+        JsValue::from_f64(v)
+    }
+
+    #[wasm_bindgen_test]
+    fn max_bytes_is_5() {
+        assert_eq!(max_bytes_i32(), 5);
+    }
+
+    #[wasm_bindgen_test]
+    fn round_trips_signed_values() {
+        for v in [0i32, -1, 1, -126, 125, -127, 126, i32::MIN, i32::MAX] {
+            let encoded = encode_i32(&n(f64::from(v))).unwrap();
+            assert_eq!(encoded.len(), encoded_len_i32(&n(f64::from(v))).unwrap());
+            let arr = js_sys::Uint8Array::from(encoded.as_slice());
+            let decoded = decode_i32(arr.unchecked_ref()).unwrap();
+            assert_eq!(decoded.value(), v);
+            assert_eq!(decoded.bytes_read(), encoded.len());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn negative_one_is_one_byte() {
+        assert_eq!(encode_i32(&n(-1.0)).unwrap(), [0x01]);
+    }
+
+    #[wasm_bindgen_test]
+    fn range_errors_at_signed_bounds() {
+        for v in [2_147_483_648.0, -2_147_483_649.0] {
+            let err = encode_i32(&n(v)).expect_err("out of range must throw");
+            let js: JsValue = err.into();
+            assert!(js.dyn_ref::<js_sys::RangeError>().is_some());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn decode_all_returns_int32_array_semantics() {
+        let mut buf = Vec::new();
+        for v in [-2.0, -1.0, 0.0, 1.0, 2.0] {
+            buf.extend(encode_i32(&n(v)).unwrap());
+        }
+        let arr = js_sys::Uint8Array::from(buf.as_slice());
+        let out = decode_all_i32(arr.unchecked_ref()).unwrap();
+        assert_eq!(out, [-2, -1, 0, 1, 2]);
+    }
+
+    #[wasm_bindgen_test]
+    fn error_name_is_bijou32s() {
+        let arr = js_sys::Uint8Array::from(&[0xFC_u8][..]); // truncated
+        let err = decode_i32(arr.unchecked_ref()).expect_err("truncated must throw");
+        let name = js_sys::Reflect::get(&err, &"name".into()).unwrap();
+        assert_eq!(name.as_string().unwrap(), "Bijou32sDecodeError");
+    }
+}
+
+mod i64_signed {
+    use bijoux_wasm::i64::{
+        decode::{decode_all_i64, decode_i64},
+        encode::{encode_i64, encoded_len_i64},
+        max_bytes_i64,
+    };
+    use js_sys::BigInt;
+    use wasm_bindgen::{JsCast, JsValue};
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    fn bi(v: i64) -> BigInt {
+        BigInt::from(v)
+    }
+
+    #[wasm_bindgen_test]
+    fn max_bytes_is_9() {
+        assert_eq!(max_bytes_i64(), 9);
+    }
+
+    #[wasm_bindgen_test]
+    fn round_trips_signed_values() {
+        for v in [0i64, -1, 1, -124, 123, -125, 124, i64::MIN, i64::MAX] {
+            let encoded = encode_i64(&bi(v)).unwrap();
+            assert_eq!(encoded.len(), encoded_len_i64(&bi(v)).unwrap());
+            let arr = js_sys::Uint8Array::from(encoded.as_slice());
+            let decoded = decode_i64(arr.unchecked_ref()).unwrap();
+            assert_eq!(decoded.value(), v);
+            assert_eq!(decoded.bytes_read(), encoded.len());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn negative_one_is_one_byte() {
+        assert_eq!(encode_i64(&bi(-1)).unwrap(), [0x01]);
+    }
+
+    #[wasm_bindgen_test]
+    fn range_errors_beyond_i64() {
+        // 2^63 and -(2^63) - 1
+        let too_big = BigInt::new(&JsValue::from_str("9223372036854775808")).unwrap();
+        let too_small = BigInt::new(&JsValue::from_str("-9223372036854775809")).unwrap();
+        for v in [too_big, too_small] {
+            let err = encode_i64(&v).expect_err("out of range must throw");
+            let js: JsValue = err.into();
+            assert!(js.dyn_ref::<js_sys::RangeError>().is_some());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn decode_all_round_trips() {
+        let mut buf = Vec::new();
+        for v in [i64::MIN, -1, 0, 1, i64::MAX] {
+            buf.extend(encode_i64(&bi(v)).unwrap());
+        }
+        let arr = js_sys::Uint8Array::from(buf.as_slice());
+        let out = decode_all_i64(arr.unchecked_ref()).unwrap();
+        assert_eq!(out, [i64::MIN, -1, 0, 1, i64::MAX]);
+    }
+
+    #[wasm_bindgen_test]
+    fn error_name_is_bijou64s() {
+        let arr = js_sys::Uint8Array::from(&[0xF8_u8][..]);
+        let err = decode_i64(arr.unchecked_ref()).expect_err("truncated must throw");
+        let name = js_sys::Reflect::get(&err, &"name".into()).unwrap();
+        assert_eq!(name.as_string().unwrap(), "Bijou64sDecodeError");
+    }
+}
+
+mod i128_signed {
+    use bijoux_wasm::i128::{
+        decode::decode_i128,
+        encode::{encode_i128, encoded_len_i128},
+        max_bytes_i128,
+    };
+    use js_sys::BigInt;
+    use wasm_bindgen::{JsCast, JsValue};
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    fn bi(v: i128) -> BigInt {
+        BigInt::new(&JsValue::from_str(&v.to_string())).unwrap()
+    }
+
+    #[wasm_bindgen_test]
+    fn max_bytes_is_17() {
+        assert_eq!(max_bytes_i128(), 17);
+    }
+
+    #[wasm_bindgen_test]
+    fn round_trips_signed_values() {
+        for v in [
+            0i128,
+            -1,
+            1,
+            -120,
+            119,
+            -121,
+            120,
+            i128::from(i64::MIN),
+            i128::MIN,
+            i128::MAX,
+        ] {
+            let encoded = encode_i128(&bi(v)).unwrap();
+            assert_eq!(encoded.len(), encoded_len_i128(&bi(v)).unwrap());
+            let arr = js_sys::Uint8Array::from(encoded.as_slice());
+            let decoded = decode_i128(arr.unchecked_ref()).unwrap();
+            assert_eq!(decoded.bytes_read(), encoded.len());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn negative_one_is_one_byte() {
+        assert_eq!(encode_i128(&bi(-1)).unwrap(), [0x01]);
+    }
+
+    #[wasm_bindgen_test]
+    fn range_errors_beyond_i128() {
+        let too_big = BigInt::new(&JsValue::from_str(
+            "170141183460469231731687303715884105728", // 2^127
+        ))
+        .unwrap();
+        let err = encode_i128(&too_big).expect_err("out of range must throw");
+        let js: JsValue = err.into();
+        assert!(js.dyn_ref::<js_sys::RangeError>().is_some());
+    }
+
+    #[wasm_bindgen_test]
+    fn error_name_is_bijou128s() {
+        let arr = js_sys::Uint8Array::from(&[0xF0_u8][..]);
+        let err = decode_i128(arr.unchecked_ref()).expect_err("truncated must throw");
+        let name = js_sys::Reflect::get(&err, &"name".into()).unwrap();
+        assert_eq!(name.as_string().unwrap(), "Bijou128sDecodeError");
+    }
+}
