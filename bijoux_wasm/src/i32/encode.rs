@@ -17,10 +17,10 @@ use wasm_bindgen::prelude::*;
 ///
 /// * [`Self::OutOfRange`] — the caller passed a valid integer Number
 ///   but its value is outside `[-(2**31), 2**31)`. Without this check,
-///   wasm-bindgen would silently truncate via `value >>> 0` (JS
-///   unsigned-32 cast), which means `-1` would silently encode as
-///   `u32::MAX` and `2**32` as `0` — a footgun for content-addressed
-///   protocols. Lowered to a JS native `RangeError` via
+///   wasm-bindgen would silently wrap via `value | 0` (JS signed-32
+///   cast), which means `2**31` would silently encode as `i32::MIN`
+///   and `2**32` as `0` — a footgun for content-addressed protocols.
+///   Lowered to a JS native `RangeError` via
 ///   [`js_sys::RangeError::new`].
 ///
 /// Using the typed `js_sys::TypeError` / `js_sys::RangeError`
@@ -30,11 +30,11 @@ use wasm_bindgen::prelude::*;
 /// the thrown values are actual platform `TypeError` / `RangeError`
 /// instances.
 ///
-/// Unlike `bijou64_wasm` and `bijou128_wasm`, the input type at the JS
-/// boundary is `number` (not `bigint`) because `u32::MAX` fits inside
-/// `Number.MAX_SAFE_INTEGER`. `bigint` is intentionally rejected as a
+/// Unlike the `I64`/`I128` families, the input type at the JS boundary
+/// is `number` (not `bigint`) because the full `i32` range fits inside
+/// the JS safe-integer range. `bigint` is intentionally rejected as a
 /// `TypeError` to keep the API surface explicit — if you need 64-bit
-/// values, use `bijou64`.
+/// values, use `encodeI64`.
 #[derive(Debug, Clone, Copy, Error)]
 pub enum WasmNumberError {
     /// Caller passed a value that isn't a finite, integer-valued
@@ -65,7 +65,7 @@ impl From<WasmNumberError> for JsValue {
 /// - non-`Number` values (`bigint`, `string`, `null`, `undefined`, ...)
 ///   → `TypeError`
 /// - `NaN`, `±Infinity`, fractional values → `TypeError`
-/// - negative numbers and numbers `>= 2**32` → `RangeError`
+/// - numbers outside `[-(2**31), 2**31)` → `RangeError`
 fn jsvalue_to_i32(value: &JsValue) -> Result<i32, WasmNumberError> {
     let n = value.as_f64().ok_or(WasmNumberError::WrongType)?;
 
@@ -96,14 +96,16 @@ fn jsvalue_to_i32(value: &JsValue) -> Result<i32, WasmNumberError> {
 ///
 /// ```js
 /// import { encodedLenI32 } from "@inkandswitch/bijoux";
-/// encodedLenI32(0);          // 1
-/// encodedLenI32(251);        // 1
-/// encodedLenI32(252);        // 2
-/// encodedLenI32(2**32 - 1);  // 5 (u32::MAX)
-/// encodedLenI32(2**32);      // throws RangeError
-/// encodedLenI32(-1);         // throws RangeError
-/// encodedLenI32(1.5);        // throws TypeError (not an integer)
-/// encodedLenI32(42n);        // throws TypeError (bigint, not number)
+/// encodedLenI32(0);            // 1
+/// encodedLenI32(-1);           // 1 (small negatives are single bytes)
+/// encodedLenI32(125);          // 1 (last positive in the 1-byte window)
+/// encodedLenI32(-126);         // 1 (last negative in the 1-byte window)
+/// encodedLenI32(126);          // 2
+/// encodedLenI32(-(2**31));     // 5 (i32::MIN)
+/// encodedLenI32(2**31);        // throws RangeError
+/// encodedLenI32(-(2**31) - 1); // throws RangeError
+/// encodedLenI32(1.5);          // throws TypeError (not an integer)
+/// encodedLenI32(42n);          // throws TypeError (bigint, not number)
 /// ```
 #[wasm_bindgen(js_name = encodedLenI32)]
 pub fn encoded_len_i32(value: &JsValue) -> Result<usize, WasmNumberError> {
@@ -128,11 +130,14 @@ pub fn encoded_len_i32(value: &JsValue) -> Result<usize, WasmNumberError> {
 ///
 /// ```js
 /// import { encodeI32 } from "@inkandswitch/bijoux";
-/// encodeI32(42);          // Uint8Array([0x2A])
-/// encodeI32(300);         // Uint8Array([0xFC, 0x30])
-/// encodeI32(2**32);       // throws RangeError
-/// encodeI32(-1);          // throws RangeError
-/// encodeI32(1.5);         // throws TypeError (not an integer)
+/// encodeI32(0);            // Uint8Array([0x00])
+/// encodeI32(-1);           // Uint8Array([0x01])  (zigzag: sign in bit 0)
+/// encodeI32(42);           // Uint8Array([0x54])  (zigzag(42) = 84)
+/// encodeI32(-126);         // Uint8Array([0xFB])
+/// encodeI32(126);          // Uint8Array([0xFC, 0x00])
+/// encodeI32(2**31);        // throws RangeError
+/// encodeI32(-(2**31) - 1); // throws RangeError
+/// encodeI32(1.5);          // throws TypeError (not an integer)
 /// ```
 #[wasm_bindgen(js_name = encodeI32)]
 pub fn encode_i32(value: &JsValue) -> Result<Vec<u8>, WasmNumberError> {

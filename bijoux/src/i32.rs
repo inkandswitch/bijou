@@ -216,6 +216,39 @@ mod tests {
         assert_eq!(encoded_len(i32::MAX), MAX_BYTES);
     }
 
+    /// Both signs on both sides of every tier edge (see `i64.rs`'s
+    /// twin for the derivation).
+    #[test]
+    fn tier_edges_both_signs() {
+        const THRESHOLD: u32 = 252;
+        const TIERS: u32 = 4;
+
+        let mut offset: u32 = THRESHOLD;
+        for n in 1..=TIERS {
+            let below = n as usize;
+            let at = n as usize + 1;
+            for (z, expected_len) in [
+                (offset - 2, below),
+                (offset - 1, below),
+                (offset, at),
+                (offset + 1, at),
+            ] {
+                let value = unzigzag(z);
+                assert_eq!(encoded_len(value), expected_len, "z={z} value={value}");
+                let mut buf = Vec::new();
+                encode(value, &mut buf);
+                assert_eq!(buf.len(), expected_len);
+                assert_eq!(decode(&buf).unwrap(), (value, expected_len));
+            }
+            if n < TIERS {
+                offset += 1u32 << (8 * n);
+            }
+        }
+
+        assert_eq!(encoded_len(unzigzag(u32::MAX)), MAX_BYTES);
+        assert_eq!(encoded_len(unzigzag(u32::MAX - 1)), MAX_BYTES);
+    }
+
     #[test]
     fn errors_propagate() {
         assert_eq!(decode(&[]), Err(DecodeError::BufferTooShort));
@@ -254,7 +287,22 @@ mod tests {
                 assert_eq!(decoded, value);
                 assert_eq!(consumed, buf.len());
                 assert_eq!(encoded_len(value), buf.len());
+                assert_eq!(encoded_bytes(value).as_slice(), &buf[..]);
             });
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn canonical_all_decodable_buffers_reencode_to_themselves() {
+            bolero::check!()
+                .with_arbitrary::<Vec<u8>>()
+                .for_each(|bytes| {
+                    if let Ok((value, consumed)) = decode(bytes) {
+                        let mut re = Vec::new();
+                        encode(value, &mut re);
+                        assert_eq!(&bytes[..consumed], &re[..], "non-canonical decode");
+                    }
+                });
         }
     }
 }

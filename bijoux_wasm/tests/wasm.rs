@@ -1063,6 +1063,7 @@ mod i128_signed {
             -121,
             120,
             i128::from(i64::MIN),
+            i128::from(i64::MAX),
             i128::MIN,
             i128::MAX,
         ] {
@@ -1070,6 +1071,7 @@ mod i128_signed {
             assert_eq!(encoded.len(), encoded_len_i128(&bi(v)).unwrap());
             let arr = js_sys::Uint8Array::from(encoded.as_slice());
             let decoded = decode_i128(arr.unchecked_ref()).unwrap();
+            assert_eq!(decoded.value(), v);
             assert_eq!(decoded.bytes_read(), encoded.len());
         }
     }
@@ -1096,5 +1098,132 @@ mod i128_signed {
         let err = decode_i128(arr.unchecked_ref()).expect_err("truncated must throw");
         let name = js_sys::Reflect::get(&err, &"name".into()).unwrap();
         assert_eq!(name.as_string().unwrap(), "Bijou128sDecodeError");
+    }
+}
+
+/// Hardening cases the initial signed smoke tests lacked: `decodeAll` for
+/// i128, both range bounds, Overflow decodes, wrong-type inputs, and
+/// empty-buffer `decode_all` for every signed width.
+mod signed_hardening {
+    use js_sys::BigInt;
+    use wasm_bindgen::{JsCast, JsValue};
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    fn bi128(v: i128) -> BigInt {
+        BigInt::new(&JsValue::from_str(&v.to_string())).unwrap()
+    }
+
+    #[wasm_bindgen_test]
+    fn decode_all_i128_round_trips_array_of_bigints() {
+        use bijoux_wasm::i128::{decode::decode_all_i128, encode::encode_i128};
+
+        let values = [i128::MIN, -1, 0, 1, i128::MAX];
+        let mut buf = Vec::new();
+        for &v in &values {
+            buf.extend(encode_i128(&bi128(v)).unwrap());
+        }
+        let arr = js_sys::Uint8Array::from(buf.as_slice());
+        let out = decode_all_i128(arr.unchecked_ref()).unwrap();
+        let out_arr: &js_sys::Array = out.unchecked_ref();
+        assert_eq!(out_arr.length(), values.len() as u32);
+        for (i, &v) in values.iter().enumerate() {
+            let element = out_arr.get(i as u32);
+            assert_eq!(i128::try_from(element).unwrap(), v);
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn i128_negative_range_bound_throws() {
+        use bijoux_wasm::i128::encode::encode_i128;
+
+        let too_small = BigInt::new(&JsValue::from_str(
+            "-170141183460469231731687303715884105729", // -(2^127) - 1
+        ))
+        .unwrap();
+        let err = encode_i128(&too_small).expect_err("below i128::MIN must throw");
+        let js: JsValue = err.into();
+        assert!(js.dyn_ref::<js_sys::RangeError>().is_some());
+    }
+
+    #[wasm_bindgen_test]
+    fn overflow_decodes_throw_signed_error_names() {
+        use bijoux_wasm::{
+            i32::decode::decode_i32, i64::decode::decode_i64, i128::decode::decode_i128,
+        };
+
+        type DecodeProbe = fn(&JsValue) -> Option<String>;
+        let cases: [(&[u8], &str, DecodeProbe); 3] = [
+            (&[0xFF; 5], "Bijou32sDecodeError", |arr| {
+                decode_i32(arr).err().map(|e| error_name(&e))
+            }),
+            (&[0xFF; 9], "Bijou64sDecodeError", |arr| {
+                decode_i64(arr).err().map(|e| error_name(&e))
+            }),
+            (&[0xFF; 17], "Bijou128sDecodeError", |arr| {
+                decode_i128(arr).err().map(|e| error_name(&e))
+            }),
+        ];
+        for (bytes, expected, decode) in cases {
+            let arr = js_sys::Uint8Array::from(bytes);
+            let name = decode(arr.unchecked_ref()).expect("overflow must throw");
+            assert_eq!(name, expected);
+        }
+    }
+
+    fn error_name(err: &JsValue) -> String {
+        js_sys::Reflect::get(err, &"name".into())
+            .unwrap()
+            .as_string()
+            .unwrap()
+    }
+
+    #[wasm_bindgen_test]
+    fn wrong_carrier_types_throw_type_errors() {
+        use bijoux_wasm::{
+            i32::encode::encode_i32, i64::encode::encode_i64, i128::encode::encode_i128,
+        };
+
+        // number where bigint expected
+        let n = JsValue::from_f64(42.0);
+        assert!(encode_i64(n.unchecked_ref()).is_err());
+        assert!(encode_i128(n.unchecked_ref()).is_err());
+        // fractional / NaN / Infinity where integer number expected
+        for bad in [-1.5, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let err = encode_i32(&JsValue::from_f64(bad)).expect_err("must throw");
+            let js: JsValue = err.into();
+            assert!(js.dyn_ref::<js_sys::TypeError>().is_some(), "{bad}");
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn empty_decode_all_returns_empty() {
+        use bijoux_wasm::{i32::decode::decode_all_i32, i64::decode::decode_all_i64};
+
+        let empty = js_sys::Uint8Array::new_with_length(0);
+        assert_eq!(
+            decode_all_i32(empty.unchecked_ref()).unwrap(),
+            Vec::<i32>::new()
+        );
+        assert_eq!(
+            decode_all_i64(empty.unchecked_ref()).unwrap(),
+            Vec::<i64>::new()
+        );
+    }
+
+    #[wasm_bindgen_test]
+    fn negative_zero_folds_to_zero() {
+        use bijoux_wasm::i32::encode::encode_i32;
+        assert_eq!(encode_i32(&JsValue::from_f64(-0.0)).unwrap(), [0x00]);
+    }
+
+    #[wasm_bindgen_test]
+    fn i32_bounds_are_exact() {
+        use bijoux_wasm::i32::encode::encode_i32;
+        // Accepted exactly at the inclusive bounds…
+        assert!(encode_i32(&JsValue::from_f64(-2_147_483_648.0)).is_ok());
+        assert!(encode_i32(&JsValue::from_f64(2_147_483_647.0)).is_ok());
+        // …rejected exactly one past them.
+        assert!(encode_i32(&JsValue::from_f64(2_147_483_648.0)).is_err());
+        assert!(encode_i32(&JsValue::from_f64(-2_147_483_649.0)).is_err());
     }
 }

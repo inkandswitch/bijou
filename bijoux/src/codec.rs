@@ -299,42 +299,79 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    #[test]
-    #[cfg(feature = "i64")]
-    fn i64_matches_free_functions() {
-        for value in [0i64, -1, 1, -124, 123, -125, 124, i64::MIN, i64::MAX] {
-            assert_eq!(value.encoded_len(), crate::i64::encoded_len(value));
-
-            let mut via_trait = Vec::new();
-            value.encode(&mut via_trait);
-            let mut via_free = Vec::new();
-            crate::i64::encode(value, &mut via_free);
-            assert_eq!(via_trait, via_free);
-
-            assert_eq!(i64::decode(&via_trait), crate::i64::decode(&via_free));
-        }
-    }
-
     /// The trait surface must be indistinguishable from the free
-    /// functions it delegates to.
-    #[test]
-    fn u64_matches_free_functions() {
-        for value in [0u64, 1, 247, 248, 503, 504, 66_040, u64::MAX] {
-            assert_eq!(value.encoded_len(), crate::u64::encoded_len(value));
-            assert_eq!(
-                value.encoded_bytes().as_ref(),
-                crate::u64::encoded_bytes(value).as_slice()
-            );
+    /// functions it delegates to — one macro-generated test per width
+    /// so a copy-paste slip in any of the six delegation blocks (e.g.
+    /// `i32` delegating to `crate::u32`) cannot hide.
+    macro_rules! matches_free_functions {
+        ($name:ident, $ty:ty, $module:ident, $feature:literal, $values:expr) => {
+            #[test]
+            #[cfg(feature = $feature)]
+            fn $name() {
+                for value in $values {
+                    assert_eq!(value.encoded_len(), crate::$module::encoded_len(value));
+                    assert_eq!(
+                        value.encoded_bytes().as_ref(),
+                        crate::$module::encoded_bytes(value).as_slice()
+                    );
 
-            let mut via_trait = Vec::new();
-            value.encode(&mut via_trait);
-            let mut via_free = Vec::new();
-            crate::u64::encode(value, &mut via_free);
-            assert_eq!(via_trait, via_free);
+                    let mut via_trait = Vec::new();
+                    value.encode(&mut via_trait);
+                    let mut via_free = Vec::new();
+                    crate::$module::encode(value, &mut via_free);
+                    assert_eq!(via_trait, via_free);
 
-            assert_eq!(u64::decode(&via_trait), crate::u64::decode(&via_free));
-        }
+                    assert_eq!(
+                        <$ty as Decode>::decode(&via_trait),
+                        crate::$module::decode(&via_free)
+                    );
+                }
+            }
+        };
     }
+
+    matches_free_functions!(
+        u32_matches_free_functions,
+        u32,
+        u32,
+        "u32",
+        [0u32, 1, 251, 252, 507, 508, u32::MAX]
+    );
+    matches_free_functions!(
+        u64_matches_free_functions,
+        u64,
+        u64,
+        "u64",
+        [0u64, 1, 247, 248, 503, 504, 66_040, u64::MAX]
+    );
+    matches_free_functions!(
+        u128_matches_free_functions,
+        u128,
+        u128,
+        "u128",
+        [0u128, 1, 239, 240, 495, 496, u128::MAX]
+    );
+    matches_free_functions!(
+        i32_matches_free_functions,
+        i32,
+        i32,
+        "i32",
+        [0i32, -1, 1, -126, 125, -127, 126, i32::MIN, i32::MAX]
+    );
+    matches_free_functions!(
+        i64_matches_free_functions,
+        i64,
+        i64,
+        "i64",
+        [0i64, -1, 1, -124, 123, -125, 124, i64::MIN, i64::MAX]
+    );
+    matches_free_functions!(
+        i128_matches_free_functions,
+        i128,
+        i128,
+        "i128",
+        [0i128, -1, 1, -120, 119, -121, 120, i128::MIN, i128::MAX]
+    );
 
     #[test]
     fn u64_decode_all_roundtrip() {
@@ -347,8 +384,50 @@ mod tests {
         assert_eq!(u64::decode_all(&buf).expect("valid buffer"), values);
     }
 
+    /// Pin the literal widths so drift on either side of the
+    /// delegation fails (asserting `impl == module` would be a
+    /// tautology — the impl reads the module const).
     #[test]
-    fn u64_max_bytes_matches() {
-        assert_eq!(<u64 as Encode>::MAX_BYTES, crate::u64::MAX_BYTES);
+    fn max_bytes_literals() {
+        assert_eq!(<u32 as Encode>::MAX_BYTES, 5);
+        assert_eq!(<u64 as Encode>::MAX_BYTES, 9);
+        assert_eq!(<u128 as Encode>::MAX_BYTES, 17);
+        #[cfg(feature = "i32")]
+        assert_eq!(<i32 as Encode>::MAX_BYTES, 5);
+        #[cfg(feature = "i64")]
+        assert_eq!(<i64 as Encode>::MAX_BYTES, 9);
+        #[cfg(feature = "i128")]
+        assert_eq!(<i128 as Encode>::MAX_BYTES, 17);
+    }
+
+    /// Exercise the trait's *default* `decode_all` body (every real
+    /// impl overrides it) via a minimal in-test decoder, including the
+    /// exact-buffer-boundary and malformed-tail paths.
+    #[test]
+    fn decode_all_default_body() {
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        struct Byte(u8);
+
+        impl Decode for Byte {
+            type Error = ();
+
+            fn decode(bytes: &[u8]) -> Result<(Self, usize), ()> {
+                match bytes.first() {
+                    Some(&0xFF) | None => Err(()),
+                    Some(&b) => Ok((Byte(b), 1)),
+                }
+            }
+            // No decode_all override: the default body runs.
+        }
+
+        // Values end exactly at the buffer boundary.
+        assert_eq!(
+            Byte::decode_all(&[1, 2, 3]),
+            Ok(vec![Byte(1), Byte(2), Byte(3)])
+        );
+        // Empty input decodes to nothing.
+        assert_eq!(Byte::decode_all(&[]), Ok(vec![]));
+        // Malformed tail short-circuits (all-or-nothing).
+        assert_eq!(Byte::decode_all(&[1, 0xFF, 2]), Err(()));
     }
 }

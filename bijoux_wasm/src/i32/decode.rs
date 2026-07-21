@@ -51,7 +51,7 @@ impl From<WasmInputError> for JsValue {
     }
 }
 
-/// Decodes a `bijou32` from the front of `bytes`.
+/// Decodes a `bijou32s` from the front of `bytes`.
 ///
 /// Returns a [`WasmDecodedI32`] carrying the value plus the
 /// number of bytes consumed (so the caller can stream-decode by
@@ -62,14 +62,14 @@ impl From<WasmInputError> for JsValue {
 /// Throws a JS native `TypeError` if `bytes` is not a `Uint8Array`.
 /// Throws a JS `Error` with `name === "Bijou32sDecodeError"` if `bytes`
 /// is too short for the encoding indicated by its tag byte, or if a
-/// tier-4 payload would overflow `u32`. See [`WasmDecodeError`].
+/// tier-4 payload would overflow the zigzag `u32` range. See [`WasmDecodeError`].
 ///
 /// # JS
 ///
 /// ```js
 /// import { decodeI32 } from "@inkandswitch/bijoux";
 /// const { value, bytesRead } = decodeI32(new Uint8Array([0xFC, 0x30, 0xFF]));
-/// // value === 300, bytesRead === 2
+/// // value === 150 (unzigzag(300)), bytesRead === 2
 /// decodeI32([0xFC, 0x30]); // throws TypeError (plain Array, not Uint8Array)
 /// ```
 #[wasm_bindgen(js_name = decodeI32)]
@@ -81,7 +81,7 @@ pub fn decode_i32(
     Ok(WasmDecodedI32 { value, bytes_read })
 }
 
-/// Decodes every `bijou32`-encoded value in `bytes`, returning them as
+/// Decodes every `bijou32s`-encoded value in `bytes`, returning them as
 /// a `Int32Array`.
 ///
 /// Equivalent to calling [`decode_i32`] in a loop, advancing by
@@ -120,7 +120,7 @@ pub fn decode_all_i32(
 
 /// A successfully-decoded bijou32 value plus its byte length.
 ///
-/// Returned by [`decode_i32`]. Exposes `value` (the decoded `u32`, JS
+/// Returned by [`decode_i32`]. Exposes `value` (the decoded `i32`, JS
 /// `number`) and `bytesRead` (a JS `number`) as getters. We model this
 /// as a Rust-exported struct rather than constructing a plain JS
 /// object via [`js_sys::Object`] because the struct gives us a real

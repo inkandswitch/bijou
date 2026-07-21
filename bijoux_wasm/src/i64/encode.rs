@@ -82,13 +82,15 @@ fn bigint_to_i64(value: &js_sys::BigInt) -> Result<i64, WasmBigintError> {
 ///
 /// ```js
 /// import { encodedLenI64 } from "@inkandswitch/bijoux";
-/// encodedLenI64(0n);          // 1
-/// encodedLenI64(247n);        // 1
-/// encodedLenI64(248n);        // 2
-/// encodedLenI64((1n << 64n) - 1n); // 9 (u64::MAX)
-/// encodedLenI64(1n << 64n);   // throws RangeError
-/// encodedLenI64(-1n);         // throws RangeError
-/// encodedLenI64(42);          // throws TypeError (Number, not bigint)
+/// encodedLenI64(0n);             // 1
+/// encodedLenI64(-1n);            // 1 (small negatives are single bytes)
+/// encodedLenI64(123n);           // 1 (last positive in the 1-byte window)
+/// encodedLenI64(-124n);          // 1 (last negative in the 1-byte window)
+/// encodedLenI64(124n);           // 2
+/// encodedLenI64(-(2n ** 63n));   // 9 (i64::MIN)
+/// encodedLenI64(2n ** 63n);      // throws RangeError
+/// encodedLenI64(-(2n ** 63n) - 1n); // throws RangeError
+/// encodedLenI64(42);             // throws TypeError (Number, not bigint)
 /// ```
 #[wasm_bindgen(js_name = encodedLenI64)]
 pub fn encoded_len_i64(value: &js_sys::BigInt) -> Result<usize, WasmBigintError> {
@@ -112,11 +114,14 @@ pub fn encoded_len_i64(value: &js_sys::BigInt) -> Result<usize, WasmBigintError>
 ///
 /// ```js
 /// import { encodeI64 } from "@inkandswitch/bijoux";
-/// encodeI64(42n);       // Uint8Array([0x2A])
-/// encodeI64(300n);      // Uint8Array([0xF8, 0x34])
-/// encodeI64(1n << 64n); // throws RangeError
-/// encodeI64(-1n);       // throws RangeError
-/// encodeI64(42);        // throws TypeError (Number, not bigint)
+/// encodeI64(0n);              // Uint8Array([0x00])
+/// encodeI64(-1n);             // Uint8Array([0x01])  (zigzag: sign in bit 0)
+/// encodeI64(42n);             // Uint8Array([0x54])  (zigzag(42n) = 84n)
+/// encodeI64(-124n);           // Uint8Array([0xF7])
+/// encodeI64(124n);            // Uint8Array([0xF8, 0x00])
+/// encodeI64(2n ** 63n);       // throws RangeError
+/// encodeI64(-(2n ** 63n) - 1n); // throws RangeError
+/// encodeI64(42);              // throws TypeError (Number, not bigint)
 /// ```
 #[wasm_bindgen(js_name = encodeI64)]
 pub fn encode_i64(value: &js_sys::BigInt) -> Result<Vec<u8>, WasmBigintError> {

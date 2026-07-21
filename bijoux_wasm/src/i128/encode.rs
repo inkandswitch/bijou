@@ -84,13 +84,15 @@ fn bigint_to_i128(value: &js_sys::BigInt) -> Result<i128, WasmBigintError> {
 ///
 /// ```js
 /// import { encodedLenI128 } from "@inkandswitch/bijoux";
-/// encodedLenI128(0n);          // 1
-/// encodedLenI128(239n);        // 1
-/// encodedLenI128(240n);        // 2
-/// encodedLenI128((1n << 128n) - 1n); // 17 (u128::MAX)
-/// encodedLenI128(1n << 128n);  // throws RangeError
-/// encodedLenI128(-1n);         // throws RangeError
-/// encodedLenI128(42);          // throws TypeError (Number, not bigint)
+/// encodedLenI128(0n);             // 1
+/// encodedLenI128(-1n);            // 1 (small negatives are single bytes)
+/// encodedLenI128(119n);           // 1 (last positive in the 1-byte window)
+/// encodedLenI128(-120n);          // 1 (last negative in the 1-byte window)
+/// encodedLenI128(120n);           // 2
+/// encodedLenI128(-(2n ** 127n));  // 17 (i128::MIN)
+/// encodedLenI128(2n ** 127n);     // throws RangeError
+/// encodedLenI128(-(2n ** 127n) - 1n); // throws RangeError
+/// encodedLenI128(42);             // throws TypeError (Number, not bigint)
 /// ```
 #[wasm_bindgen(js_name = encodedLenI128)]
 pub fn encoded_len_i128(value: &js_sys::BigInt) -> Result<usize, WasmBigintError> {
@@ -114,9 +116,13 @@ pub fn encoded_len_i128(value: &js_sys::BigInt) -> Result<usize, WasmBigintError
 ///
 /// ```js
 /// import { encodeI128 } from "@inkandswitch/bijoux";
-/// encodeI128(42n);        // Uint8Array([0x2A])
-/// encodeI128(500n);       // Uint8Array([0xF1, 0x00, 0x04])
-/// encodeI128(1n << 128n); // throws RangeError
+/// encodeI128(0n);               // Uint8Array([0x00])
+/// encodeI128(-1n);              // Uint8Array([0x01])  (zigzag: sign in bit 0)
+/// encodeI128(42n);              // Uint8Array([0x54])  (zigzag(42n) = 84n)
+/// encodeI128(-120n);            // Uint8Array([0xEF])
+/// encodeI128(120n);             // Uint8Array([0xF0, 0x00])
+/// encodeI128(2n ** 127n);       // throws RangeError
+/// encodeI128(-(2n ** 127n) - 1n); // throws RangeError
 /// encodeI128(-1n);        // throws RangeError
 /// encodeI128(42);         // throws TypeError (Number, not bigint)
 /// ```

@@ -1,7 +1,7 @@
 {
   "name": "@inkandswitch/bijoux",
   "version": "0.1.0",
-  "description": "Bijective length-prefixed varint encodings for u32/u64/u128 (Wasm bindings)",
+  "description": "Bijective length-prefixed varint encodings, unsigned (u32/u64/u128) and signed zigzag (i32/i64/i128) — Wasm bindings",
   "publishConfig": {
     "access": "public"
   },

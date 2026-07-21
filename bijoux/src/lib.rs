@@ -1,13 +1,19 @@
 //! _Bijoux_, plural of bijou — the bijou family of bijective,
 //! length-prefixed variable-length integer encodings.
 //!
-//! Each format module ([`u32`](crate::u32), [`u64`](crate::u64), [`u128`](crate::u128), and in
-//! future the signed `bijou64s`, …) defines **one canonical encoding
-//! for one integer type**, exposed as free functions and gated behind a
-//! width feature (`u32` / `u64` / `u128`, all enabled by default). The
-//! [`Encode`] / [`Decode`] traits are implemented directly on the
-//! integer types — the family's one-format-per-type commitment is what
-//! makes `impl Encode for u64` unambiguous.
+//! Each format module — unsigned [`u32`](mod@u32), [`u64`](mod@u64),
+//! and [`u128`](mod@u128), and signed [`i32`](mod@i32),
+//! [`i64`](mod@i64), and [`i128`](mod@i128) (zigzag over the matching
+//! unsigned tier scheme) — defines **one canonical encoding for one
+//! integer type**, exposed as free functions and gated behind a
+//! same-named feature (all enabled by default). The [`Encode`] /
+//! [`Decode`] traits are implemented directly on the integer types —
+//! the family's one-format-per-type commitment is what makes
+//! `impl Encode for u64` unambiguous.
+//!
+//! Byte-lexicographic order matches numeric order for the unsigned
+//! formats; for the signed formats it is zigzag order (see the
+//! [`i64`](mod@i64) module's ordering caveat).
 //!
 //! # Examples
 //!

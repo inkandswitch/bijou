@@ -1,6 +1,6 @@
 //! Signed variable-length integer encoding shootout.
 //!
-//! Evaluates candidate strategies for the planned signed bijou format
+//! Compares the shipped signed format (bijoux::i64, wire format bijou64s) and rejected alternatives
 //! against existing signed varints, before committing to an implementation:
 //!
 //! - **bijou64+zigzag** — zigzag-fold the sign into a `u64`, then reuse

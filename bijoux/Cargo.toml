@@ -57,7 +57,7 @@ required-features = ["u64"]
 [[bench]]
 name = "signed_shootout"
 harness = false
-required-features = ["u64"]
+required-features = ["i64"]
 
 [features]
 default = ["i32", "i64", "i128", "u32", "u64", "u128"]

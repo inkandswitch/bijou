@@ -334,6 +334,43 @@ mod tests {
         }
     }
 
+    /// Both signs on both sides of every tier edge, with lengths
+    /// derived from the spec's offset recurrence (`O[1] = threshold`,
+    /// `O[n+1] = O[n] + 256^n`). Consecutive zigzag values have
+    /// opposite signs, so `{O-2, O-1, O, O+1}` pins both signs on both
+    /// sides of each edge — validating the spec's signed tier table.
+    #[test]
+    fn tier_edges_both_signs() {
+        const THRESHOLD: u64 = 248;
+        const TIERS: u32 = 8;
+
+        let mut offset: u64 = THRESHOLD;
+        for n in 1..=TIERS {
+            let below = n as usize; // tier n-1 total bytes (1 byte when n == 1)
+            let at = n as usize + 1; // tier n total bytes
+            for (z, expected_len) in [
+                (offset - 2, below),
+                (offset - 1, below),
+                (offset, at),
+                (offset + 1, at),
+            ] {
+                let value = unzigzag(z);
+                assert_eq!(encoded_len(value), expected_len, "z={z} value={value}");
+                let mut buf = Vec::new();
+                encode(value, &mut buf);
+                assert_eq!(buf.len(), expected_len);
+                assert_eq!(decode(&buf).unwrap(), (value, expected_len));
+            }
+            if n < TIERS {
+                offset += 1u64 << (8 * n);
+            }
+        }
+
+        // Top of the range: i64::MIN / i64::MAX occupy the full width.
+        assert_eq!(encoded_len(unzigzag(u64::MAX)), MAX_BYTES);
+        assert_eq!(encoded_len(unzigzag(u64::MAX - 1)), MAX_BYTES);
+    }
+
     #[test]
     fn errors_propagate() {
         assert_eq!(decode(&[]), Err(DecodeError::BufferTooShort));

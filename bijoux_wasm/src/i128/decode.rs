@@ -51,7 +51,7 @@ impl From<WasmInputError> for JsValue {
     }
 }
 
-/// Decodes a `bijou128` from the front of `bytes`.
+/// Decodes a `bijou128s` from the front of `bytes`.
 ///
 /// Returns a [`WasmDecodedI128`] carrying the value plus the
 /// number of bytes consumed (so the caller can stream-decode by
@@ -62,14 +62,14 @@ impl From<WasmInputError> for JsValue {
 /// Throws a JS native `TypeError` if `bytes` is not a `Uint8Array`.
 /// Throws a JS `Error` with `name === "Bijou128sDecodeError"` if `bytes`
 /// is too short for the encoding indicated by its tag byte, or if a
-/// tier-16 payload would overflow `u128`. See [`WasmDecodeError`].
+/// tier-16 payload would overflow the zigzag `u128` range. See [`WasmDecodeError`].
 ///
 /// # JS
 ///
 /// ```js
 /// import { decodeI128 } from "@inkandswitch/bijoux";
 /// const { value, bytesRead } = decodeI128(new Uint8Array([0xF1, 0x00, 0x04, 0xFF]));
-/// // value === 500n, bytesRead === 3
+/// // value === 250n (unzigzag(500n)), bytesRead === 3
 /// decodeI128([0xF1, 0x00, 0x04]); // throws TypeError (plain Array, not Uint8Array)
 /// ```
 #[wasm_bindgen(js_name = decodeI128)]
@@ -81,11 +81,11 @@ pub fn decode_i128(
     Ok(WasmDecodedI128 { value, bytes_read })
 }
 
-/// Decodes every `bijou128`-encoded value in `bytes`, returning them as
+/// Decodes every `bijou128s`-encoded value in `bytes`, returning them as
 /// a JS `Array<bigint>`.
 ///
-/// Unlike `bijou64_wasm::decodeAll` (which returns a `BigUint64Array`),
-/// there is no `BigUint128Array` in the web platform. Returning
+/// Unlike `decodeAllI64` (which returns a `BigInt64Array`),
+/// there is no 128-bit `BigInt` typed array in the web platform. Returning
 /// `js_sys::Array` of `bigint`s is the natural mapping for `Vec<i128>` —
 /// it preserves the full 128-bit range with zero precision loss at the
 /// cost of one allocation per element on the JS side.
@@ -124,7 +124,7 @@ pub fn decode_all_i128(
 
 /// A successfully-decoded bijou128 value plus its byte length.
 ///
-/// Returned by [`decode_i128`]. Exposes `value` (the decoded `u128`, JS
+/// Returned by [`decode_i128`]. Exposes `value` (the decoded `i128`, JS
 /// `bigint`) and `bytesRead` (a JS `number`) as getters. We model this
 /// as a Rust-exported struct rather than constructing a plain JS
 /// object via [`js_sys::Object`] because the struct gives us a real

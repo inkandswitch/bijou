@@ -116,3 +116,36 @@ test("decode errors carry width-specific *sDecodeError names", async ({ page }) 
     "Bijou128sDecodeError",
   ]);
 });
+
+test("decodeAllI128 returns an Array of bigints across the full range", async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const b = (window as any).bijoux;
+    const buf = new Uint8Array([
+      ...b.encodeI128(-(2n ** 127n)),
+      ...b.encodeI128(-1n),
+      ...b.encodeI128(2n ** 127n - 1n),
+    ]);
+    const out = b.decodeAllI128(buf);
+    return {
+      isArray: Array.isArray(out),
+      ok:
+        out[0] === -(2n ** 127n) &&
+        out[1] === -1n &&
+        out[2] === 2n ** 127n - 1n,
+    };
+  });
+  expect(result).toEqual({ isArray: true, ok: true });
+});
+
+test("i128 negative range bound throws RangeError", async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const b = (window as any).bijoux;
+    try {
+      b.encodeI128(-(2n ** 127n) - 1n);
+      return "no-throw";
+    } catch (e: any) {
+      return e.constructor.name;
+    }
+  });
+  expect(result).toBe("RangeError");
+});
