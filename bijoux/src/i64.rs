@@ -59,13 +59,86 @@ pub use crate::u64::{DecodeError, MAX_BYTES};
 
 /// Stack-only encoded form of a bijou64s value.
 ///
-/// The byte container is identical to the unsigned format's — a
-/// bijou64s encoding *is* a bijou64 encoding of the zigzag-mapped
-/// value — so this is an alias of [`crate::u64::EncodedU64`],
-/// not a distinct type. Note the inherited `Ord` compares
-/// byte-lexicographically, which for this signed format is **zigzag
-/// order, not numeric order** (see the module docs).
-pub type EncodedI64 = crate::u64::EncodedU64;
+/// A distinct type from [`crate::u64::EncodedU64`] even though the byte
+/// container is identical (a bijou64s encoding *is* a u64-format encoding
+/// of the zigzag-mapped value): keeping the types separate makes
+/// signed/unsigned mix-ups — e.g. inserting a signed encoding into a
+/// map keyed by unsigned ones — a compile error instead of a silent
+/// logic bug.
+///
+/// `Ord`/`PartialOrd` compare byte-lexicographically, which for this
+/// signed format is **zigzag order, not numeric order** (see the
+/// module docs). `Eq`/`Hash`/`Borrow<[u8]>` are byte-wise and
+/// mutually consistent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct EncodedI64(crate::u64::EncodedU64);
+
+impl EncodedI64 {
+    /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Always `false`; bijou encodings are never empty.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The encoded bytes as a `&[u8]` of the correct length.
+    #[inline]
+    #[must_use]
+    pub const fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl core::ops::Deref for EncodedI64 {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl AsRef<[u8]> for EncodedI64 {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl core::borrow::Borrow<[u8]> for EncodedI64 {
+    #[inline]
+    fn borrow(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl IntoIterator for EncodedI64 {
+    type Item = u8;
+    type IntoIter = <crate::u64::EncodedU64 as IntoIterator>::IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a EncodedI64 {
+    type Item = &'a u8;
+    type IntoIter = <&'a crate::u64::EncodedU64 as IntoIterator>::IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
 
 use alloc::vec::Vec;
 
@@ -139,7 +212,7 @@ pub fn encode(value: i64, buf: &mut Vec<u8>) {
 #[inline]
 #[must_use]
 pub const fn encoded_bytes(value: i64) -> EncodedI64 {
-    crate::u64::encoded_bytes(zigzag(value))
+    EncodedI64(crate::u64::encoded_bytes(zigzag(value)))
 }
 
 /// Decodes one value from the front of `buf`, returning it along with

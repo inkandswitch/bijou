@@ -42,10 +42,88 @@ pub use crate::u32::{DecodeError, MAX_BYTES};
 
 use alloc::vec::Vec;
 
-/// Stack-only encoded form of a bijou32s value. An alias of
-/// [`crate::u32::EncodedU32`] (the byte container is identical); its
-/// `Ord` compares in **zigzag order, not numeric order**.
-pub type EncodedI32 = crate::u32::EncodedU32;
+/// Stack-only encoded form of a bijou32s value.
+///
+/// A distinct type from [`crate::u32::EncodedU32`] even though the byte
+/// container is identical (a bijou32s encoding *is* a u32-format encoding
+/// of the zigzag-mapped value): keeping the types separate makes
+/// signed/unsigned mix-ups — e.g. inserting a signed encoding into a
+/// map keyed by unsigned ones — a compile error instead of a silent
+/// logic bug.
+///
+/// `Ord`/`PartialOrd` compare byte-lexicographically, which for this
+/// signed format is **zigzag order, not numeric order** (see the
+/// module docs). `Eq`/`Hash`/`Borrow<[u8]>` are byte-wise and
+/// mutually consistent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct EncodedI32(crate::u32::EncodedU32);
+
+impl EncodedI32 {
+    /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Always `false`; bijou encodings are never empty.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The encoded bytes as a `&[u8]` of the correct length.
+    #[inline]
+    #[must_use]
+    pub const fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl core::ops::Deref for EncodedI32 {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl AsRef<[u8]> for EncodedI32 {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl core::borrow::Borrow<[u8]> for EncodedI32 {
+    #[inline]
+    fn borrow(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl IntoIterator for EncodedI32 {
+    type Item = u8;
+    type IntoIter = <crate::u32::EncodedU32 as IntoIterator>::IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a EncodedI32 {
+    type Item = &'a u8;
+    type IntoIter = <&'a crate::u32::EncodedU32 as IntoIterator>::IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
 
 /// Map an `i32` onto a `u32` by interleaving around zero:
 /// `0, -1, 1, -2, 2, … → 0, 1, 2, 3, 4, …`.
@@ -91,7 +169,7 @@ pub fn encode(value: i32, buf: &mut Vec<u8>) {
 #[inline]
 #[must_use]
 pub const fn encoded_bytes(value: i32) -> EncodedI32 {
-    crate::u32::encoded_bytes(zigzag(value))
+    EncodedI32(crate::u32::encoded_bytes(zigzag(value)))
 }
 
 /// Decodes one value from the front of `buf`, returning it along with
