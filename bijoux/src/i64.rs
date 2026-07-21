@@ -319,9 +319,10 @@ pub fn decode_all(buf: &[u8]) -> Result<Vec<i64>, DecodeError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
+
+    type TestResult = core::result::Result<(), DecodeError>;
 
     /// Spec test vectors: (value, encoding).
     const VECTORS: &[(i64, &[u8])] = &[
@@ -359,12 +360,14 @@ mod tests {
     }
 
     #[test]
-    fn spec_vectors_decode() {
+    fn spec_vectors_decode() -> TestResult {
         for &(expected, bytes) in VECTORS {
-            let (value, consumed) = decode(bytes).unwrap();
+            let (value, consumed) = decode(bytes)?;
             assert_eq!(value, expected, "decode({bytes:02X?})");
             assert_eq!(consumed, bytes.len());
         }
+
+        Ok(())
     }
 
     #[test]
@@ -377,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn tier_boundaries_round_trip() {
+    fn tier_boundaries_round_trip() -> TestResult {
         // Signed preimages of every bijou64 tier edge, both signs.
         let unsigned_boundaries: &[u64] = &[
             0,
@@ -404,10 +407,12 @@ mod tests {
             let mut buf = Vec::new();
             encode(value, &mut buf);
             assert_eq!(buf.len(), crate::u64::encoded_len(u));
-            let (decoded, consumed) = decode(&buf).unwrap();
+            let (decoded, consumed) = decode(&buf)?;
             assert_eq!(decoded, value);
             assert_eq!(consumed, buf.len());
         }
+
+        Ok(())
     }
 
     /// Both signs on both sides of every tier edge, with lengths
@@ -416,7 +421,7 @@ mod tests {
     /// opposite signs, so `{O-2, O-1, O, O+1}` pins both signs on both
     /// sides of each edge — validating the spec's signed tier table.
     #[test]
-    fn tier_edges_both_signs() {
+    fn tier_edges_both_signs() -> TestResult {
         const THRESHOLD: u64 = 248;
         const TIERS: u32 = 8;
 
@@ -435,7 +440,7 @@ mod tests {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(buf.len(), expected_len);
-                assert_eq!(decode(&buf).unwrap(), (value, expected_len));
+                assert_eq!(decode(&buf)?, (value, expected_len));
             }
             if n < TIERS {
                 offset += 1u64 << (8 * n);
@@ -445,6 +450,8 @@ mod tests {
         // Top of the range: i64::MIN / i64::MAX occupy the full width.
         assert_eq!(encoded_len(unzigzag(u64::MAX)), MAX_BYTES);
         assert_eq!(encoded_len(unzigzag(u64::MAX - 1)), MAX_BYTES);
+
+        Ok(())
     }
 
     #[test]
@@ -477,12 +484,13 @@ mod tests {
         // Documented caveat: lex order interleaves signs by magnitude.
         let order = [0i64, -1, 1, -2, 2, -124, 124];
         let encoded: Vec<EncodedI64> = order.iter().map(|&v| encoded_bytes(v)).collect();
-        for pair in encoded.windows(2) {
-            assert!(pair[0] < pair[1], "zigzag order violated");
+        for (a, b) in encoded.iter().zip(encoded.iter().skip(1)) {
+            assert!(a < b, "zigzag order violated");
         }
     }
 
     #[cfg(feature = "bolero")]
+    #[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
     mod property {
         use super::*;
 

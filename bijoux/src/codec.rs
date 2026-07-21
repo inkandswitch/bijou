@@ -294,10 +294,11 @@ impl Decode for i64 {
 }
 
 #[cfg(all(test, feature = "u64"))]
-#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
     use alloc::vec;
+
+    type TestResult = core::result::Result<(), crate::u64::DecodeError>;
 
     /// The trait surface must be indistinguishable from the free
     /// functions it delegates to — one macro-generated test per width
@@ -374,14 +375,16 @@ mod tests {
     );
 
     #[test]
-    fn u64_decode_all_roundtrip() {
+    fn u64_decode_all_roundtrip() -> TestResult {
         let values = vec![0u64, 42, 300, u64::MAX];
         let mut buf = Vec::new();
         for &value in &values {
             value.encode(&mut buf);
         }
 
-        assert_eq!(u64::decode_all(&buf).expect("valid buffer"), values);
+        assert_eq!(u64::decode_all(&buf)?, values);
+
+        Ok(())
     }
 
     /// Pin the literal widths so drift on either side of the

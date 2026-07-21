@@ -235,9 +235,10 @@ pub fn decode_all(buf: &[u8]) -> Result<Vec<i32>, DecodeError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
+
+    type TestResult = core::result::Result<(), DecodeError>;
 
     const VECTORS: &[(i32, &[u8])] = &[
         (0, &[0x00]),
@@ -255,18 +256,20 @@ mod tests {
     ];
 
     #[test]
-    fn spec_vectors_round_trip() {
+    fn spec_vectors_round_trip() -> TestResult {
         for &(value, expected) in VECTORS {
             let mut buf = Vec::new();
             encode(value, &mut buf);
             assert_eq!(buf, expected, "encode({value})");
             assert_eq!(encoded_len(value), expected.len());
-            assert_eq!(decode(expected).unwrap(), (value, expected.len()));
+            assert_eq!(decode(expected)?, (value, expected.len()));
         }
+
+        Ok(())
     }
 
     #[test]
-    fn definitional_equivalence_and_extremes() {
+    fn definitional_equivalence_and_extremes() -> TestResult {
         for value in [
             0i32,
             -1,
@@ -288,19 +291,21 @@ mod tests {
                 encoded_bytes(value).as_slice(),
                 crate::u32::encoded_bytes(z).as_slice()
             );
-            let (decoded, consumed) = decode(encoded_bytes(value).as_slice()).unwrap();
+            let (decoded, consumed) = decode(encoded_bytes(value).as_slice())?;
             assert_eq!(decoded, value);
             assert_eq!(consumed, encoded_len(value));
         }
         assert_eq!(zigzag(i32::MIN), u32::MAX);
         assert_eq!(encoded_len(i32::MIN), MAX_BYTES);
         assert_eq!(encoded_len(i32::MAX), MAX_BYTES);
+
+        Ok(())
     }
 
     /// Both signs on both sides of every tier edge (see `i64.rs`'s
     /// twin for the derivation).
     #[test]
-    fn tier_edges_both_signs() {
+    fn tier_edges_both_signs() -> TestResult {
         const THRESHOLD: u32 = 252;
         const TIERS: u32 = 4;
 
@@ -319,7 +324,7 @@ mod tests {
                 let mut buf = Vec::new();
                 encode(value, &mut buf);
                 assert_eq!(buf.len(), expected_len);
-                assert_eq!(decode(&buf).unwrap(), (value, expected_len));
+                assert_eq!(decode(&buf)?, (value, expected_len));
             }
             if n < TIERS {
                 offset += 1u32 << (8 * n);
@@ -328,6 +333,8 @@ mod tests {
 
         assert_eq!(encoded_len(unzigzag(u32::MAX)), MAX_BYTES);
         assert_eq!(encoded_len(unzigzag(u32::MAX - 1)), MAX_BYTES);
+
+        Ok(())
     }
 
     #[test]
@@ -341,18 +348,18 @@ mod tests {
     }
 
     #[test]
-    fn decode_iter_and_all() {
+    fn decode_iter_and_all() -> TestResult {
         let mut buf = Vec::new();
         for v in [-2i32, -1, 0, 1, 2, i32::MIN, i32::MAX] {
             encode(v, &mut buf);
         }
-        assert_eq!(
-            decode_all(&buf).unwrap(),
-            [-2, -1, 0, 1, 2, i32::MIN, i32::MAX]
-        );
+        assert_eq!(decode_all(&buf)?, [-2, -1, 0, 1, 2, i32::MIN, i32::MAX]);
+
+        Ok(())
     }
 
     #[cfg(feature = "bolero")]
+    #[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
     mod property {
         use super::*;
 
