@@ -15,7 +15,7 @@
 //! determined by the first byte alone, structural canonicality (each
 //! `i64` has exactly one encoding and vice versa).
 //!
-//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/bijoux/specs/bijou64s.md)
+//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/specs/bijou64s.md)
 //! for the full format definition and test vectors.
 //!
 //! # Encoding

@@ -22,12 +22,12 @@ by default):
 
 | Module / feature       | Integer | Max bytes | Tag threshold | Spec                                 |
 |------------------------|---------|-----------|---------------|--------------------------------------|
-| `bijoux::i32`, feature `i32`  | `i32`   | 5         | 252 (zigzag)  | [specs/bijou32s.md](./bijoux/specs/bijou32s.md) |
-| `bijoux::i64`, feature `i64`  | `i64`   | 9         | 248 (zigzag)  | [specs/bijou64s.md](./bijoux/specs/bijou64s.md) |
-| `bijoux::i128`, feature `i128` | `i128`  | 17        | 240 (zigzag)  | [specs/bijou128s.md](./bijoux/specs/bijou128s.md) |
-| `bijoux::u32`, feature `u32`  | `u32`   | 5         | 252           | [specs/bijou32.md](./bijoux/specs/bijou32.md)   |
-| `bijoux::u64`, feature `u64`  | `u64`   | 9         | 248           | [specs/bijou64.md](./bijoux/specs/bijou64.md)   |
-| `bijoux::u128`, feature `u128` | `u128`  | 17        | 240           | [specs/bijou128.md](./bijoux/specs/bijou128.md) |
+| `bijoux::i32`, feature `i32`  | `i32`   | 5         | 252 (zigzag)  | [specs/bijou32s.md](./specs/bijou32s.md) |
+| `bijoux::i64`, feature `i64`  | `i64`   | 9         | 248 (zigzag)  | [specs/bijou64s.md](./specs/bijou64s.md) |
+| `bijoux::i128`, feature `i128` | `i128`  | 17        | 240 (zigzag)  | [specs/bijou128s.md](./specs/bijou128s.md) |
+| `bijoux::u32`, feature `u32`  | `u32`   | 5         | 252           | [specs/bijou32.md](./specs/bijou32.md)   |
+| `bijoux::u64`, feature `u64`  | `u64`   | 9         | 248           | [specs/bijou64.md](./specs/bijou64.md)   |
+| `bijoux::u128`, feature `u128` | `u128`  | 17        | 240           | [specs/bijou128.md](./specs/bijou128.md) |
 
 The width variants are **not wire-compatible** — they use different tag
 thresholds so each can reach its maximum in the smallest number of
@@ -122,12 +122,12 @@ another:
 | [Joel-hanson/bijou64](https://github.com/Joel-hanson/bijou64)                                 | Java (+ Rust JNI) | `bijou64` Kafka serializer/deserializer                              |
 
 Building another one? Open a PR adding it here! The specs in
-[`bijoux/specs/`](./bijoux/specs) and the test vectors in the test
+[`specs/`](./specs) and the test vectors in the test
 suite are the reference for compatibility.
 
 ## License
 
 Code is dual-licensed under [MIT](./LICENSE-MIT) OR
 [Apache-2.0](./LICENSE-APACHE).
-The encoding specifications ([`bijoux/specs/`](./bijoux/specs)) are
+The encoding specifications ([`specs/`](./specs)) are
 licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

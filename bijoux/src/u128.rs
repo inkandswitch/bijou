@@ -42,7 +42,7 @@
 //!
 //! See the `OFFSETS` table in this module's source for the exact
 //! per-tier offsets, and the
-//! [specification](https://github.com/inkandswitch/bijou/blob/main/bijoux/specs/bijou128.md)
+//! [specification](https://github.com/inkandswitch/bijou/blob/main/specs/bijou128.md)
 //! for the full format definition, design rationale, and test vectors.
 //!
 //! # Canonicality

@@ -11,7 +11,7 @@
 //! structural properties (canonicality, length from the first byte,
 //! 1–17 byte range) are inherited from bijou128.
 //!
-//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/bijoux/specs/bijou128s.md)
+//! See the [specification](https://github.com/inkandswitch/bijou/blob/main/specs/bijou128s.md)
 //! for the full format definition and test vectors.
 //!
 //! # Encoding

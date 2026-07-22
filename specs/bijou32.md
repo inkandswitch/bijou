@@ -242,4 +242,4 @@ This specification is licensed under [CC BY-SA 4.0](https://creativecommons.org/
 [VARU64]: https://github.com/AljoschaMeyer/varu64-rs
 [bijective numeration]: https://en.wikipedia.org/wiki/Bijective_numeration
 [bijou64]: ../bijou64
-[bijou64 SPEC]: ../bijou64/SPEC.md
+[bijou64 SPEC]: ./bijou64.md

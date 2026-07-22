@@ -301,9 +301,9 @@ Three width variants are currently specified:
 
 | Variant                       | Max value   | Max bytes | Tiers | Tag threshold |
 |-------------------------------|-------------|-----------|-------|---------------|
-| [bijou32](../bijou32/SPEC.md) | `u32::MAX`  | 5         | 0–4   | 252           |
+| [bijou32](./bijou32.md) | `u32::MAX`  | 5         | 0–4   | 252           |
 | bijou64 (this spec)           | `u64::MAX`  | 9         | 0–8   | 248           |
-| [bijou128](../bijou128/SPEC.md) | `u128::MAX` | 17        | 0–16  | 240           |
+| [bijou128](./bijou128.md) | `u128::MAX` | 17        | 0–16  | 240           |
 
 Each variant uses the **widest tag threshold its tier count allows**, maximising the single-byte literal range. This was a revision to the original bijou64 specification, which speculated that all variants would share threshold 248 (matching VARU64). Choosing per-variant thresholds:
 
