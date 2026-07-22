@@ -83,7 +83,7 @@ Output (into `bijou64/charts/<arch>/`):
 | Rust    | 1.90.0                                     |
 | Profile | `bench` (opt-level = 3)                    |
 
-> All medians are taken from [`charts/x86/percentiles.md`](charts/x86/percentiles.md).
+> All medians are taken from [`charts/x86/percentiles.md`](../charts/x86/percentiles.md).
 
 ## Encode
 
@@ -115,7 +115,7 @@ vu128 and leb128 are excluded: neither crate exposes a standalone
 encoding).
 
 > For the arch-independent _format_ size comparison (how many bytes
-> each format uses), see [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md).
+> each format uses), see [SIZE_ANALYSIS.md](../docs/SIZE_ANALYSIS.md).
 
 | Distribution    | bijou64 | varu64 | vu64     | bijou64 rank | bijou64 vs other best |
 |-----------------|--------:|-------:|---------:|--------------|-----------------------|
@@ -139,7 +139,7 @@ vu64 wins every cell because its tier boundaries are exact powers of
 2, so `encoded_len` reduces to a single `leading_zeros` instruction
 with no correction step. bijou64's per-tier offsets force an extra
 comparison; the gap (~2.2-2.5x) is unavoidable for the
-canonicality-preserving path. See [OPTIMISATION.md](OPTIMISATION.md)
+canonicality-preserving path. See [OPTIMISATION.md](../docs/OPTIMISATION.md)
 for the full analysis.
 
 ## Decode
@@ -224,7 +224,7 @@ bijou64 wins all 6 stream_decode cells, with margins from 1.93× (small vs varu6
 
 Full percentile breakdowns (p50/p90/p95/p99/p99.9) are available in:
 
-- [`charts/x86/percentiles.md`](charts/x86/percentiles.md) -- markdown tables
+- [`charts/x86/percentiles.md`](../charts/x86/percentiles.md) -- markdown tables
 - [`charts/x86/percentiles.csv`](charts/x86/percentiles.csv) -- machine-readable CSV
 - [`charts/x86/percentiles.html`](charts/x86/percentiles.html) -- interactive sortable table
 

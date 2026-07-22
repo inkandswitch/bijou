@@ -5,7 +5,7 @@
 > This is a property of the _format_, not the implementation -- it does
 > not depend on architecture, compiler, or optimisation level. For
 > wall-clock measurements of `encoded_len(v)`, see the per-arch shootout
-> docs ([x86](SHOOTOUT_ANALYSIS_X86.md), [ARM](SHOOTOUT_ANALYSIS_ARM.md)).
+> docs ([x86](../benches/SHOOTOUT_ANALYSIS_X86.md), [ARM](../benches/SHOOTOUT_ANALYSIS_ARM.md)).
 
 ## Format Recap
 

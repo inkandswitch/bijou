@@ -50,7 +50,7 @@ bijou64/charts/<arch>/
 |------------------------------------------------------|-------------------------------------------------------------|
 | [SHOOTOUT_ANALYSIS_X86.md](SHOOTOUT_ANALYSIS_X86.md) | Wall-clock + instruction-count on AMD Ryzen AI 9 HX 370 (Zen 5) |
 | [SHOOTOUT_ANALYSIS_ARM.md](SHOOTOUT_ANALYSIS_ARM.md) | Wall-clock on Apple M2 Pro                                  |
-| [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md)                 | Arch-independent encoded-byte-width comparison              |
+| [SIZE_ANALYSIS.md](../docs/SIZE_ANALYSIS.md)                 | Arch-independent encoded-byte-width comparison              |
 
 ## Quick Comparison
 
@@ -79,7 +79,7 @@ power-of-2 boundaries skip the per-tier correction step bijou64
 must perform, leaving an unavoidable arithmetic gap on
 `encoded_len`'s allocation-free path. This is a property of the
 canonical format, not the implementation — see
-[SIZE_ANALYSIS.md](SIZE_ANALYSIS.md) for the format-level trade-off
+[SIZE_ANALYSIS.md](../docs/SIZE_ANALYSIS.md) for the format-level trade-off
 table.
 
 For workloads that care about canonical encoding — content-addressed

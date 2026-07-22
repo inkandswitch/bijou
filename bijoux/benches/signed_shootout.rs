@@ -341,7 +341,75 @@ fn distributions() -> Vec<(&'static str, Vec<i64>)> {
                 .map(|_| rng.gen_range(i64::MIN..=i64::MAX))
                 .collect(),
         ),
+        // --- Signed-realistic distributions -----------------------------
+        // Unlike the mirrored unsigned bands above, real signed data
+        // (deltas, offsets, differences) concentrates near zero with
+        // decaying tails — the premise zigzag exists for.
+        (
+            "deltas_pm16",
+            (0..BATCH).map(|_| rng.gen_range(-16..=16i64)).collect(),
+        ),
+        (
+            "deltas_geometric",
+            // Two-sided geometric magnitudes (p = 0.96, mean |v| ≈ 24):
+            // a generic model of clock/cursor deltas.
+            (0..BATCH)
+                .map(|_| {
+                    let u: f64 = rng.r#gen();
+                    #[allow(clippy::cast_possible_truncation)]
+                    let magnitude = ((1.0 - u).ln() / 0.96f64.ln()) as i64;
+                    if rng.r#gen() { magnitude } else { -magnitude }
+                })
+                .collect(),
+        ),
+        (
+            "hexane_deltas",
+            (0..BATCH).map(|_| hexane_delta(&mut rng)).collect(),
+        ),
     ]
+}
+
+/// One sample shaped by the hexane census (automerge edit-trace, 1.35M
+/// real delta values; see the signed shootout analysis): 74.0% in the
+/// 1-byte window [-124, 123], 7.3% in the remaining |v| <= 256 band,
+/// 18.8% in a measured bit-length tail. Signs approximated as balanced
+/// (measured 47.5/51.8).
+fn hexane_delta(rng: &mut SmallRng) -> i64 {
+    // Cumulative counts per 1,345,765 samples.
+    let r = rng.gen_range(0..1_345_765u32);
+    if r < 995_310 {
+        rng.gen_range(-124..=123i64)
+    } else if r < 1_093_347 {
+        let magnitude = rng.gen_range(125..=256i64);
+        if rng.r#gen() { magnitude } else { -magnitude }
+    } else {
+        // Measured |v| bit-length tail (b = 9..=18).
+        const TAIL: [(u32, u32); 10] = [
+            (9, 52_975),
+            (10, 28_863),
+            (11, 17_835),
+            (12, 18_655),
+            (13, 13_049),
+            (14, 13_448),
+            (15, 20_962),
+            (16, 28_004),
+            (17, 29_903),
+            (18, 28_724),
+        ];
+        let mut pick = rng.gen_range(0..252_418u32);
+        let mut bits = 18;
+        for (b, count) in TAIL {
+            if pick < count {
+                bits = b;
+                break;
+            }
+            pick -= count;
+        }
+        let lo = 1i64 << (bits - 1);
+        let hi = (1i64 << bits) - 1;
+        let magnitude = rng.gen_range(lo..=hi);
+        if rng.r#gen() { magnitude } else { -magnitude }
+    }
 }
 
 /// Signed values at and around every bijou64 tier boundary, obtained as

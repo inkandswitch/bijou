@@ -80,7 +80,7 @@ Output (into `bijou64/charts/<arch>/`):
 | Rust    | 1.94.0                  |
 | Profile | `bench` (opt-level = 3) |
 
-> All medians are taken from [`charts/arm/percentiles.md`](charts/arm/percentiles.md).
+> All medians are taken from [`charts/arm/percentiles.md`](../charts/arm/percentiles.md).
 
 ## Encode
 
@@ -114,7 +114,7 @@ vu128 and leb128 are excluded: neither crate exposes a standalone
 encoding).
 
 > For the arch-independent _format_ size comparison (how many bytes
-> each format uses), see [SIZE_ANALYSIS.md](SIZE_ANALYSIS.md).
+> each format uses), see [SIZE_ANALYSIS.md](../docs/SIZE_ANALYSIS.md).
 
 | Distribution    | bijou64  | varu64   | vu64     | bijou64 rank        | bijou64 vs other best |
 |-----------------|---------:|---------:|---------:|---------------------|-----------------------|
@@ -140,7 +140,7 @@ bijou64's per-tier offsets force an extra comparison; the gap
 (~2.9-3.2x) is unavoidable for the canonicality-preserving path. On
 `tiny`, bijou64 and varu64 are a statistical tie (1.369 us vs 1.372
 us; the difference is well inside criterion's confidence interval).
-See [OPTIMISATION.md](OPTIMISATION.md) for the full analysis.
+See [OPTIMISATION.md](../docs/OPTIMISATION.md) for the full analysis.
 
 ## Decode
 
@@ -223,7 +223,7 @@ bijou64 wins every stream_decode cell against varu64/vu64/leb128. The tiny distr
 
 Full percentile breakdowns (p50/p90/p95/p99/p99.9) are available in:
 
-- [`charts/arm/percentiles.md`](charts/arm/percentiles.md) -- markdown tables
+- [`charts/arm/percentiles.md`](../charts/arm/percentiles.md) -- markdown tables
 - [`charts/arm/percentiles.csv`](charts/arm/percentiles.csv) -- machine-readable CSV
 - [`charts/arm/percentiles.html`](charts/arm/percentiles.html) -- interactive sortable table
 
