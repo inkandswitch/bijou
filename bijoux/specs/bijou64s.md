@@ -1,7 +1,10 @@
 # bijou64s
 
-> "The two is the first plurality, the beginning of otherness."
-> — Nicomachus of Gerasa
+> ὁδὸς ἄνω κάτω μία καὶ ὡυτή
+>
+> "The road up and the road down are one and the same."
+>
+> — Heraclitus, fragment DK B60 (preserved in Hippolytus, _Refutation of All Heresies_ IX.10.4)
 
 ## Authors
 
@@ -13,7 +16,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Name
 
-bijou64s (**BIJ**ective **O**ffset **U64**, **s**igned) is pronounced /biːʒuː sɪksti fɔːr ɛs/ ("bee-zoo-sixty-four-ess").
+bijou64s (**BIJ**ective **O**ffset **U64**, **S**igned) is pronounced /biːʒuː sɪksti fɔːr ɛs/ ("bee-zoo-sixty-four-ess").
 
 # Abstract
 

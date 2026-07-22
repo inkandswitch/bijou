@@ -1,6 +1,7 @@
 # bijou64
 
 > "Plurality must never be posited without necessity."
+>
 > — William of Ockham
 
 ## Authors
@@ -149,6 +150,7 @@ To decode from a byte buffer:
 ## Canonicality
 
 > "The best error message is the one that never shows up."
+>
 > — Thomas Fuchs
 
 bijou64 achieves canonicality _structurally_ (by construction) rather than by runtime rejection of overlong encodings.
