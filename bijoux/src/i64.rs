@@ -73,7 +73,7 @@ pub use crate::u64::{DecodeError, MAX_BYTES};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 // Same container, signed interpretation: bijou64s is defined as
-// zigzag ∘ bijou64, so this wraps the unsigned encoder's output and
+// `zigzag ∘ bijou64`, so this wraps the unsigned encoder's output and
 // adds only the type-level domain distinction (see module docs).
 pub struct EncodedI64(crate::u64::EncodedU64);
 

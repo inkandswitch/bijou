@@ -50,8 +50,15 @@
 //! Unlike [VARU64], which requires a runtime check to reject overlong
 //! encodings, bijou128 achieves canonicality structurally: each tier's
 //! value range is disjoint, so no byte sequence can decode to a value
-//! representable in a shorter form. The only decoder error conditions are
-//! buffer underflow and arithmetic overflow on tier 16.
+//! representable in a shorter form. An "overlong" spelling like
+//! `[0xF0, 0x00]` is not a redundant encoding of `0` that must be rejected —
+//! it *means* `240`, because the decoder adds the tier offset. There is no
+//! check to forget.
+//!
+//! The decoder still has two (non-canonicality) runtime error conditions:
+//! buffer underflow, and arithmetic overflow on tier `16` — the top tier's
+//! code space slightly overshoots the type, so its largest payloads map to
+//! no value ([`DecodeError::Overflow`]).
 //!
 //! # Examples
 //!
