@@ -63,6 +63,17 @@ pub mod u32;
 #[cfg(feature = "u64")]
 pub mod u64;
 
+// The signed formats are implemented over the matching unsigned tier
+// machinery, so a signed-only build still *compiles* the unsigned
+// module — but privately: enabling `i64` without `u64` does not export
+// the `u64` API (module, trait impls, or docs).
+#[cfg(all(feature = "i128", not(feature = "u128")))]
+mod u128;
+#[cfg(all(feature = "i32", not(feature = "u32")))]
+mod u32;
+#[cfg(all(feature = "i64", not(feature = "u64")))]
+mod u64;
+
 mod codec;
 
 pub use codec::{Decode, Encode};

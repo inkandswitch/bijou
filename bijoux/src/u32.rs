@@ -80,6 +80,18 @@
 //! [`bijou128`]: https://docs.rs/bijou128
 
 #![forbid(unsafe_code)]
+// When only the signed feature is on, this module is compiled privately
+// as the signed implementation layer; its `pub` items are then not
+// externally reachable except via the signed re-exports.
+#![cfg_attr(
+    not(feature = "u32"),
+    allow(
+        dead_code,
+        unreachable_pub,
+        clippy::trivially_copy_pass_by_ref,
+        clippy::unused_self
+    )
+)]
 
 #[allow(unused_imports)] // vec! macro used in tests
 use alloc::{vec, vec::Vec};
