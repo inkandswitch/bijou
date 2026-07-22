@@ -99,15 +99,7 @@
 // When only the signed feature is on, this module is compiled privately
 // as the signed implementation layer; its `pub` items are then not
 // externally reachable except via the signed re-exports.
-#![cfg_attr(
-    not(feature = "u128"),
-    allow(
-        dead_code,
-        unreachable_pub,
-        clippy::trivially_copy_pass_by_ref,
-        clippy::unused_self
-    )
-)]
+#![cfg_attr(not(feature = "u128"), allow(unreachable_pub))]
 
 #[allow(unused_imports)] // vec! macro used in tests
 use alloc::{vec, vec::Vec};
@@ -366,6 +358,7 @@ impl EncodedU128 {
     /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
     #[inline]
     #[must_use]
+    #[cfg_attr(not(feature = "u128"), allow(clippy::trivially_copy_pass_by_ref))]
     pub const fn len(&self) -> usize {
         self.len as usize
     }
@@ -375,6 +368,10 @@ impl EncodedU128 {
     /// the standard `len`/`is_empty` API pairing.
     #[inline]
     #[must_use]
+    #[cfg_attr(
+        not(feature = "u128"),
+        allow(clippy::trivially_copy_pass_by_ref, clippy::unused_self)
+    )]
     pub const fn is_empty(&self) -> bool {
         false
     }
@@ -809,6 +806,7 @@ impl core::iter::FusedIterator for DecodeIter<'_> {}
 /// }
 /// assert_eq!(decode_all(&buf).unwrap(), vec![0, 42, 500, u128::MAX]);
 /// ```
+#[cfg_attr(not(feature = "u128"), allow(dead_code))]
 pub fn decode_all(buf: &[u8]) -> Result<Vec<u128>, DecodeError> {
     decode_iter(buf).collect()
 }
