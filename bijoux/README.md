@@ -34,7 +34,7 @@ tier scheme: 1 byte for `[-124, +123]`, canonical, but byte order is
 zigzag order rather than numeric order — don't use it for memcomparable
 keys.
 
-[zigzag]: https://protobuf.dev/programming-guides/encoding/#signed-ints
+[zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 
 > [!TIP]
 > Prefer fully-qualified paths (`bijoux::u64::encode`) or the traits

@@ -129,4 +129,4 @@ This specification is licensed under [CC BY-SA 4.0].
 [CC BY-SA 4.0]: https://creativecommons.org/licenses/by-sa/4.0/
 [Protocol Buffers]: https://protobuf.dev/programming-guides/encoding/#signed-ints
 [bijou64]: ./bijou64.md
-[zigzag]: https://protobuf.dev/programming-guides/encoding/#signed-ints
+[zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding

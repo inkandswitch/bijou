@@ -53,7 +53,7 @@
 //! assert_eq!((value, len), (-1, 1));
 //! ```
 //!
-//! [zigzag]: https://protobuf.dev/programming-guides/encoding/#signed-ints
+//! [zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 
 pub use crate::u64::{DecodeError, MAX_BYTES};
 
