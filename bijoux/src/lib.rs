@@ -1,4 +1,4 @@
-//! _Bijoux_ — the bijou family of bijective, length-prefixed
+//! 💎 _Bijoux_ — the bijou family of bijective, length-prefixed
 //! variable-length integer encodings. (Read the name both ways:
 //! **bijouX** with `X` ranging over the widths — bijou32, bijou64,
 //! bijou128 — and the French plural: all of the bijous.)
@@ -49,6 +49,7 @@
 
 #![no_std]
 #![forbid(unsafe_code)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 extern crate alloc;
 

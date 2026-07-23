@@ -1,4 +1,4 @@
-# bijoux
+# 💎 bijoux
 
 _Bijoux_ — bijective, length-prefixed variable-length integer
 encodings, one canonical format per integer type.
