@@ -1,6 +1,6 @@
 [package]
 name = "bijoux"
-version = "0.3.0"
+version = "0.3.1"
 description = "Bijective variable-length integer encodings (the bijou family): canonical by construction, 1-byte small values, length from the first byte"
 
 categories = ["encoding", "no-std"]
