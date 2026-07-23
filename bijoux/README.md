@@ -1,7 +1,11 @@
 # bijoux
 
-_Bijoux_, plural of [bijou] — bijective, length-prefixed variable-length
-integer encodings, one canonical format per integer type.
+_Bijoux_ — bijective, length-prefixed variable-length integer
+encodings, one canonical format per integer type.
+
+The name is a double reading: **bijouX**, with `X` ranging over the
+widths ([bijou]32, bijou64, bijou128, …), and the French plural — the
+crate that holds all of the bijous.
 
 Each width is a module gated by a feature (all enabled by default), and
 the `Encode` / `Decode` traits are implemented directly on the integer
@@ -35,11 +39,6 @@ zigzag order rather than numeric order — don't use it for memcomparable
 keys.
 
 [zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
-
-> [!TIP]
-> Prefer fully-qualified paths (`bijoux::u64::encode`) or the traits
-> over `use bijoux::u64;` — importing a module named `u64` shadows the
-> primitive type in that scope.
 
 `no_std` (uses `alloc`), `#![forbid(unsafe_code)]`.
 

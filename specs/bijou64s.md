@@ -118,7 +118,7 @@ Exactly bijou64's: a buffer shorter than its tag byte requires is invalid (`Buff
 
 The zigzag map is the standard signed-integer mapping used by [Protocol Buffers] (`sint64`), Apache Avro, and Apache Thrift. bijou64s contributes the composition with a structurally canonical base format: unlike zigzag-over-LEB128, a bijou64s decoder never needs to reject overlong encodings, because none exist.
 
-Rejected alternatives (benchmarked; see [the signed shootout analysis]): two's-complement casting (9-byte encodings for all small negatives), and a sign-in-tag "mirrored tier" layout (preserves numeric byte order but costs 2–6× on decode). The symmetric single-byte window was confirmed against 5.4M signed values from a real editing-trace workload; skewed windows offered < 0.5 % density improvement.
+Rejected alternatives (benchmarked; see [the rejected-alternatives analysis]): two's-complement casting (9-byte encodings for all small negatives), and a sign-in-tag "mirrored tier" layout (preserves numeric byte order but costs 2–6× on decode). The symmetric single-byte window was confirmed against 5.4M signed values from a real editing-trace workload; skewed windows offered < 0.5 % density improvement.
 
 # License
 
@@ -129,5 +129,5 @@ This specification is licensed under [CC BY-SA 4.0].
 [CC BY-SA 4.0]: https://creativecommons.org/licenses/by-sa/4.0/
 [Protocol Buffers]: https://protobuf.dev/programming-guides/encoding/#signed-ints
 [bijou64]: ./bijou64.md
-[the signed shootout analysis]: ../bijoux/benches/SHOOTOUT_ANALYSIS_SIGNED.md
+[the rejected-alternatives analysis]: ../bijoux/benches/REJECTED_ALTERNATIVES.md
 [zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding

@@ -1,5 +1,7 @@
-//! _Bijoux_, plural of bijou — the bijou family of bijective,
-//! length-prefixed variable-length integer encodings.
+//! _Bijoux_ — the bijou family of bijective, length-prefixed
+//! variable-length integer encodings. (Read the name both ways:
+//! **bijouX** with `X` ranging over the widths — bijou32, bijou64,
+//! bijou128 — and the French plural: all of the bijous.)
 //!
 //! Each format module — unsigned [`u32`](mod@u32), [`u64`](mod@u64),
 //! and [`u128`](mod@u128), and signed [`i32`](mod@i32),

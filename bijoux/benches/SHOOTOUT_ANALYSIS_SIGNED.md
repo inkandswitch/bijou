@@ -147,4 +147,4 @@ Deterministic (format property, not a timing).
   for the signed formats.
 - Alternative in-house signed designs (a two's-complement passthrough
   and a sign-in-tag layout) were prototyped, benchmarked, and rejected
-  during design; the spec's Prior Art section summarises why.
+  during design; see [REJECTED_ALTERNATIVES.md](REJECTED_ALTERNATIVES.md).

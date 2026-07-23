@@ -1,11 +1,5 @@
 //! The [`Encode`] / [`Decode`] traits and their implementations on the
-//! primitive integer types.
-//!
-//! Lives in its own module (re-exported at the crate root) because the
-//! format modules are named after the primitives (`crate::u64`, …):
-//! inside `lib.rs` those module names shadow the primitive types, so
-//! `impl Encode for u64` must be written in a scope that does not
-//! declare them.
+//! primitive integer types. Re-exported at the crate root.
 
 use alloc::vec::Vec;
 
