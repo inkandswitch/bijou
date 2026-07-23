@@ -1,4 +1,4 @@
-//! Wasm/JavaScript bindings for [`bijou32`].
+//! Wasm/JavaScript bindings for [`bijou32`](mod@bijoux::u32).
 //!
 //! `bijou32` is a small, stateless library: every public item operates on
 //! plain numbers and byte slices, all of which are `IntoWasmAbi` in the
