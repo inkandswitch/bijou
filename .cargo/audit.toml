@@ -1,0 +1,34 @@
+# cargo-audit configuration.
+#
+# https://docs.rs/cargo-audit/latest/cargo_audit/#configuration
+#
+# NOTE: cargo-audit only reads this file at `.cargo/audit.toml` (relative to
+# the workspace) or `~/.cargo/audit.toml`. It previously lived at the repo
+# root as `audit.toml`, where nothing picked it up. Used by
+# `actions-rust-lang/audit@v1` in `.github/workflows/cargo-audit.yml`.
+
+[advisories]
+# RUSTSEC-2025-0141: bincode 1.3.3 unmaintained.
+#
+# Pulled in transitively by `gungraun` (formerly `iai-callgrind`), itself a
+# dev-dependency of `bijou64` used only for instruction-count benchmarks.
+# Not in any release artifact.
+#
+# Upstream migration to `bincode-next` was merged 2026-05-01 in
+# https://github.com/gungraun/gungraun/pull/608 but has not yet been released
+# (latest gungraun is 0.18.2). Remove this ignore once a gungraun release on
+# bincode-next lands and we bump.
+#
+# RUSTSEC-2026-0194 / RUSTSEC-2026-0195: quick-xml 0.26.0 (quadratic
+# attribute-duplicate check; NsReader namespace-declaration memory DoS).
+#
+# Pulled in transitively via `criterion_pprof` (pprof 0.15, "flamegraph"
+# feature) -> inferno 0.11.21 -> quick-xml 0.26 — a dev-dependency used only
+# to render local bench flamegraph SVGs in the shootout benches. quick-xml
+# never parses untrusted input here, and nothing ships in release artifacts.
+#
+# No upgrade path exists yet: the fix is quick-xml >= 0.41.0 (2026-06-29),
+# but pprof 0.15 (latest) pins inferno ^0.11, and even inferno's latest
+# (0.12.6, 2026-03-01) predates the fixed quick-xml. Remove these ignores
+# once a pprof release depends on an inferno with quick-xml >= 0.41.
+ignore = ["RUSTSEC-2025-0141", "RUSTSEC-2026-0194", "RUSTSEC-2026-0195"]
