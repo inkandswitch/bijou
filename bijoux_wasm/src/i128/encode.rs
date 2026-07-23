@@ -123,7 +123,6 @@ pub fn encoded_len_i128(value: &js_sys::BigInt) -> Result<usize, WasmBigintError
 /// encodeI128(120n);             // Uint8Array([0xF0, 0x00])
 /// encodeI128(2n ** 127n);       // throws RangeError
 /// encodeI128(-(2n ** 127n) - 1n); // throws RangeError
-/// encodeI128(-1n);        // throws RangeError
 /// encodeI128(42);         // throws TypeError (Number, not bigint)
 /// ```
 #[wasm_bindgen(js_name = encodeI128)]

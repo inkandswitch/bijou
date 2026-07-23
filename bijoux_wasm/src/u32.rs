@@ -7,7 +7,7 @@
 //! more idiomatic shape for utility libraries in 2026 (better tree-shaking,
 //! cleaner TypeScript inference, no fake namespacing).
 //!
-//! Unlike `bijou64_wasm` and `bijou128_wasm`, `u32` fits inside the
+//! Unlike the `U64` and `U128` families, `u32` fits inside the
 //! JS-safe-integer range (`[0, 2**53)`), so the wasm boundary uses plain
 //! JS `number` values rather than `bigint` — no `BigInt`-shimming, no
 //! out-of-range checks against `2**53`, no surprise truncation.

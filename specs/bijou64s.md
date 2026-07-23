@@ -129,5 +129,5 @@ This specification is licensed under [CC BY-SA 4.0].
 [CC BY-SA 4.0]: https://creativecommons.org/licenses/by-sa/4.0/
 [Protocol Buffers]: https://protobuf.dev/programming-guides/encoding/#signed-ints
 [bijou64]: ./bijou64.md
-[the rejected-alternatives analysis]: ../bijoux/benches/REJECTED_ALTERNATIVES.md
+[the rejected-alternatives analysis]: ../bijoux/design/REJECTED_ALTERNATIVES.md
 [zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding

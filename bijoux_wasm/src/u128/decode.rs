@@ -84,7 +84,7 @@ pub fn decode_u128(
 /// Decodes every `bijou128`-encoded value in `bytes`, returning them as
 /// a JS `Array<bigint>`.
 ///
-/// Unlike `bijou64_wasm::decodeAll` (which returns a `BigUint64Array`),
+/// Unlike `decodeAllU64` (which returns a `BigUint64Array`),
 /// there is no `BigUint128Array` in the web platform. Returning
 /// `js_sys::Array` of `bigint`s is the natural mapping for `Vec<u128>` —
 /// it preserves the full 128-bit range with zero precision loss at the

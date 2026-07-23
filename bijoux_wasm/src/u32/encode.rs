@@ -30,11 +30,11 @@ use wasm_bindgen::prelude::*;
 /// the thrown values are actual platform `TypeError` / `RangeError`
 /// instances.
 ///
-/// Unlike `bijou64_wasm` and `bijou128_wasm`, the input type at the JS
+/// Unlike the `U64` and `U128` families, the input type at the JS
 /// boundary is `number` (not `bigint`) because `u32::MAX` fits inside
 /// `Number.MAX_SAFE_INTEGER`. `bigint` is intentionally rejected as a
 /// `TypeError` to keep the API surface explicit — if you need 64-bit
-/// values, use `bijou64`.
+/// values, use the `U64` family.
 #[derive(Debug, Clone, Copy, Error)]
 pub enum WasmNumberError {
     /// Caller passed a value that isn't a finite, integer-valued

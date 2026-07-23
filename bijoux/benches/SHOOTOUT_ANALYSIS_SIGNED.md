@@ -108,7 +108,7 @@ predictors.
 | uniform      |     3.15 | **1.70** |
 
 vu64's power-of-two tiers win the length query, as in the unsigned
-shootout — format-bound; see `../docs/OPTIMISATION.md`.
+shootout — format-bound; see [`OPTIMISATION.md`](../design/OPTIMISATION.md).
 
 ## Density (bytes/value)
 
