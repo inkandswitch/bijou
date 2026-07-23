@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>bijoux Wasm Test</title>
+  </head>
+  <body>
+    <div id="status">loading…</div>
+
+    <!--
+      Load the wasm-bodge "web" entry point. It auto-initialises by
+      decoding the base64-embedded wasm in `wasm-base64.js`, so no
+      explicit fetch / `init()` call is required.
+    -->
+    <script type="module">
+      import * as bijoux from "../../dist/esm/web.js";
+      window.bijoux = bijoux;
+      window.bijouxReady = true;
+      document.getElementById("status").textContent = "ready";
+    </script>
+  </body>
+</html>

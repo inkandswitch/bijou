@@ -8,13 +8,13 @@ on:
       - '.github/workflows/cargo-audit.yml'
       - '**/Cargo.toml'
       - '**/Cargo.lock'
-      - '**/audit.toml'
+      - '.cargo/audit.toml'
   pull_request:
     paths:
       - '.github/workflows/cargo-audit.yml'
       - '**/Cargo.toml'
       - '**/Cargo.lock'
-      - '**/audit.toml'
+      - '.cargo/audit.toml'
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:

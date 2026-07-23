@@ -1,0 +1,78 @@
+[package]
+name = "bijoux"
+version = "0.3.0"
+description = "Bijective variable-length integer encodings (the bijou family): canonical by construction, 1-byte small values, length from the first byte"
+
+categories = ["encoding", "no-std"]
+keywords = ["varint", "variable-length", "canonical", "bijective"]
+readme = "./README.md"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+arbitrary = { workspace = true, optional = true, features = ["derive"] }
+bolero = { workspace = true, optional = true, features = ["arbitrary"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+arbitrary = { workspace = true, optional = false, features = ["derive"] }
+bijoux = { path = ".", features = ["bolero"] }
+bolero = { workspace = true, features = ["arbitrary"] }
+criterion = { workspace = true }
+criterion_pprof = { workspace = true }
+gungraun = "0.18"
+leb128 = "0.2"
+rand = { workspace = true, features = ["small_rng"] }
+testresult = { workspace = true }
+varu64 = "0.7"
+vu64 = "0.2"
+vu128 = "1.1"
+
+[[example]]
+name = "decode32"
+required-features = ["u32"]
+
+[[example]]
+name = "decode64"
+required-features = ["u64"]
+
+[[example]]
+name = "decode128"
+required-features = ["u128"]
+
+[[bench]]
+name = "shootout"
+harness = false
+required-features = ["u64"]
+
+[[bench]]
+name = "gungraun_shootout"
+harness = false
+required-features = ["u64"]
+
+[[bench]]
+name = "signed_shootout"
+harness = false
+required-features = ["i64"]
+
+[features]
+default = ["i32", "i64", "i128", "u32", "u64", "u128"]
+arbitrary = ["dep:arbitrary"]
+bolero = ["dep:bolero", "arbitrary"]
+i32 = []
+i64 = []
+i128 = []
+u32 = []
+u64 = []
+u128 = []
+
+[lints]
+workspace = true

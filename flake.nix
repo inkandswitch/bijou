@@ -102,7 +102,7 @@
           pname = "wasm-bodge";
           version = wasm-bodge-src.shortRev;
           src = wasm-bodge-src;
-          cargoHash = "sha256-akp4r8C4MWGqTbqr40jHdHuzqx6ZKcr4rFynarPsZWI=";
+          cargoHash = "sha256-tARojdKFjnkCeJIhgpMFEvfxrOTOH8L3cAvE2UQm0jY=";
           nativeBuildInputs = [ unstable.cargo-auditable ];
           doCheck = false; # tests require npm/puppeteer infrastructure
         };
@@ -110,7 +110,7 @@
         # gungraun-runner: required binary harness for gungraun (formerly
         # iai-callgrind) instruction-count benchmarks. Not yet in nixpkgs;
         # we build it from crates.io. Version must match the `gungraun`
-        # workspace dep in `bijou64/Cargo.toml`.
+        # workspace dep in `bijoux/Cargo.toml`.
         gungraun-runner = pinnedRustPlatform.buildRustPackage rec {
           pname = "gungraun-runner";
           version = "0.18.2";
@@ -187,21 +187,25 @@
         ]);
 
         bench-charts = pkgs.writeShellScriptBin "bench-charts" ''
-          exec "${bench-charts-python}/bin/python3" "$WORKSPACE_ROOT/bijou64/charts/analyze.py" "$@"
+          exec "${bench-charts-python}/bin/python3" "$WORKSPACE_ROOT/bijoux/charts/analyze.py" "$@"
         '';
 
         size-charts = pkgs.writeShellScriptBin "size-charts" ''
-          exec "${bench-charts-python}/bin/python3" "$WORKSPACE_ROOT/bijou64/charts/size_charts.py" "$@"
+          exec "${bench-charts-python}/bin/python3" "$WORKSPACE_ROOT/bijoux/charts/size_charts.py" "$@"
         '';
 
         # Project-specific commands
         projectCommands = {
           "bench:shootout" = cmd "Run the bijou64 criterion shootout benchmark" ''
-            ${pkgs.cargo}/bin/cargo bench --package bijou64 --bench shootout
+            ${pkgs.cargo}/bin/cargo bench --package bijoux --bench shootout
+          '';
+
+          "bench:shootout:signed" = cmd "Run the signed-format criterion shootout benchmark" ''
+            ${pkgs.cargo}/bin/cargo bench --package bijoux --bench signed_shootout
           '';
 
           "bench:gungraun" = cmd "Run the bijou64 gungraun instruction-count benchmark" ''
-            ${pkgs.cargo}/bin/cargo bench --package bijou64 --bench gungraun_shootout
+            ${pkgs.cargo}/bin/cargo bench --package bijoux --bench gungraun_shootout
           '';
 
           "bench:charts" = cmd "Generate benchmark comparison charts (requires bench results in target/criterion)" ''
@@ -228,11 +232,13 @@
             ${pkgs.cargo}/bin/cargo test --release --workspace --features bolero --lib tests::property -- --nocapture
           '';
 
-          "test:no_std" = cmd "Check no_std builds for bijou32, bijou64, and bijou128" ''
+          "test:no_std" = cmd "Check no_std builds for every bijoux width" ''
             set -e
-            ${pkgs.cargo}/bin/cargo check --package bijou32 --no-default-features -v
-            ${pkgs.cargo}/bin/cargo check --package bijou64 --no-default-features -v
-            ${pkgs.cargo}/bin/cargo check --package bijou128 --no-default-features -v
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features -v
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u32 -v
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u64 -v
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u128 -v
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features i32,i64,i128 -v
             echo ""
             echo "✓ no_std check passed"
           '';
@@ -244,59 +250,17 @@
             echo "✓ wasm32 check passed"
           '';
 
-          "bodge:all" = cmd "Build all bijou wasm packages with wasm-bodge (release + /debug variants)" ''
+          "bodge" = cmd "Build bijoux_wasm into a universal NPM package via wasm-bodge (release + /debug variants)" ''
             set -e
-            for crate in bijou32_wasm bijou64_wasm bijou128_wasm; do
-              echo "===> wasm-bodge build $crate..."
-              ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/$crate/dist"
-              ${wasm-bodge}/bin/wasm-bodge build \
-                --crate-path "$WORKSPACE_ROOT/$crate" \
-                --package-json "$WORKSPACE_ROOT/$crate/package.json" \
-                --out-dir "$WORKSPACE_ROOT/$crate/dist" \
-                --debug-profile wasm-debug
-            done
-            echo ""
-            echo "✓ All bijou wasm packages built with wasm-bodge"
-            "wasm:sizes"
-          '';
-
-          "bodge" = cmd "Build bijou64_wasm into a universal NPM package via wasm-bodge" ''
-            set -e
-            ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijou64_wasm/dist"
-            echo "===> wasm-bodge build bijou64_wasm..."
+            ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijoux_wasm/dist"
+            echo "===> wasm-bodge build bijoux_wasm..."
             ${wasm-bodge}/bin/wasm-bodge build \
-              --crate-path "$WORKSPACE_ROOT/bijou64_wasm" \
-              --package-json "$WORKSPACE_ROOT/bijou64_wasm/package.json" \
-              --out-dir "$WORKSPACE_ROOT/bijou64_wasm/dist" \
+              --crate-path "$WORKSPACE_ROOT/bijoux_wasm" \
+              --package-json "$WORKSPACE_ROOT/bijoux_wasm/package.json" \
+              --out-dir "$WORKSPACE_ROOT/bijoux_wasm/dist" \
               --debug-profile wasm-debug
             echo ""
-            echo "✓ bijou64_wasm built — output in bijou64_wasm/dist/"
-          '';
-
-          "bodge:32" = cmd "Build bijou32_wasm into a universal NPM package via wasm-bodge" ''
-            set -e
-            ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijou32_wasm/dist"
-            echo "===> wasm-bodge build bijou32_wasm..."
-            ${wasm-bodge}/bin/wasm-bodge build \
-              --crate-path "$WORKSPACE_ROOT/bijou32_wasm" \
-              --package-json "$WORKSPACE_ROOT/bijou32_wasm/package.json" \
-              --out-dir "$WORKSPACE_ROOT/bijou32_wasm/dist" \
-              --debug-profile wasm-debug
-            echo ""
-            echo "✓ bijou32_wasm built — output in bijou32_wasm/dist/"
-          '';
-
-          "bodge:128" = cmd "Build bijou128_wasm into a universal NPM package via wasm-bodge" ''
-            set -e
-            ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijou128_wasm/dist"
-            echo "===> wasm-bodge build bijou128_wasm..."
-            ${wasm-bodge}/bin/wasm-bodge build \
-              --crate-path "$WORKSPACE_ROOT/bijou128_wasm" \
-              --package-json "$WORKSPACE_ROOT/bijou128_wasm/package.json" \
-              --out-dir "$WORKSPACE_ROOT/bijou128_wasm/dist" \
-              --debug-profile wasm-debug
-            echo ""
-            echo "✓ bijou128_wasm built — output in bijou128_wasm/dist/"
+            echo "✓ bijoux_wasm built — output in bijoux_wasm/dist/"
           '';
 
           "wasm:sizes" = cmd "Print wasm bundle sizes for all bijou wasm packages" ''
@@ -314,7 +278,7 @@
             }
 
             rows=""
-            for dir in bijou32_wasm bijou64_wasm bijou128_wasm; do
+            for dir in bijoux_wasm; do
               wasm_file=$(ls "$WORKSPACE_ROOT/$dir/dist/wasm_bindgen/web/"*_bg.wasm 2>/dev/null | head -1)
               if [ -n "$wasm_file" ] && [ -f "$wasm_file" ]; then
                 name=$(basename "$dir")
@@ -339,26 +303,26 @@
             echo ""
           '';
 
-          "test:js" = cmd "Run bijou64_wasm JS-package tests in Node + browsers (rebuilds dist via bodge)" ''
+          "test:js" = cmd "Run bijoux_wasm JS-package tests in Node + browsers (rebuilds dist via bodge)" ''
             set -e
             "test:js:node"
             "test:js:browser"
           '';
 
-          "test:js:node" = cmd "Run bijou64_wasm JS-package tests in Node.js via Mocha (rebuilds dist via bodge)" ''
+          "test:js:node" = cmd "Run bijoux_wasm JS-package tests in Node.js via Mocha (rebuilds dist via bodge)" ''
             set -e
             bodge
-            cd "$WORKSPACE_ROOT/bijou64_wasm"
+            cd "$WORKSPACE_ROOT/bijoux_wasm"
             if [ ! -d node_modules ]; then
               ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
             ${pkgs.pnpm}/bin/pnpm run test:js:node
           '';
 
-          "test:js:browser" = cmd "Run bijou64_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge)" ''
+          "test:js:browser" = cmd "Run bijoux_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge)" ''
             set -e
             bodge
-            cd "$WORKSPACE_ROOT/bijou64_wasm"
+            cd "$WORKSPACE_ROOT/bijoux_wasm"
             # `--frozen-lockfile` mirrors what CI does and makes sure the
             # local run cannot silently mutate `pnpm-lock.yaml` if it
             # disagrees with `package.json`. To intentionally update the
@@ -370,75 +334,7 @@
           '';
 
           "test:js:browser:report" = cmd "Open the most recent Playwright HTML report" ''
-            cd "$WORKSPACE_ROOT/bijou64_wasm"
-            if [ ! -d node_modules ]; then
-              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
-            fi
-            ${pkgs.pnpm}/bin/pnpm exec playwright show-report
-          '';
-
-          "test:js:32" = cmd "Run bijou32_wasm JS-package tests in Node + browsers (rebuilds dist via bodge:32)" ''
-            set -e
-            "test:js:32:node"
-            "test:js:32:browser"
-          '';
-
-          "test:js:32:node" = cmd "Run bijou32_wasm JS-package tests in Node.js via Mocha (rebuilds dist via bodge:32)" ''
-            set -e
-            "bodge:32"
-            cd "$WORKSPACE_ROOT/bijou32_wasm"
-            if [ ! -d node_modules ]; then
-              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
-            fi
-            ${pkgs.pnpm}/bin/pnpm run test:js:node
-          '';
-
-          "test:js:32:browser" = cmd "Run bijou32_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge:32)" ''
-            set -e
-            "bodge:32"
-            cd "$WORKSPACE_ROOT/bijou32_wasm"
-            if [ ! -d node_modules ]; then
-              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
-            fi
-            ${pkgs.pnpm}/bin/pnpm exec playwright test
-          '';
-
-          "test:js:32:browser:report" = cmd "Open the most recent bijou32_wasm Playwright HTML report" ''
-            cd "$WORKSPACE_ROOT/bijou32_wasm"
-            if [ ! -d node_modules ]; then
-              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
-            fi
-            ${pkgs.pnpm}/bin/pnpm exec playwright show-report
-          '';
-
-          "test:js:128" = cmd "Run bijou128_wasm JS-package tests in Node + browsers (rebuilds dist via bodge:128)" ''
-            set -e
-            "test:js:128:node"
-            "test:js:128:browser"
-          '';
-
-          "test:js:128:node" = cmd "Run bijou128_wasm JS-package tests in Node.js via Mocha (rebuilds dist via bodge:128)" ''
-            set -e
-            "bodge:128"
-            cd "$WORKSPACE_ROOT/bijou128_wasm"
-            if [ ! -d node_modules ]; then
-              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
-            fi
-            ${pkgs.pnpm}/bin/pnpm run test:js:node
-          '';
-
-          "test:js:128:browser" = cmd "Run bijou128_wasm JS-package Playwright tests across browsers (rebuilds dist via bodge:128)" ''
-            set -e
-            "bodge:128"
-            cd "$WORKSPACE_ROOT/bijou128_wasm"
-            if [ ! -d node_modules ]; then
-              ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
-            fi
-            ${pkgs.pnpm}/bin/pnpm exec playwright test
-          '';
-
-          "test:js:128:browser:report" = cmd "Open the most recent bijou128_wasm Playwright HTML report" ''
-            cd "$WORKSPACE_ROOT/bijou128_wasm"
+            cd "$WORKSPACE_ROOT/bijoux_wasm"
             if [ ! -d node_modules ]; then
               ${pkgs.pnpm}/bin/pnpm install --frozen-lockfile
             fi
@@ -464,9 +360,10 @@
             echo ""
 
             echo "===> [4/7] Checking no_std..."
-            ${pkgs.cargo}/bin/cargo check --package bijou32 --no-default-features
-            ${pkgs.cargo}/bin/cargo check --package bijou64 --no-default-features
-            ${pkgs.cargo}/bin/cargo check --package bijou128 --no-default-features
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u32
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u64
+            ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u128
             echo "✓ no_std OK"
             echo ""
 
@@ -476,16 +373,12 @@
             echo ""
 
             echo "===> [6/7] Running wasm-pack tests in Node.js..."
-            ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou32_wasm
-            ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou64_wasm
-            ${pkgs.wasm-pack}/bin/wasm-pack test --node bijou128_wasm
+            ${pkgs.wasm-pack}/bin/wasm-pack test --node bijoux_wasm
             echo "✓ wasm-pack tests OK"
             echo ""
 
             echo "===> [7/7] Running JS-package tests (Node + browsers)..."
-            "test:js:32"
             "test:js"
-            "test:js:128"
             echo "✓ JS-package tests OK"
             echo ""
 
@@ -503,16 +396,12 @@
           (rust.bench { cargo = pkgs.cargo; cargo-criterion = pkgs.cargo-criterion; inherit xdg-open; })
           (rust.watch { cargo-watch = pkgs.cargo-watch; })
 
-          # Default wasm commands target the `bijou64_wasm` crate. They
-          # need to point at a `[package]`-manifest crate (the workspace
-          # root has only `[workspace]` and would make wasm-pack bail out
-          # with "missing field `package`"). The `bijou32_wasm` and
-          # `bijou128_wasm` crates have their own dedicated commands —
-          # see `bodge:32` / `bodge:128` and `test:js:32` / `test:js:128`
-          # in `projectCommands` below.
-          (wasm.build { wasm-pack = pkgs.wasm-pack; path = "bijou64_wasm"; })
-          (wasm.release { wasm-pack = pkgs.wasm-pack; gzip = pkgs.gzip; path = "bijou64_wasm"; })
-          (wasm.test { wasm-pack = pkgs.wasm-pack; path = "bijou64_wasm"; features = ""; })
+          # Wasm commands need to point at a `[package]`-manifest crate
+          # (the workspace root has only `[workspace]` and would make
+          # wasm-pack bail out with "missing field `package`").
+          (wasm.build { wasm-pack = pkgs.wasm-pack; path = "bijoux_wasm"; })
+          (wasm.release { wasm-pack = pkgs.wasm-pack; gzip = pkgs.gzip; path = "bijoux_wasm"; })
+          (wasm.test { wasm-pack = pkgs.wasm-pack; path = "bijoux_wasm"; features = ""; })
           (wasm.doc { cargo = pkgs.cargo; inherit xdg-open; })
 
           { commands = projectCommands; packages = []; }

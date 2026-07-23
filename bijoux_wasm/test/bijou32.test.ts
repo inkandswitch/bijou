@@ -1,0 +1,221 @@
+import { expect } from "chai";
+import * as bijou32 from "../dist/esm/node.js";
+
+/**
+ * Node.js smoke tests for the wasm-bodge-built `bijou32` npm package.
+ *
+ * Counterpart to `e2e/bijou32.spec.ts` (which runs the same surface in
+ * real browsers via Playwright). Unlike `bijou64`/`bijou128`, the wasm
+ * boundary uses plain JS `number` values, not `bigint` — `u32::MAX`
+ * fits inside `Number.MAX_SAFE_INTEGER`.
+ */
+
+const U32_MAX = 2 ** 32 - 1;
+
+describe("bijou32 (node)", () => {
+  describe("constants", () => {
+    it("MAX_BYTES_U32 is 5", () => {
+      expect(bijou32.MAX_BYTES_U32()).to.equal(5);
+    });
+  });
+
+  describe("encodeU32 (happy path)", () => {
+    it("encodes tier-0 values as a single byte equal to the value", () => {
+      expect([...bijou32.encodeU32(0)]).to.deep.equal([0x00]);
+      expect([...bijou32.encodeU32(42)]).to.deep.equal([0x2a]);
+      expect([...bijou32.encodeU32(251)]).to.deep.equal([0xfb]);
+    });
+
+    it("encodes tier-1 values with offset", () => {
+      expect([...bijou32.encodeU32(252)]).to.deep.equal([0xfc, 0x00]);
+      expect([...bijou32.encodeU32(300)]).to.deep.equal([0xfc, 0x30]);
+      expect([...bijou32.encodeU32(507)]).to.deep.equal([0xfc, 0xff]);
+    });
+
+    it("encodes u32::MAX as 5 bytes starting with 0xFF", () => {
+      const bytes = bijou32.encodeU32(U32_MAX);
+      expect(bytes.length).to.equal(5);
+      expect(bytes[0]).to.equal(0xff);
+    });
+
+    it("accepts the boundary values 0 and u32::MAX exactly", () => {
+      expect([...bijou32.encodeU32(0)]).to.deep.equal([0x00]);
+      expect([...bijou32.encodeU32(U32_MAX)]).to.deep.equal([
+        0xff, 0xfe, 0xfe, 0xfe, 0x03,
+      ]);
+    });
+  });
+
+  describe("encodedLenU32", () => {
+    it("agrees with encodeU32().length across tier boundaries", () => {
+      const cases: number[] = [
+        0, 251, 252, 507, 508, 65_535, 66_043, 66_044,
+        16_843_259, 16_843_260, U32_MAX - 1, U32_MAX,
+      ];
+      for (const v of cases) {
+        expect(bijou32.encodedLenU32(v), `encodedLenU32(${v})`).to.equal(
+          bijou32.encodeU32(v).length,
+        );
+      }
+    });
+  });
+
+  describe("decodeU32 (happy path)", () => {
+    it("round-trips every tier boundary", () => {
+      const cases: number[] = [
+        0, 1, 251, 252, 507, 508, 65_535, 66_043, 66_044,
+        16_843_259, 16_843_260, U32_MAX - 1, U32_MAX,
+      ];
+      for (const v of cases) {
+        const bytes = bijou32.encodeU32(v);
+        const r = bijou32.decodeU32(bytes);
+        expect(r.value, `round-trip ${v}`).to.equal(v);
+        expect(r.bytesRead).to.equal(bytes.length);
+      }
+    });
+
+    it("reports bytesRead < input length when buffer has trailing data", () => {
+      const head = bijou32.encodeU32(300); // 2 bytes
+      const buf = new Uint8Array(head.length + 3);
+      buf.set(head, 0);
+      buf.set([0xaa, 0xbb, 0xcc], head.length);
+      const r = bijou32.decodeU32(buf);
+      expect(r.value).to.equal(300);
+      expect(r.bytesRead).to.equal(2);
+      expect(buf.length).to.equal(5);
+    });
+  });
+
+  describe("decodeU32 (errors)", () => {
+    it("throws Bijou32DecodeError on empty input", () => {
+      try {
+        bijou32.decodeU32(new Uint8Array([]));
+        expect.fail("decodeU32 did not throw");
+      } catch (e: any) {
+        expect(e.name).to.equal("Bijou32DecodeError");
+        expect(e.message).to.contain("buffer too short");
+      }
+    });
+
+    it("throws Bijou32DecodeError on truncated tier-4 input", () => {
+      try {
+        // 0xFF needs 4 payload bytes; supply 3.
+        bijou32.decodeU32(new Uint8Array([0xff, 0, 0, 0]));
+        expect.fail("decodeU32 did not throw");
+      } catch (e: any) {
+        expect(e.name).to.equal("Bijou32DecodeError");
+      }
+    });
+
+    it("Bijou32DecodeError thrown is an instance of the platform Error", () => {
+      try {
+        bijou32.decodeU32(new Uint8Array([0xfc]));
+        expect.fail("decodeU32 did not throw");
+      } catch (e: any) {
+        expect(e).to.be.an.instanceOf(Error);
+        expect(e.stack).to.be.a("string").and.not.empty;
+      }
+    });
+
+    it("throws TypeError on non-Uint8Array input (no silent truncation)", () => {
+      // Guards the shipped dist against the silent-truncation footgun:
+      // a plain JS Array would be coerced via `new Uint8Array(arr)`,
+      // bitwise-truncating out-of-range elements (1000 & 0xFF === 232).
+      // decodeU32/decodeAllU32 must reject anything that isn't a real
+      // Uint8Array. Exercised here through the published package (the
+      // wasm-bindgen ABI layer is covered separately in tests/wasm.rs).
+      const bad: unknown[] = [[1000], [0x00], null, 42, "nope"];
+      for (const input of bad) {
+        expect(() => (bijou32.decodeU32 as any)(input)).to.throw(TypeError);
+        expect(() => (bijou32.decodeAllU32 as any)(input)).to.throw(TypeError);
+      }
+    });
+  });
+
+  describe("encodeU32 (errors)", () => {
+    it("throws RangeError for numbers >= 2**32", () => {
+      // Without the range check, JS's `>>> 0` cast silently wraps
+      // `2**32` to `0` and `2**32 + 1` to `1` — a silent footgun for
+      // content-addressed protocols.
+      try {
+        bijou32.encodeU32(2 ** 32);
+        expect.fail("encodeU32 did not throw");
+      } catch (e: any) {
+        expect(e).to.be.an.instanceOf(RangeError);
+        expect(e.message).to.contain("2**32");
+      }
+    });
+
+    it("throws RangeError for negative numbers", () => {
+      // Without the range check, JS's `>>> 0` cast encodes `-1` as
+      // u32::MAX. We reject negatives explicitly.
+      const cases: (() => unknown)[] = [
+        () => bijou32.encodeU32(-1),
+        () => bijou32.encodeU32(-(2 ** 31)),
+        () => bijou32.encodedLenU32(-1),
+      ];
+      for (const fn of cases) {
+        expect(fn).to.throw(RangeError);
+      }
+    });
+
+    it("throws TypeError for fractional numbers", () => {
+      // Fractional values are nominally in range but not integers.
+      const cases: (() => unknown)[] = [
+        () => bijou32.encodeU32(1.5),
+        () => bijou32.encodeU32(0.1),
+        () => bijou32.encodedLenU32(3.14),
+      ];
+      for (const fn of cases) {
+        expect(fn).to.throw(TypeError);
+      }
+    });
+
+    it("throws TypeError for NaN, Infinity, and non-number inputs", () => {
+      const cases: (() => unknown)[] = [
+        () => bijou32.encodeU32(NaN),
+        () => bijou32.encodeU32(Infinity),
+        () => bijou32.encodeU32(-Infinity),
+        () => (bijou32.encodeU32 as any)(42n),         // bigint, not number
+        () => (bijou32.encodeU32 as any)("300"),       // string
+        () => (bijou32.encodeU32 as any)(null),
+        () => (bijou32.encodeU32 as any)(undefined),
+        () => (bijou32.encodedLenU32 as any)({}),
+      ];
+      for (const fn of cases) {
+        expect(fn).to.throw(TypeError);
+      }
+    });
+  });
+
+  describe("decodeAllU32", () => {
+    it("returns a Uint32Array of every value in the buffer", () => {
+      const merged = new Uint8Array([
+        ...bijou32.encodeU32(42),
+        ...bijou32.encodeU32(300),
+        ...bijou32.encodeU32(65_535),
+        ...bijou32.encodeU32(1 << 24),
+      ]);
+      const values = bijou32.decodeAllU32(merged);
+      expect(values).to.be.an.instanceOf(Uint32Array);
+      expect(values.length).to.equal(4);
+      expect(Array.from(values)).to.deep.equal([42, 300, 65_535, 1 << 24]);
+    });
+
+    it("returns an empty Uint32Array on an empty buffer", () => {
+      const empty = bijou32.decodeAllU32(new Uint8Array(0));
+      expect(empty).to.be.an.instanceOf(Uint32Array);
+      expect(empty.length).to.equal(0);
+    });
+
+    it("throws Bijou32DecodeError on a malformed element", () => {
+      try {
+        bijou32.decodeAllU32(new Uint8Array([0x42, 0xfc]));
+        expect.fail("decodeAllU32 did not throw");
+      } catch (e: any) {
+        expect(e.name).to.equal("Bijou32DecodeError");
+        expect(e).to.be.an.instanceOf(Error);
+      }
+    });
+  });
+});
