@@ -27,7 +27,7 @@ dotted lines mark tier boundaries: blue for bijou64, green for
 vu64/leb128. The x-axis is log-scale; the y-axis is byte count
 (1--10).
 
-![Encoded length vs value (full u64 range)](charts/size/bytes_vs_value.svg)
+![Encoded length vs value (full u64 range)](../charts/size/bytes_vs_value.svg)
 
 The four formats stay within one byte of each other at every value,
 but the curve shape differs: vu64/leb128 climb in even 7-bit steps,
@@ -40,7 +40,7 @@ Outside the range below, all four formats agree on byte count to
 within ±1. The low end (0--66,500) is where the interesting choices
 live. Tier transitions are annotated with vertical lines.
 
-![Encoded length vs value (low range, 0--66,500)](charts/size/bytes_vs_value_low.svg)
+![Encoded length vs value (low range, 0--66,500)](../charts/size/bytes_vs_value_low.svg)
 
 Three transitions visible here are worth pointing out:
 
@@ -57,7 +57,7 @@ Three transitions visible here are worth pointing out:
 Four panels zoomed into the transitions where formats disagree.
 Step lines show byte count at each integer value.
 
-![Boundary detail](charts/size/boundary_detail.svg)
+![Boundary detail](../charts/size/boundary_detail.svg)
 
 - **(a)** bijou64 and varu64 share a wider 1-byte tier (0--247) than
   vu64/leb128 (0--127). Their lines overlap exactly here.
@@ -76,7 +76,7 @@ Step lines show byte count at each integer value.
 The 22-value reference table as a heatmap. Lighter cells use fewer
 bytes; the per-row minimum is bolded.
 
-![Encoded length heatmap](charts/size/heatmap.svg)
+![Encoded length heatmap](../charts/size/heatmap.svg)
 
 ## Bytes Per Value
 

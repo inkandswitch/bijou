@@ -2,7 +2,7 @@
 
 > Criterion benchmarks comparing bijou64 against varu64, vu64, vu128, and leb128 across six value distributions over batches of 4096 values.
 >
-> Run: `cargo bench -p bijou64 --bench shootout`
+> Run: `cargo bench -p bijoux --bench shootout`
 >
 > See also: [ARM results (Apple M2 Pro)](SHOOTOUT_ANALYSIS_ARM.md)
 
@@ -33,7 +33,7 @@ Deterministic benchmarks via Valgrind's Callgrind. Reports CPU instructions, cac
 Run locally (Linux only):
 ```bash
 cargo install gungraun-runner
-cargo bench -p bijou64 --bench gungraun_shootout
+cargo bench -p bijoux --bench gungraun_shootout
 ```
 
 ### Chart Generation
@@ -45,19 +45,19 @@ All charts are auto-generated from Criterion's raw sample data (`target/criterio
 nix run .#bench-charts
 
 # or via uv (auto-installs Python deps)
-uv run bijou64/charts/analyze.py --arch x86
+uv run bijoux/charts/analyze.py --arch x86
 ```
 
-Output (into `bijou64/charts/<arch>/`):
-- `bijou64/charts/<arch>/percentiles.csv` -- machine-readable statistics
-- `bijou64/charts/<arch>/percentiles.md` -- markdown tables with p50/p90/p95/p99/p99.9
-- `bijou64/charts/<arch>/*_box.svg` -- box-and-whisker plots
-- `bijou64/charts/<arch>/*_bar.svg` -- grouped bar charts (median + p5-p95 whiskers)
-- `bijou64/charts/<arch>/*_cdf.svg` -- CDF overlay plots
-- `bijou64/charts/<arch>/*_heatmap.svg` -- library x distribution heatmaps
-- `bijou64/charts/<arch>/*_cdf.html` -- interactive Plotly CDFs (hover, zoom)
-- `bijou64/charts/<arch>/*_heatmap.html` -- interactive Plotly heatmaps
-- `bijou64/charts/<arch>/percentiles.html` -- sortable/filterable percentile table
+Output (into `bijoux/charts/<arch>/`):
+- `bijoux/charts/<arch>/percentiles.csv` -- machine-readable statistics
+- `bijoux/charts/<arch>/percentiles.md` -- markdown tables with p50/p90/p95/p99/p99.9
+- `bijoux/charts/<arch>/*_box.svg` -- box-and-whisker plots
+- `bijoux/charts/<arch>/*_bar.svg` -- grouped bar charts (median + p5-p95 whiskers)
+- `bijoux/charts/<arch>/*_cdf.svg` -- CDF overlay plots
+- `bijoux/charts/<arch>/*_heatmap.svg` -- library x distribution heatmaps
+- `bijoux/charts/<arch>/*_cdf.html` -- interactive Plotly CDFs (hover, zoom)
+- `bijoux/charts/<arch>/*_heatmap.html` -- interactive Plotly heatmaps
+- `bijoux/charts/<arch>/percentiles.html` -- sortable/filterable percentile table
 
 ### Value Distributions
 
@@ -101,9 +101,9 @@ Encode to a `Vec<u8>`.
 <details open>
 <summary>Charts</summary>
 
-![Encode — Bar Chart](charts/x86/encode_bar.svg)
-![Encode — Box Plot](charts/x86/encode_box.svg)
-![Encode — CDF](charts/x86/encode_cdf.svg)
+![Encode — Bar Chart](../charts/x86/encode_bar.svg)
+![Encode — Box Plot](../charts/x86/encode_box.svg)
+![Encode — CDF](../charts/x86/encode_cdf.svg)
 
 </details>
 
@@ -115,7 +115,7 @@ vu128 and leb128 are excluded: neither crate exposes a standalone
 encoding).
 
 > For the arch-independent _format_ size comparison (how many bytes
-> each format uses), see [SIZE_ANALYSIS.md](../docs/SIZE_ANALYSIS.md).
+> each format uses), see [SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md).
 
 | Distribution    | bijou64 | varu64 | vu64     | bijou64 rank | bijou64 vs other best |
 |-----------------|--------:|-------:|---------:|--------------|-----------------------|
@@ -129,9 +129,9 @@ encoding).
 <details open>
 <summary>Charts</summary>
 
-![Encoded Size — Bar Chart](charts/x86/encoded_size_bar.svg)
-![Encoded Size — Box Plot](charts/x86/encoded_size_box.svg)
-![Encoded Size — CDF](charts/x86/encoded_size_cdf.svg)
+![Encoded Size — Bar Chart](../charts/x86/encoded_size_bar.svg)
+![Encoded Size — Box Plot](../charts/x86/encoded_size_box.svg)
+![Encoded Size — CDF](../charts/x86/encoded_size_cdf.svg)
 
 </details>
 
@@ -139,7 +139,7 @@ vu64 wins every cell because its tier boundaries are exact powers of
 2, so `encoded_len` reduces to a single `leading_zeros` instruction
 with no correction step. bijou64's per-tier offsets force an extra
 comparison; the gap (~2.2-2.5x) is unavoidable for the
-canonicality-preserving path. See [OPTIMISATION.md](../docs/OPTIMISATION.md)
+canonicality-preserving path. See [OPTIMISATION.md](../design/OPTIMISATION.md)
 for the full analysis.
 
 ## Decode
@@ -158,9 +158,9 @@ Decode from a `&[u8]` buffer.
 <details open>
 <summary>Charts</summary>
 
-![Decode — Bar Chart](charts/x86/decode_bar.svg)
-![Decode — Box Plot](charts/x86/decode_box.svg)
-![Decode — CDF](charts/x86/decode_cdf.svg)
+![Decode — Bar Chart](../charts/x86/decode_bar.svg)
+![Decode — Box Plot](../charts/x86/decode_box.svg)
+![Decode — CDF](../charts/x86/decode_cdf.svg)
 
 </details>
 
@@ -185,8 +185,8 @@ bijou64 achieves canonicality structurally: its disjoint tier ranges make overlo
 <details open>
 <summary>Charts</summary>
 
-![Canonical Decode — Bar Chart](charts/x86/canonical_decode_bar.svg)
-![Canonical Decode — CDF](charts/x86/canonical_decode_cdf.svg)
+![Canonical Decode — Bar Chart](../charts/x86/canonical_decode_bar.svg)
+![Canonical Decode — CDF](../charts/x86/canonical_decode_cdf.svg)
 
 </details>
 
@@ -210,8 +210,8 @@ Decode a concatenated stream of encoded values, advancing a cursor by the number
 <details open>
 <summary>Charts</summary>
 
-![Stream Decode — Bar Chart](charts/x86/stream_decode_bar.svg)
-![Stream Decode — CDF](charts/x86/stream_decode_cdf.svg)
+![Stream Decode — Bar Chart](../charts/x86/stream_decode_bar.svg)
+![Stream Decode — CDF](../charts/x86/stream_decode_cdf.svg)
 
 </details>
 
@@ -225,18 +225,18 @@ bijou64 wins all 6 stream_decode cells, with margins from 1.93× (small vs varu6
 Full percentile breakdowns (p50/p90/p95/p99/p99.9) are available in:
 
 - [`charts/x86/percentiles.md`](../charts/x86/percentiles.md) -- markdown tables
-- [`charts/x86/percentiles.csv`](charts/x86/percentiles.csv) -- machine-readable CSV
-- [`charts/x86/percentiles.html`](charts/x86/percentiles.html) -- interactive sortable table
+- [`charts/x86/percentiles.csv`](../charts/x86/percentiles.csv) -- machine-readable CSV
+- [`charts/x86/percentiles.html`](../charts/x86/percentiles.html) -- interactive sortable table
 
 Heatmaps provide a quick visual overview of which library performs best across all distributions:
 
 <details>
 <summary>Heatmaps (click to expand)</summary>
 
-![Decode Heatmap](charts/x86/decode_heatmap.svg)
-![Canonical Decode Heatmap](charts/x86/canonical_decode_heatmap.svg)
-![Stream Decode Heatmap](charts/x86/stream_decode_heatmap.svg)
-![Encode Heatmap](charts/x86/encode_heatmap.svg)
+![Decode Heatmap](../charts/x86/decode_heatmap.svg)
+![Canonical Decode Heatmap](../charts/x86/canonical_decode_heatmap.svg)
+![Stream Decode Heatmap](../charts/x86/stream_decode_heatmap.svg)
+![Encode Heatmap](../charts/x86/encode_heatmap.svg)
 
 </details>
 

@@ -2,7 +2,7 @@
 """Generate encoded-size comparison charts for bijou64.
 
 These are architecture-independent (the chart is a property of the format,
-not the implementation). Outputs into `bijou64/charts/size/`:
+not the implementation). Outputs into `bijoux/charts/size/`:
 
   - bytes_vs_value.svg       full-range step plot, log-x
   - bytes_vs_value_low.svg   zoomed step plot for 0–66,500 (where formats diverge)
@@ -11,7 +11,7 @@ not the implementation). Outputs into `bijou64/charts/size/`:
 
 Usage:
   nix run .#size-charts
-  python bijou64/charts/size_charts.py
+  python bijoux/charts/size_charts.py
 """
 
 from __future__ import annotations
@@ -368,14 +368,14 @@ def plot_boundary_detail(out: Path) -> None:
 def workspace_root() -> Path:
     here = Path(__file__).resolve()
     for parent in here.parents:
-        if (parent / "Cargo.toml").exists() and (parent / "bijou64").is_dir():
+        if (parent / "Cargo.toml").exists() and (parent / "bijoux").is_dir():
             return parent
-    raise SystemExit("could not locate workspace root (no Cargo.toml + bijou64/ found)")
+    raise SystemExit("could not locate workspace root (no Cargo.toml + bijoux/ found)")
 
 
 def main() -> int:
     root = workspace_root()
-    out_dir = root / "bijou64" / "charts" / "size"
+    out_dir = root / "bijoux" / "charts" / "size"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     plot_bytes_vs_value(out_dir / "bytes_vs_value.svg")

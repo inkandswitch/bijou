@@ -5,10 +5,10 @@ benchmarked, and rejected during design (2026-07). This file is the
 evidence backing the rejection summaries in the
 [bijou64s spec](../../specs/bijou64s.md)'s Prior Art section; the
 shipped format's numbers against *external* codecs live in
-[SHOOTOUT_ANALYSIS_SIGNED.md](SHOOTOUT_ANALYSIS_SIGNED.md).
+[SHOOTOUT_ANALYSIS_SIGNED.md](../benches/SHOOTOUT_ANALYSIS_SIGNED.md).
 
 Both rejected lanes remain implemented in
-[`signed_shootout.rs`](signed_shootout.rs) (`bijou64+twos` and
+[`signed_shootout.rs`](../benches/signed_shootout.rs) (`bijou64+twos` and
 `mod mirrored`) so these results stay reproducible. Setup as in the
 main analysis: Zen 5, criterion medians, µs per 4096-value batch,
 bold = lowest in row. Rows `tiny…uniform` from the 2026-07-22 run;

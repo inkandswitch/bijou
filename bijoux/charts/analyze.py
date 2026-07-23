@@ -14,16 +14,16 @@
 Reads target/criterion/**/new/{sample,estimates}.json, computes percentile
 statistics, and generates:
 
-  - bijou64/charts/<arch>/percentiles.csv   (machine-readable summary)
-  - bijou64/charts/<arch>/percentiles.md    (markdown table)
-  - bijou64/charts/<arch>/*.svg             (static charts)
-  - bijou64/charts/<arch>/*.html            (interactive Plotly charts)
+  - bijoux/charts/<arch>/percentiles.csv   (machine-readable summary)
+  - bijoux/charts/<arch>/percentiles.md    (markdown table)
+  - bijoux/charts/<arch>/*.svg             (static charts)
+  - bijoux/charts/<arch>/*.html            (interactive Plotly charts)
 
 Usage:
   nix run .#bench-charts                         # via flake app (defaults to auto-detect)
-  uv run bijou64/charts/analyze.py --arch x86    # explicit architecture
-  uv run bijou64/charts/analyze.py --arch arm    # explicit architecture
-  python bijou64/charts/analyze.py               # auto-detects from `uname -m`
+  uv run bijoux/charts/analyze.py --arch x86    # explicit architecture
+  uv run bijoux/charts/analyze.py --arch arm    # explicit architecture
+  python bijoux/charts/analyze.py               # auto-detects from `uname -m`
 
 The script auto-detects the workspace root by looking for Cargo.toml.
 """
@@ -148,7 +148,7 @@ def load_criterion_data(workspace: Path) -> list[BenchResult]:
     if not criterion_dir.is_dir():
         sys.exit(
             f"No criterion data at {criterion_dir}\n"
-            "Run: cargo bench -p bijou64 --bench shootout"
+            "Run: cargo bench -p bijoux --bench shootout"
         )
 
     results: list[BenchResult] = []
@@ -215,7 +215,7 @@ def load_criterion_data(workspace: Path) -> list[BenchResult]:
     if not results:
         sys.exit(
             "No benchmark data found.\n"
-            "Run: cargo bench -p bijou64 --bench shootout"
+            "Run: cargo bench -p bijoux --bench shootout"
         )
 
     return results
@@ -1024,7 +1024,7 @@ def main() -> None:
     arch: str = args.arch or _detect_arch()
 
     workspace = find_workspace_root()
-    out_dir = workspace / "bijou64" / "charts" / arch
+    out_dir = workspace / "bijoux" / "charts" / arch
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading Criterion data (arch={arch})...")
