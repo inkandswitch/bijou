@@ -1,5 +1,12 @@
 # 💎 bijou128
 
+> [!WARNING]
+> **This crate is deprecated.** bijou128 has moved into the
+> [`bijoux`](https://crates.io/crates/bijoux) crate as `bijoux::u128`.
+> The wire format is unchanged (byte-for-byte identical); migration is a
+> one-line dependency swap. Existing releases will remain available and
+> will not be yanked, but no further development happens here.
+
 Bijective variable-length encoding for unsigned 128-bit integers.
 
 Pronounced "bee-zoo-one-twenty-eight" — **bij**ective **o**ffset **u128**.

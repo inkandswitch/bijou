@@ -1,5 +1,12 @@
 # 💎 bijou64
 
+> [!WARNING]
+> **This crate is deprecated.** bijou64 has moved into the
+> [`bijoux`](https://crates.io/crates/bijoux) crate as `bijoux::u64`.
+> The wire format is unchanged (byte-for-byte identical); migration is a
+> one-line dependency swap. Existing releases will remain available and
+> will not be yanked, but no further development happens here.
+
 Bijective variable-length encoding for unsigned 64-bit integers.
 
 Pronounced "bee-zoo-sixty-four" — **bij**ective **o**ffset **u64**.

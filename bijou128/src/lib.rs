@@ -1,5 +1,11 @@
 //! Bijective variable-length encoding for unsigned 128-bit integers.
 //!
+//! <div class="warning">
+//!
+//! **Deprecated:** bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.
+//!
+//! </div>
+//!
 //! bijou128 (**BIJ**ective **O**ffset **U128**) encodes `u128` values into
 //! 1–17 bytes using a tag-byte prefix scheme derived from [VARU64], modified
 //! with per-tier offsets to achieve **structural canonicality** — each value
@@ -90,6 +96,7 @@
 #![no_std]
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![allow(deprecated)]
 
 extern crate alloc;
 
@@ -97,6 +104,7 @@ extern crate alloc;
 use alloc::{vec, vec::Vec};
 
 /// Maximum number of bytes a `bijou128` encoding can occupy.
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub const MAX_BYTES: usize = 17;
 
 /// Tag byte threshold: values below this are encoded as a single byte.
@@ -201,6 +209,7 @@ const BOUNDS: [u128; NUM_TIERS + 1] = [
 /// ```
 #[inline]
 #[must_use]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub const fn encoded_len(value: u128) -> usize {
     // Fast path: tier 0 values (0–239) are the most common in many
     // workloads and need only a single well-predicted comparison.
@@ -249,6 +258,7 @@ pub const fn encoded_len(value: u128) -> usize {
 /// assert_eq!(buf, [0xF0, 0x00]);
 /// ```
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub fn encode(value: u128, buf: &mut Vec<u8>) {
     if value < BOUNDS[0] {
         buf.push((value & 0xFF) as u8);
@@ -298,6 +308,7 @@ pub fn encode(value: u128, buf: &mut Vec<u8>) {
 /// assert_eq!(collected, [0xF0, 0x00]);
 /// ```
 #[derive(Debug, Clone, Copy)]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub struct EncodedBytes {
     buf: [u8; MAX_BYTES],
     /// Invariant: `len <= MAX_BYTES`. Stored as `u8` because the value
@@ -441,6 +452,7 @@ impl<'a> IntoIterator for &'a EncodedBytes {
 #[inline]
 #[must_use]
 #[allow(clippy::cast_possible_truncation, clippy::indexing_slicing)]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub const fn encoded_bytes(value: u128) -> EncodedBytes {
     if value < BOUNDS[0] {
         return EncodedBytes {
@@ -523,6 +535,7 @@ pub const fn encoded_bytes(value: u128) -> EncodedBytes {
 // runtime-length copy (see bijou64's `OPTIMISATION.md`), so we keep
 // the explicit per-tier dispatch.
 #[allow(clippy::many_single_char_names, clippy::too_many_lines)]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub const fn decode(buf: &[u8]) -> Result<(u128, usize), DecodeError> {
     let Some((&tag, rest)) = buf.split_first() else {
         return Err(DecodeError::BufferTooShort);
@@ -710,6 +723,7 @@ pub const fn decode(buf: &[u8]) -> Result<(u128, usize), DecodeError> {
 /// ```
 #[derive(Debug)]
 #[must_use = "iterators are lazy; consume with for/.collect/.next"]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub struct DecodeIter<'a> {
     cursor: &'a [u8],
     fused_err: bool,
@@ -721,6 +735,7 @@ pub struct DecodeIter<'a> {
 /// encoded value in `buf`, in order. See [`DecodeIter`] for the exact
 /// fused-iteration semantics.
 #[inline]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub const fn decode_iter(buf: &[u8]) -> DecodeIter<'_> {
     DecodeIter {
         cursor: buf,
@@ -793,12 +808,14 @@ impl core::iter::FusedIterator for DecodeIter<'_> {}
 /// }
 /// assert_eq!(decode_all(&buf).unwrap(), vec![0, 42, 500, u128::MAX]);
 /// ```
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub fn decode_all(buf: &[u8]) -> Result<Vec<u128>, DecodeError> {
     decode_iter(buf).collect()
 }
 
 /// Errors that can occur when decoding a `bijou128`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[deprecated(since = "0.1.1", note = "bijou128 has moved into the `bijoux` crate as `bijoux::u128`. The wire format is unchanged (byte-for-byte identical); migration is a one-line dependency swap.")]
 pub enum DecodeError {
     /// The input buffer is shorter than the encoding requires.
     #[error("buffer too short for bijou128 encoding")]

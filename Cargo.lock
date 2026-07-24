@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "bijou128"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arbitrary",
  "bijou128",
@@ -137,7 +137,7 @@ dependencies = [
 
 [[package]]
 name = "bijou32"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arbitrary",
  "bijou32",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "bijou64"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "arbitrary",
  "bijou64",

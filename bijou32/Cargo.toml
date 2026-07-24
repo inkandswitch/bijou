@@ -1,7 +1,7 @@
 [package]
 name = "bijou32"
-version = "0.1.0"
-description = "Bijective variable-length encoding for unsigned 32-bit integers"
+version = "0.1.1"
+description = "DEPRECATED: moved into the bijoux crate — Bijective variable-length encoding for unsigned 32-bit integers"
 
 categories = ["encoding", "no-std"]
 keywords = ["varint", "variable-length", "canonical", "bijective"]
