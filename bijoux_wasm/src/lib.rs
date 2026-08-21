@@ -34,3 +34,24 @@ pub mod i64;
 pub mod u128;
 pub mod u32;
 pub mod u64;
+
+/// Deliberately panics. **Not part of the public API.**
+///
+/// The bijoux API is total — no exported function has a reachable panic —
+/// so the JS test suites need this hook to verify the `panic=unwind`
+/// contract: a panic must surface as a catchable JS `Error` with
+/// `name === "PanicError"`, and the Wasm instance must remain usable
+/// afterward.
+///
+/// Gated on `debug_assertions`, so it exists only in the shipped `/debug`
+/// package variant (built with the `wasm-debug` profile), never in the
+/// release entry points. Both variants compile with the same wasm-bindgen
+/// unwind glue, so exercising this path in the debug variant covers the
+/// shared machinery.
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+#[allow(clippy::panic)] // the panic IS the feature under test
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = "__triggerPanicForTesting")]
+pub fn trigger_panic_for_testing() {
+    panic!("deliberate test panic (__triggerPanicForTesting)");
+}
