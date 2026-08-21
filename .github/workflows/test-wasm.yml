@@ -109,16 +109,13 @@ jobs:
 
       - name: Install nightly toolchain (panic=unwind builds)
         # wasm-bodge's default panic=unwind mode rebuilds std via
-        # -Zbuild-std, which needs `cargo +nightly` with rust-src.
+        # -Zbuild-std, which needs a nightly toolchain with rust-src.
         # Dated pin: keep in sync with the flake's rust-overlay nightly
         # (rust-bin.nightly.latest at the flake.lock rev) so CI and local
-        # builds produce the same bytes. Bump alongside `nix flake update`.
-        # The `link` makes wasm-bodge's literal `cargo +nightly` resolve to
-        # the dated toolchain.
-        run: |
-          rustup toolchain install nightly-2026-08-21 --profile minimal --component rust-src
-          rustup toolchain link nightly \
-            "$(rustup toolchain list -v | awk '/nightly-2026-08-21/ {print $NF}')"
+        # builds produce the same bytes. Bump alongside `nix flake update`,
+        # and keep the `--rust-toolchain` flag on the wasm-bodge build step
+        # below in sync with this version.
+        run: rustup toolchain install nightly-2026-08-21 --profile minimal --component rust-src
 
       - name: Install wasm-bindgen-cli (must match workspace pin)
         run: cargo install --locked wasm-bindgen-cli@0.2.127
@@ -168,7 +165,10 @@ jobs:
 
       - name: Build ${{ matrix.crate }} with wasm-bodge
         working-directory: ${{ matrix.crate }}
-        run: wasm-bodge build
+        # --rust-toolchain: use the dated nightly installed above (rustup
+        # rejects linking custom toolchains to channel names like `nightly`,
+        # so we pass the toolchain to wasm-bodge explicitly instead).
+        run: wasm-bodge build --rust-toolchain nightly-2026-08-21
 
       - name: Install JS dependencies
         working-directory: ${{ matrix.crate }}
