@@ -8,7 +8,7 @@
     flake-utils.url = "github:numtide/flake-utils";
 
     command-utils = {
-      url = "git+https://codeberg.org/expede/nix-command-utils";
+      url = "git+https://tangled.org/expede.wtf/nix-command-utils";
       inputs.flake-utils.follows = "flake-utils";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -102,7 +102,7 @@
           pname = "wasm-bodge";
           version = wasm-bodge-src.shortRev;
           src = wasm-bodge-src;
-          cargoHash = "sha256-tARojdKFjnkCeJIhgpMFEvfxrOTOH8L3cAvE2UQm0jY=";
+          cargoHash = "sha256-lNgGxyLcO7yEATlMfjjVXBgmjtXI4l+lFk/yagP7lh0=";
           nativeBuildInputs = [ unstable.cargo-auditable ];
           doCheck = false; # tests require npm/puppeteer infrastructure
         };
@@ -113,14 +113,14 @@
         # workspace dep in `bijoux/Cargo.toml`.
         gungraun-runner = pinnedRustPlatform.buildRustPackage rec {
           pname = "gungraun-runner";
-          version = "0.18.2";
+          version = "0.19.4";
 
           src = pkgs.fetchCrate {
             inherit pname version;
-            hash = "sha256-DiJq9TZCZdWKSstIyMjkLuxaYXua0WKD2AVbEIxM590=";
+            hash = "sha256-DrIbeUVI+fhrp87rzIxYRvAlPSJ3ksa6cHHNFg4I+zE=";
           };
 
-          cargoHash = "sha256-eb9U1MgCg7MpwzS2RnFXMWdPitweKMMty0n3SC0F6+I=";
+          cargoHash = "sha256-68SL8pEYw9nV9g3ZmUjWDL9DXOBDfSMy1y3ZuKuHW2I=";
 
           # Tests require a full benchmark execution loop with valgrind.
           # We're shipping just the binary harness.
@@ -254,11 +254,17 @@
             set -e
             ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijoux_wasm/dist"
             echo "===> wasm-bodge build bijoux_wasm..."
+            # --panic abort: wasm-bodge defaults to wasm-bindgen's panic=unwind
+            # mode (alexjg/wasm-bodge@7894ffb), which needs a rustup nightly with
+            # rust-src and wasm-bindgen >= 0.2.127. We build with pinned stable,
+            # panic = "abort" (workspace profile.release), and wasm-bindgen
+            # =0.2.118, so opt out explicitly.
             ${wasm-bodge}/bin/wasm-bodge build \
               --crate-path "$WORKSPACE_ROOT/bijoux_wasm" \
               --package-json "$WORKSPACE_ROOT/bijoux_wasm/package.json" \
               --out-dir "$WORKSPACE_ROOT/bijoux_wasm/dist" \
-              --debug-profile wasm-debug
+              --debug-profile wasm-debug \
+              --panic abort
             echo ""
             echo "✓ bijoux_wasm built — output in bijoux_wasm/dist/"
           '';
