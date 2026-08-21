@@ -127,20 +127,60 @@
           doCheck = false;
         };
 
-        # wasm-bindgen-cli 0.2.118 (not yet in nixpkgs)
-        wasm-bindgen-cli_0_2_118 = unstable.buildWasmBindgenCli rec {
+        # wasm-bindgen-cli 0.2.127 (not yet in nixpkgs). Must exactly match the
+        # workspace `wasm-bindgen` crate pin; >= 0.2.127 is required for
+        # wasm-bodge's panic=unwind mode.
+        wasm-bindgen-cli_0_2_127 = unstable.buildWasmBindgenCli rec {
           src = unstable.fetchCrate {
             pname = "wasm-bindgen-cli";
-            version = "0.2.118";
-            hash = "sha256-ve783oYH0TGv8Z8lIPdGjItzeLDQLOT5uv/jbFOlZpI=";
+            version = "0.2.127";
+            hash = "sha256-di+qBAdd7pENLiIB9CoZoab+W5xeDoByMREcCGTSzWo=";
           };
 
           cargoDeps = unstable.rustPlatform.fetchCargoVendor {
             inherit src;
             inherit (src) pname version;
-            hash = "sha256-EYDfuBlH3zmTxACBL+sjicRna84CvoesKSQVcYiG9P0=";
+            hash = "sha256-FTv2GZIAQs0ePdIZXIXil7JbZ6kIT05VG6vqC1qNFxQ=";
           };
         };
+
+        # Nightly toolchain for wasm-bodge's panic=unwind builds, which rebuild
+        # std via -Zbuild-std (needs rust-src). Kept minimal + separate from the
+        # stable dev toolchain. "latest" is pinned by the rust-overlay input in
+        # flake.lock, so this is reproducible.
+        nightly-wasm-toolchain = pkgs.rust-bin.nightly.latest.minimal.override {
+          extensions = [ "rust-src" ];
+          targets = [ "wasm32-unknown-unknown" ];
+        };
+
+        # wasm-bodge invokes `cargo +nightly ...` (a rustup convention). There is
+        # no rustup in this shell, so provide a cargo shim that routes
+        # `+nightly`-prefixed calls to the pinned nightly toolchain and
+        # everything else to the stable one. Prepend to PATH only where needed.
+        # wasm-bodge runs bare `wasm-opt -O4`, relying on the module's
+        # target_features section. Rust's wasm output uses bulk-memory (stable
+        # default since 1.87) and, for panic=unwind builds, legacy exception
+        # handling — neither of which binaryen enables by default. Enable them
+        # explicitly (validation only; -O4 won't introduce features beyond
+        # what the module already uses, keeping Node 20 compatibility).
+        wasm-opt-shim = pkgs.writeShellScriptBin "wasm-opt" ''
+          exec "${pkgs.binaryen}/bin/wasm-opt" \
+            --enable-bulk-memory \
+            --enable-exception-handling \
+            --enable-nontrapping-float-to-int \
+            --enable-reference-types \
+            "$@"
+        '';
+
+        cargo-nightly-shim = pkgs.writeShellScriptBin "cargo" ''
+          if [ "$1" = "+nightly" ]; then
+            shift
+            export RUSTC="${nightly-wasm-toolchain}/bin/rustc"
+            export RUSTDOC="${nightly-wasm-toolchain}/bin/rustdoc"
+            exec "${nightly-wasm-toolchain}/bin/cargo" "$@"
+          fi
+          exec "${rust-toolchain}/bin/cargo" "$@"
+        '';
 
         format-pkgs = with pkgs; [
           alejandra
@@ -161,7 +201,7 @@
           cargo-udeps
           cargo-watch
           twiggy
-          wasm-bindgen-cli_0_2_118
+          wasm-bindgen-cli_0_2_127
           wasm-tools
         ];
 
@@ -254,17 +294,17 @@
             set -e
             ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijoux_wasm/dist"
             echo "===> wasm-bodge build bijoux_wasm..."
-            # --panic abort: wasm-bodge defaults to wasm-bindgen's panic=unwind
-            # mode (alexjg/wasm-bodge@7894ffb), which needs a rustup nightly with
-            # rust-src and wasm-bindgen >= 0.2.127. We build with pinned stable,
-            # panic = "abort" (workspace profile.release), and wasm-bindgen
-            # =0.2.118, so opt out explicitly.
+            # panic=unwind (the wasm-bodge default): recoverable Rust panics
+            # surface as catchable JS PanicErrors instead of aborting the Wasm
+            # instance. Requires nightly + rust-src (std is rebuilt via
+            # -Zbuild-std) and wasm-bindgen >= 0.2.127. wasm-bodge invokes
+            # `cargo +nightly`, so route it through the cargo shim.
+            PATH="${cargo-nightly-shim}/bin:${wasm-opt-shim}/bin:$PATH" \
             ${wasm-bodge}/bin/wasm-bodge build \
               --crate-path "$WORKSPACE_ROOT/bijoux_wasm" \
               --package-json "$WORKSPACE_ROOT/bijoux_wasm/package.json" \
               --out-dir "$WORKSPACE_ROOT/bijoux_wasm/dist" \
-              --debug-profile wasm-debug \
-              --panic abort
+              --debug-profile wasm-debug
             echo ""
             echo "✓ bijoux_wasm built — output in bijoux_wasm/dist/"
           '';

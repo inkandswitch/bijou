@@ -22,11 +22,11 @@ criterion_pprof = { package = "pprof", version = "0.15", default-features = fals
   "criterion",
   "flamegraph",
 ] }
-js-sys = { version = "=0.3.95", default-features = false }
+js-sys = { version = "=0.3.104", default-features = false }
 rand = { version = "0.8.5", default-features = false }
 testresult = "0.4.1"
 thiserror = { version = "2.0", default-features = false }
-wasm-bindgen = { version = "=0.2.118", default-features = false }
+wasm-bindgen = { version = "=0.2.127", default-features = false }
 wasm-bindgen-test = "0.3"
 
 [workspace.lints.rust]
