@@ -6,6 +6,9 @@
     "access": "public"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "keywords": [
     "bijective",
     "canonical",

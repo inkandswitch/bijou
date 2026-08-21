@@ -149,20 +149,19 @@
         # stable dev toolchain. "latest" is pinned by the rust-overlay input in
         # flake.lock, so this is reproducible.
         nightly-wasm-toolchain = pkgs.rust-bin.nightly.latest.minimal.override {
+          # rust-src only: -Zbuild-std compiles std from source, so a
+          # prebuilt wasm32 std component would be dead weight.
           extensions = [ "rust-src" ];
-          targets = [ "wasm32-unknown-unknown" ];
         };
 
-        # wasm-bodge invokes `cargo +nightly ...` (a rustup convention). There is
-        # no rustup in this shell, so provide a cargo shim that routes
-        # `+nightly`-prefixed calls to the pinned nightly toolchain and
-        # everything else to the stable one. Prepend to PATH only where needed.
         # wasm-bodge runs bare `wasm-opt -O4`, relying on the module's
         # target_features section. Rust's wasm output uses bulk-memory (stable
         # default since 1.87) and, for panic=unwind builds, legacy exception
         # handling — neither of which binaryen enables by default. Enable them
         # explicitly (validation only; -O4 won't introduce features beyond
         # what the module already uses, keeping Node 20 compatibility).
+        # Mirrors the wasm-opt wrapper in .github/workflows/test-wasm.yml —
+        # keep the flag lists in sync.
         wasm-opt-shim = pkgs.writeShellScriptBin "wasm-opt" ''
           exec "${pkgs.binaryen}/bin/wasm-opt" \
             --enable-bulk-memory \
@@ -175,13 +174,26 @@
             "$@"
         '';
 
+        # wasm-bodge invokes `cargo +nightly ...` (a rustup convention). There
+        # is no rustup in this shell, so this cargo shim routes
+        # `+nightly`-prefixed calls to the pinned nightly toolchain (RUSTC/
+        # RUSTDOC included — nightly cargo would otherwise pick up the stable
+        # rustc from PATH) and everything else to the stable toolchain. Only
+        # prepended to PATH where needed (the `bodge` command).
         cargo-nightly-shim = pkgs.writeShellScriptBin "cargo" ''
-          if [ "$1" = "+nightly" ]; then
-            shift
-            export RUSTC="${nightly-wasm-toolchain}/bin/rustc"
-            export RUSTDOC="${nightly-wasm-toolchain}/bin/rustdoc"
-            exec "${nightly-wasm-toolchain}/bin/cargo" "$@"
-          fi
+          case "$1" in
+            +nightly)
+              shift
+              export RUSTC="${nightly-wasm-toolchain}/bin/rustc"
+              export RUSTDOC="${nightly-wasm-toolchain}/bin/rustdoc"
+              exec "${nightly-wasm-toolchain}/bin/cargo" "$@"
+              ;;
+            +*)
+              echo "cargo shim: unsupported toolchain override '$1'" >&2
+              echo "(this Nix shell only provides stable and +nightly)" >&2
+              exit 1
+              ;;
+          esac
           exec "${rust-toolchain}/bin/cargo" "$@"
         '';
 

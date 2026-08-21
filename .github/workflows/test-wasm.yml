@@ -110,7 +110,15 @@ jobs:
       - name: Install nightly toolchain (panic=unwind builds)
         # wasm-bodge's default panic=unwind mode rebuilds std via
         # -Zbuild-std, which needs `cargo +nightly` with rust-src.
-        run: rustup toolchain install nightly --profile minimal --component rust-src
+        # Dated pin: keep in sync with the flake's rust-overlay nightly
+        # (rust-bin.nightly.latest at the flake.lock rev) so CI and local
+        # builds produce the same bytes. Bump alongside `nix flake update`.
+        # The `link` makes wasm-bodge's literal `cargo +nightly` resolve to
+        # the dated toolchain.
+        run: |
+          rustup toolchain install nightly-2026-08-21 --profile minimal --component rust-src
+          rustup toolchain link nightly \
+            "$(rustup toolchain list -v | awk '/nightly-2026-08-21/ {print $NF}')"
 
       - name: Install wasm-bindgen-cli (must match workspace pin)
         run: cargo install --locked wasm-bindgen-cli@0.2.127
@@ -126,6 +134,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y binaryen
+          wasm-opt --version
           mkdir -p "$HOME/.local/wasm-opt-shim"
           cat > "$HOME/.local/wasm-opt-shim/wasm-opt" <<'EOF'
           #!/usr/bin/env bash

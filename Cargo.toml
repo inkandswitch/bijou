@@ -68,6 +68,9 @@ pedantic = { level = "deny", priority = -1 }
 codegen-units = 1
 lto = "fat"
 opt-level = 3
+# Native/wasm-pack builds abort on panic. NOTE: wasm-bodge (`bodge`) builds
+# override this to panic=unwind via -Zbuild-std so panics surface as
+# catchable JS PanicErrors — see the `bodge` command in flake.nix.
 panic = "abort"
 strip = "symbols"
 
@@ -99,7 +102,8 @@ strip = false
 # | strip            | "none"     | symbols | DWARF must survive        |
 # | debug-assertions | true       | false   | catch bugs during debug   |
 # | overflow-checks  | true       | false   | catch bugs during debug   |
-# | panic            | "abort"    | "abort" | (inherited)               |
+# | panic            | "abort"*   | "abort"* | (inherited)              |
+# * wasm-bodge overrides both to panic=unwind at build time (see flake.nix).
 #
 # opt-level=1 is the Chrome-DevTools sweet spot: most locals remain visible,
 # line stepping feels natural, and iterator chains don't fuse. wasm-opt is
