@@ -254,11 +254,17 @@
             set -e
             ${pkgs.coreutils}/bin/rm -rf "$WORKSPACE_ROOT/bijoux_wasm/dist"
             echo "===> wasm-bodge build bijoux_wasm..."
+            # --panic abort: wasm-bodge defaults to wasm-bindgen's panic=unwind
+            # mode (alexjg/wasm-bodge@7894ffb), which needs a rustup nightly with
+            # rust-src and wasm-bindgen >= 0.2.127. We build with pinned stable,
+            # panic = "abort" (workspace profile.release), and wasm-bindgen
+            # =0.2.118, so opt out explicitly.
             ${wasm-bodge}/bin/wasm-bodge build \
               --crate-path "$WORKSPACE_ROOT/bijoux_wasm" \
               --package-json "$WORKSPACE_ROOT/bijoux_wasm/package.json" \
               --out-dir "$WORKSPACE_ROOT/bijoux_wasm/dist" \
-              --debug-profile wasm-debug
+              --debug-profile wasm-debug \
+              --panic abort
             echo ""
             echo "✓ bijoux_wasm built — output in bijoux_wasm/dist/"
           '';
