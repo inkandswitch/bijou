@@ -28,7 +28,7 @@ bijoux = { path = ".", features = ["bolero"] }
 bolero = { workspace = true, features = ["arbitrary"] }
 criterion = { workspace = true }
 criterion_pprof = { workspace = true }
-gungraun = "0.19.4"
+gungraun = "=0.19.4"
 leb128 = "0.2.7"
 rand = { workspace = true, features = ["small_rng"] }
 testresult = { workspace = true }
