@@ -8,7 +8,7 @@
     flake-utils.url = "github:numtide/flake-utils";
 
     command-utils = {
-      url = "git+https://codeberg.org/expede/nix-command-utils";
+      url = "git+https://tangled.org/expede.wtf/nix-command-utils";
       inputs.flake-utils.follows = "flake-utils";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -102,7 +102,7 @@
           pname = "wasm-bodge";
           version = wasm-bodge-src.shortRev;
           src = wasm-bodge-src;
-          cargoHash = "sha256-tARojdKFjnkCeJIhgpMFEvfxrOTOH8L3cAvE2UQm0jY=";
+          cargoHash = "sha256-lNgGxyLcO7yEATlMfjjVXBgmjtXI4l+lFk/yagP7lh0=";
           nativeBuildInputs = [ unstable.cargo-auditable ];
           doCheck = false; # tests require npm/puppeteer infrastructure
         };
