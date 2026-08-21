@@ -168,7 +168,11 @@ jobs:
         # --rust-toolchain: use the dated nightly installed above (rustup
         # rejects linking custom toolchains to channel names like `nightly`,
         # so we pass the toolchain to wasm-bodge explicitly instead).
-        run: wasm-bodge build --rust-toolchain nightly-2026-08-21
+        # --debug-profile: also build the shipped `/debug` package variant,
+        # matching the flake's `bodge` command — the panic=unwind tests
+        # (test/panic.test.ts, e2e/panic.spec.ts) exercise the debug-only
+        # `__triggerPanicForTesting` hook.
+        run: wasm-bodge build --rust-toolchain nightly-2026-08-21 --debug-profile wasm-debug
 
       - name: Install JS dependencies
         working-directory: ${{ matrix.crate }}
