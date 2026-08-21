@@ -132,8 +132,11 @@ jobs:
           exec /usr/bin/wasm-opt \
             --enable-bulk-memory \
             --enable-exception-handling \
+            --enable-multivalue \
+            --enable-mutable-globals \
             --enable-nontrapping-float-to-int \
             --enable-reference-types \
+            --enable-sign-ext \
             "$@"
           EOF
           chmod +x "$HOME/.local/wasm-opt-shim/wasm-opt"

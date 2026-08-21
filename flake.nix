@@ -167,8 +167,11 @@
           exec "${pkgs.binaryen}/bin/wasm-opt" \
             --enable-bulk-memory \
             --enable-exception-handling \
+            --enable-multivalue \
+            --enable-mutable-globals \
             --enable-nontrapping-float-to-int \
             --enable-reference-types \
+            --enable-sign-ext \
             "$@"
         '';
 
