@@ -107,13 +107,46 @@ jobs:
           target: wasm32-unknown-unknown
           cache: true
 
+      - name: Install nightly toolchain (panic=unwind builds)
+        # wasm-bodge's default panic=unwind mode rebuilds std via
+        # -Zbuild-std, which needs a nightly toolchain with rust-src.
+        # Dated pin: keep in sync with the flake's rust-overlay nightly
+        # (rust-bin.nightly.latest at the flake.lock rev) so CI and local
+        # builds produce the same bytes. Bump alongside `nix flake update`,
+        # and keep the `--rust-toolchain` flag on the wasm-bodge build step
+        # below in sync with this version.
+        run: rustup toolchain install nightly-2026-08-21 --profile minimal --component rust-src
+
       - name: Install wasm-bindgen-cli (must match workspace pin)
-        run: cargo install --locked wasm-bindgen-cli@0.2.118
+        run: cargo install --locked wasm-bindgen-cli@0.2.127
 
       - name: Install wasm-opt (binaryen)
+        # wasm-bodge invokes bare `wasm-opt -O4`, but rustc's wasm output
+        # uses bulk-memory (stable default since 1.87) and, for
+        # panic=unwind builds, legacy exception handling with externref
+        # tag params. Wrap wasm-opt to enable exactly those features
+        # (validation only; -O4 introduces nothing the module doesn't
+        # already use). Mirrors `wasm-opt-shim` in flake.nix — keep the
+        # flag lists in sync.
         run: |
           sudo apt-get update
           sudo apt-get install -y binaryen
+          wasm-opt --version
+          mkdir -p "$HOME/.local/wasm-opt-shim"
+          cat > "$HOME/.local/wasm-opt-shim/wasm-opt" <<'EOF'
+          #!/usr/bin/env bash
+          exec /usr/bin/wasm-opt \
+            --enable-bulk-memory \
+            --enable-exception-handling \
+            --enable-multivalue \
+            --enable-mutable-globals \
+            --enable-nontrapping-float-to-int \
+            --enable-reference-types \
+            --enable-sign-ext \
+            "$@"
+          EOF
+          chmod +x "$HOME/.local/wasm-opt-shim/wasm-opt"
+          echo "$HOME/.local/wasm-opt-shim" >> "$GITHUB_PATH"
 
       - name: Install esbuild (under the pinned Node)
         # Pinned to the version `pkgs.esbuild` provides in the Nix dev
@@ -127,12 +160,19 @@ jobs:
         # `flake.lock`'s wasm-bodge-src node.
         run: |
           cargo install --git https://github.com/alexjg/wasm-bodge \
-            --rev 2700e4b60ccfd346bdace2b3af78141a1a9511e8 \
+            --rev ee3bca139cea45a38aab78a2f2fcc136432ce25f \
             --locked
 
       - name: Build ${{ matrix.crate }} with wasm-bodge
         working-directory: ${{ matrix.crate }}
-        run: wasm-bodge build
+        # --rust-toolchain: use the dated nightly installed above (rustup
+        # rejects linking custom toolchains to channel names like `nightly`,
+        # so we pass the toolchain to wasm-bodge explicitly instead).
+        # --debug-profile: also build the shipped `/debug` package variant,
+        # matching the flake's `bodge` command — the panic=unwind tests
+        # (test/panic.test.ts, e2e/panic.spec.ts) exercise the debug-only
+        # `__triggerPanicForTesting` hook.
+        run: wasm-bodge build --rust-toolchain nightly-2026-08-21 --debug-profile wasm-debug
 
       - name: Install JS dependencies
         working-directory: ${{ matrix.crate }}
