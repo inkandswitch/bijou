@@ -113,14 +113,14 @@
         # workspace dep in `bijoux/Cargo.toml`.
         gungraun-runner = pinnedRustPlatform.buildRustPackage rec {
           pname = "gungraun-runner";
-          version = "0.18.2";
+          version = "0.19.4";
 
           src = pkgs.fetchCrate {
             inherit pname version;
-            hash = "sha256-DiJq9TZCZdWKSstIyMjkLuxaYXua0WKD2AVbEIxM590=";
+            hash = "sha256-DrIbeUVI+fhrp87rzIxYRvAlPSJ3ksa6cHHNFg4I+zE=";
           };
 
-          cargoHash = "sha256-eb9U1MgCg7MpwzS2RnFXMWdPitweKMMty0n3SC0F6+I=";
+          cargoHash = "sha256-68SL8pEYw9nV9g3ZmUjWDL9DXOBDfSMy1y3ZuKuHW2I=";
 
           # Tests require a full benchmark execution loop with valgrind.
           # We're shipping just the binary harness.
