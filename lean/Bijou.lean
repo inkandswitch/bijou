@@ -4,6 +4,8 @@ import Bijou.Family
 import Bijou.Instances
 import Bijou.Order
 import Bijou.RoundTrip
+import Bijou.Signed
+import Bijou.SignedInstances
 import Bijou.Spec
 
 /-!
@@ -30,7 +32,15 @@ Headline theorems (all in `Bijou.Family`):
 - `encodedLen_le` — encodings never exceed `maxBytes` (`tiers + 1`).
 - `decode_overflow_max_tag` — overflow is possible only at the top tier.
 
-`Bijou.Instances` instantiates the three specified variants and checks
-every test vector from the SPEC documents (and the offset tables and
-`maxBytes`) by reduction.
+Signed formats (`Bijou.Signed`, zigzag ∘ unsigned per the bijou‹N›s
+SPECs): `unzigzag_zigzag` / `zigzag_unzigzag` (the zigzag layer is a
+bijection), and the lifted family theorems `decodeS_encodeS`,
+`decodeS_ok`, `encodeS_injective`, `encodedLenS_le`, and
+`encodeS_lex_iff` (byte order is zigzag order — magnitude, negative
+first at equal magnitude — not numeric order).
+
+`Bijou.Instances` and `Bijou.SignedInstances` instantiate the six
+specified variants and check every test vector from the SPEC documents
+(offset tables, `maxBytes`, signed tier boundaries, error vectors) by
+reduction.
 -/

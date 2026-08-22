@@ -144,6 +144,21 @@
           };
         };
 
+        lean4 = unstable.lean4;
+
+        lean-proofs = pkgs.stdenv.mkDerivation {
+          name = "bijou-lean-proofs";
+          src = ./lean;
+          nativeBuildInputs = [ lean4 ];
+
+          buildPhase = ''
+            export HOME="$TMPDIR"
+            lake build
+          '';
+
+          installPhase = "touch $out";
+        };
+
         # Nightly toolchain for wasm-bodge's panic=unwind builds, which rebuild
         # std via -Zbuild-std (needs rust-src). Kept minimal + separate from the
         # stable dev toolchain. "latest" is pinned by the rust-overlay input in
@@ -402,25 +417,33 @@
             ${pkgs.pnpm}/bin/pnpm exec playwright show-report
           '';
 
-          "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package)" ''
+          "proofs" = cmd "Check the Lean 4 format proofs in lean/" ''
+            set -e
+            cd "$WORKSPACE_ROOT/lean"
+            ${lean4}/bin/lake build
+            echo ""
+            echo "✓ Lean proofs OK"
+          '';
+
+          "ci" = cmd "Run full CI suite (fmt, clippy, test, no_std, wasm32, wasm-pack, JS package, Lean proofs)" ''
             set -e
 
-            echo "===> [1/7] Checking formatting..."
+            echo "===> [1/8] Checking formatting..."
             ${pkgs.cargo}/bin/cargo fmt --check
             echo "✓ Formatting OK"
             echo ""
 
-            echo "===> [2/7] Running Clippy..."
+            echo "===> [2/8] Running Clippy..."
             ${pkgs.cargo}/bin/cargo clippy --workspace --all-targets --all-features -- -D warnings
             echo "✓ Clippy OK"
             echo ""
 
-            echo "===> [3/7] Running host tests..."
+            echo "===> [3/8] Running host tests..."
             ${pkgs.cargo}/bin/cargo test --workspace --all-features
             echo "✓ Host tests OK"
             echo ""
 
-            echo "===> [4/7] Checking no_std..."
+            echo "===> [4/8] Checking no_std..."
             ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features
             ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u32
             ${pkgs.cargo}/bin/cargo check --package bijoux --no-default-features --features u64
@@ -428,19 +451,23 @@
             echo "✓ no_std OK"
             echo ""
 
-            echo "===> [5/7] Checking wasm32 build..."
+            echo "===> [5/8] Checking wasm32 build..."
             ${pkgs.cargo}/bin/cargo check --workspace --target wasm32-unknown-unknown
             echo "✓ wasm32 OK"
             echo ""
 
-            echo "===> [6/7] Running wasm-pack tests in Node.js..."
+            echo "===> [6/8] Running wasm-pack tests in Node.js..."
             ${pkgs.wasm-pack}/bin/wasm-pack test --node bijoux_wasm
             echo "✓ wasm-pack tests OK"
             echo ""
 
-            echo "===> [7/7] Running JS-package tests (Node + browsers)..."
+            echo "===> [7/8] Running JS-package tests (Node + browsers)..."
             "test:js"
             echo "✓ JS-package tests OK"
+            echo ""
+
+            echo "===> [8/8] Checking Lean proofs..."
+            proofs
             echo ""
 
             echo "✓ All CI checks passed"
@@ -481,6 +508,10 @@
 
         packages = {
           inherit gungraun-runner wasm-bodge;
+        };
+
+        checks = {
+          inherit lean-proofs;
         };
 
         devShells.default = pkgs.mkShell {
