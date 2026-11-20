@@ -114,12 +114,13 @@ independent projects, not maintained here — but they target the same `bijou64`
 format, so an encoder in one language interoperates with a decoder in
 another:
 
-| Implementation                                                                                | Language          | Notes                                                                |
-|-----------------------------------------------------------------------------------------------|-------------------|----------------------------------------------------------------------|
-| [LostKobrakai/bijou64](https://github.com/LostKobrakai/bijou64)                               | Elixir            | `bijou64` port ([published on Hex](https://hex.pm/packages/bijou64)) |
-| [MichaelMure/go-bijou](https://github.com/MichaelMure/go-bijou)                               | Go                | `bijou64` port                                                       |
-| [scottchiefbaker/perl-Encode-Bijou64](https://github.com/scottchiefbaker/perl-Encode-Bijou64) | Perl              | `bijou64` ([on CPAN](https://metacpan.org/dist/Encode-Bijou64))      |
-| [Joel-hanson/bijou64](https://github.com/Joel-hanson/bijou64)                                 | Java (+ Rust JNI) | `bijou64` Kafka serializer/deserializer                              |
+| Implementation                                                                                | Language          | Notes                                                                         |
+|-----------------------------------------------------------------------------------------------|-------------------|-------------------------------------------------------------------------------|
+| [LostKobrakai/bijou64](https://github.com/LostKobrakai/bijou64)                               | Elixir            | `bijou64` port ([published on Hex](https://hex.pm/packages/bijou64))          |
+| [MichaelMure/go-bijou](https://github.com/MichaelMure/go-bijou)                               | Go                | `bijou64` port                                                                |
+| [scottchiefbaker/perl-Encode-Bijou64](https://github.com/scottchiefbaker/perl-Encode-Bijou64) | Perl              | `bijou64` ([on CPAN](https://metacpan.org/dist/Encode-Bijou64))               |
+| [Joel-hanson/bijou64](https://github.com/Joel-hanson/bijou64)                                 | Java (+ Rust JNI) | `bijou64` Kafka serializer/deserializer                                       |
+| [i-e-b/bijou64net](https://github.com/i-e-b/bijou64net)                                       | C# / dotnet       | `bijou64` port ([published on NuGet](https://www.nuget.org/packages/Bijou64)) |
 
 Building another one? Open a PR adding it here! The specs in
 [`specs/`](./specs) and the test vectors in the test
