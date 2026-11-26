@@ -62,6 +62,19 @@ use alloc::vec::Vec;
 // adds only the type-level domain distinction (see module docs).
 pub struct EncodedI32(crate::u32::EncodedU32);
 
+/// Delegates to the unsigned generator (uniform over tiers).
+///
+/// bijou32s is zigzag ∘ bijou32, and zigzag is a bijection, so every
+/// bijou32 encoding is the encoding of exactly one `i32`. Wrapping the
+/// unsigned arbitrary encoding is therefore valid and canonical by
+/// construction.
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for EncodedI32 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        <crate::u32::EncodedU32 as arbitrary::Arbitrary>::arbitrary(u).map(Self)
+    }
+}
+
 impl EncodedI32 {
     /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
     #[inline]
@@ -362,6 +375,20 @@ mod tests {
     #[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
     mod property {
         use super::*;
+
+        /// Every `Arbitrary` encoding decodes to a value that re-encodes
+        /// to the same bytes.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn arbitrary_encoded_is_canonical() {
+            bolero::check!()
+                .with_arbitrary::<EncodedI32>()
+                .for_each(|enc| {
+                    let (value, consumed) = decode(enc).unwrap();
+                    assert_eq!(consumed, enc.len());
+                    assert_eq!(encoded_bytes(value), *enc);
+                });
+        }
 
         #[test]
         #[cfg_attr(miri, ignore)]
