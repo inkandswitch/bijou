@@ -1434,8 +1434,8 @@ mod tests {
                 .with_arbitrary::<EncodedU32>()
                 .for_each(|enc| {
                     assert_eq!(
-                        crate::test_support::hash_stream(enc),
-                        crate::test_support::hash_stream(enc.as_slice())
+                        crate::test_utils::hash_stream(enc),
+                        crate::test_utils::hash_stream(enc.as_slice())
                     );
                 });
         }
