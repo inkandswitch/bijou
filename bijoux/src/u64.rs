@@ -1282,8 +1282,7 @@ mod tests {
         /// `decode_iter` on an empty buffer yields nothing.
         #[test]
         fn empty_buffer() {
-            let collected: Vec<_> = decode_iter(&[]).collect();
-            assert!(collected.is_empty());
+            assert_eq!(decode_iter(&[]).next(), None);
         }
 
         /// Happy path: encoded N values, `decode_iter` yields the same N values.

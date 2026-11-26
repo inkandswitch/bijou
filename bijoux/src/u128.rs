@@ -1409,8 +1409,7 @@ mod tests {
 
         #[test]
         fn empty_buffer() {
-            let collected: Vec<_> = decode_iter(&[]).collect();
-            assert!(collected.is_empty());
+            assert_eq!(decode_iter(&[]).next(), None);
         }
 
         #[test]

@@ -12,7 +12,6 @@ authors = ["Brooklyn Zelenka <hello@brooklynzelenka.com>"]
 [workspace.dependencies]
 # Internal crates
 bijoux = { version = "0.3", path = "bijoux", default-features = false }
-bijoux_wasm = { version = "0.1", path = "bijoux_wasm", default-features = false }
 
 # External crates
 arbitrary = "1.4"

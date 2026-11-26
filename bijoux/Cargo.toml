@@ -19,11 +19,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 arbitrary = { workspace = true, optional = true, features = ["derive"] }
-bolero = { workspace = true, optional = true, features = ["arbitrary"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-arbitrary = { workspace = true, optional = false, features = ["derive"] }
 bijoux = { path = ".", features = ["bolero"] }
 bolero = { workspace = true, features = ["arbitrary"] }
 criterion = { workspace = true }
@@ -66,7 +64,7 @@ required-features = ["i64"]
 [features]
 default = ["i32", "i64", "i128", "u32", "u64", "u128"]
 arbitrary = ["dep:arbitrary"]
-bolero = ["dep:bolero", "arbitrary"]
+bolero = ["arbitrary"]
 i32 = []
 i64 = []
 i128 = []
