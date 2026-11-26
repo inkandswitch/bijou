@@ -77,6 +77,19 @@ pub use crate::u64::{DecodeError, MAX_BYTES};
 // adds only the type-level domain distinction (see module docs).
 pub struct EncodedI64(crate::u64::EncodedU64);
 
+/// Delegates to the unsigned generator (uniform over tiers).
+///
+/// bijou64s is zigzag ∘ bijou64, and zigzag is a bijection, so every
+/// bijou64 encoding is the encoding of exactly one `i64`. Wrapping the
+/// unsigned arbitrary encoding is therefore valid and canonical by
+/// construction.
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for EncodedI64 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        <crate::u64::EncodedU64 as arbitrary::Arbitrary>::arbitrary(u).map(Self)
+    }
+}
+
 impl EncodedI64 {
     /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
     #[inline]
@@ -493,6 +506,20 @@ mod tests {
     #[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
     mod property {
         use super::*;
+
+        /// Every `Arbitrary` encoding decodes to a value that re-encodes
+        /// to the same bytes.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn arbitrary_encoded_is_canonical() {
+            bolero::check!()
+                .with_arbitrary::<EncodedI64>()
+                .for_each(|enc| {
+                    let (value, consumed) = decode(enc).unwrap();
+                    assert_eq!(consumed, enc.len());
+                    assert_eq!(encoded_bytes(value), *enc);
+                });
+        }
 
         #[test]
         #[cfg_attr(miri, ignore)]

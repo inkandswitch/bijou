@@ -811,8 +811,31 @@ pub fn decode_all(buf: &[u8]) -> Result<Vec<u128>, DecodeError> {
     decode_iter(buf).collect()
 }
 
+/// Uniform over tiers, then uniform within the chosen tier.
+///
+/// A uniform `u128` would almost always land in the top tier (a
+/// max-length encoding), so fuzzers would rarely see short encodings or
+/// tier boundaries. Weighting tiers equally gives every encoding length
+/// the same share. Every generated value is a valid, canonical encoding.
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for EncodedU128 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let tier = u.choose_index(NUM_TIERS + 1)?;
+        let lo = tier_offset(tier);
+        // `tier_offset` saturates past the top tier, which would exclude
+        // `u128::MAX` itself, so the top tier's bound is explicit.
+        let hi = if tier == NUM_TIERS {
+            u128::MAX
+        } else {
+            tier_offset(tier + 1) - 1
+        };
+        u.int_in_range(lo..=hi).map(encoded_bytes)
+    }
+}
+
 /// Errors that can occur when decoding a `bijou128`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DecodeError {
     /// The input buffer is shorter than the encoding requires.
     #[error("buffer too short for bijou128 encoding")]
@@ -1636,6 +1659,22 @@ mod tests {
     #[cfg(feature = "bolero")]
     mod property {
         use super::*;
+
+        /// Every `Arbitrary` encoding decodes, consumes exactly its own
+        /// length, and re-encodes to itself (i.e. it is canonical).
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn arbitrary_encoded_is_canonical() {
+            bolero::check!()
+                .with_arbitrary::<EncodedU128>()
+                .for_each(|enc| {
+                    let Ok((value, consumed)) = decode(enc) else {
+                        panic!("arbitrary EncodedU128 must decode: {enc:?}");
+                    };
+                    assert_eq!(consumed, enc.len());
+                    assert_eq!(encoded_bytes(value), *enc);
+                });
+        }
 
         #[test]
         #[cfg_attr(miri, ignore)]
