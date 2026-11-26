@@ -1,0 +1,10 @@
+[toolchain]
+# Development + CI toolchain. Single source of truth: the Nix flake reads
+# `channel` (`rustVersion`), and rustup reads this file on non-Nix runners
+# (`actions-rust-lang/setup-rust-toolchain`).
+#
+# This is NOT the MSRV. The MSRV is `workspace.package.rust-version` in
+# Cargo.toml, enforced by `nix run .#ci-msrv`.
+channel = "1.100.0"
+components = ["clippy", "rust-src"]
+targets = ["thumbv6m-none-eabi", "wasm32-unknown-unknown"]

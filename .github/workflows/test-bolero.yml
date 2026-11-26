@@ -1,5 +1,8 @@
 name: Bolero Property Tests
 
+# Tiered sweeps of the same `ci-bolero` app CI and `test:props` run locally;
+# only BOLERO_RANDOM_ITERATIONS differs.
+
 on:
   push:
     branches:
@@ -10,62 +13,71 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
+permissions:
+  contents: read
 
 jobs:
   property-tests:
+    name: ${{ matrix.label }} (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Every PR: quick smoke test of the property suite.
           - os: ubuntu-latest
-            iterations: 1000000     # 1M
-            label: "Quick"
-          # Every PR: thorough run that still finishes under a minute.
+            iterations: 1000000 # 1M
+            label: Quick
           - os: ubuntu-latest
-            iterations: 10000000    # 10M
-            label: "Thorough"
-          # Cross-platform sanity check.
+            iterations: 10000000 # 10M
+            label: Thorough
           - os: macos-latest
-            iterations: 1000000     # 1M
-            label: "Quick"
-
+            iterations: 1000000 # 1M
+            label: Quick
     runs-on: ${{ matrix.os }}
-
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         with:
-          cache: true
+          name: inkandswitch
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Run property tests (${{ matrix.label }} — ${{ matrix.iterations }} iterations)
+      - name: ci-bolero (${{ matrix.iterations }} iterations)
         env:
           BOLERO_RANDOM_ITERATIONS: ${{ matrix.iterations }}
-          RUST_BACKTRACE: "1"
-        # --release: bolero iterations are CPU-bound, debug builds are ~10x slower.
-        # tests::property: filter to the property-test module so we don't re-run
-        # the deterministic unit tests for every matrix entry.
-        run: cargo test --release --workspace --features bolero --lib tests::property
+        run: nix run .#ci-bolero
 
+  # 100M iterations (~10 min): main only, not worth blocking PRs on.
   property-tests-intense:
-    # Push-to-main only: runs ~10 minutes but exercises the full state space.
+    name: Intense (ubuntu-latest)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         with:
-          cache: true
+          name: inkandswitch
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Run property tests (Intense — 100M iterations)
+      - name: ci-bolero (100000000 iterations)
         env:
           BOLERO_RANDOM_ITERATIONS: 100000000
-          RUST_BACKTRACE: "1"
-        run: cargo test --release --workspace --features bolero --lib tests::property
+        run: nix run .#ci-bolero

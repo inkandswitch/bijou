@@ -68,7 +68,11 @@ jobs:
   # exercises the Node entrypoint; Playwright exercises the browser
   # entrypoint across chromium / firefox / webkit. Linux only — macOS
   # Playwright runs work but are slow and the bug surface is similar
-  # enough that ubuntu-latest suffices for CI.
+  # enough that one Linux runner suffices for CI.
+  #
+  # Pinned to ubuntu-24.04: `ubuntu-latest` is now 26.04, which Playwright
+  # 1.59 can't install browsers or system deps for. Bump together with
+  # `@playwright/test` once a release supports the newer image.
   #
   # Single wasm crate (bijoux_wasm): one `package.json`, one `dist/`,
   # one Playwright config covering all three widths.
@@ -79,7 +83,7 @@ jobs:
         crate: [bijoux_wasm]
 
     name: JS-package tests ${{ matrix.crate }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Force playwright to test all three engines on CI.
       PLAYWRIGHT_INCLUDE_WEBKIT: "1"
@@ -156,8 +160,8 @@ jobs:
 
       - name: Install wasm-bodge
         # wasm-bodge isn't on a package registry; we build it from source
-        # at the same commit the flake pins. Keep this in sync with
-        # `flake.lock`'s wasm-bodge-src node.
+        # at the same commit the flake pins (tag v0.5.0). Keep this in sync
+        # with `wasm-bodge-src` in flake.nix.
         run: |
           cargo install --git https://github.com/alexjg/wasm-bodge \
             --rev ee3bca139cea45a38aab78a2f2fcc136432ce25f \
