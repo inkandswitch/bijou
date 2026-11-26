@@ -203,6 +203,8 @@
           taplo
         ];
 
+        # `cargo-release` comes from unstable: the 26.05 backport of 1.1.7
+        # requires rustc >= 1.97, but 26.05 ships rustc 1.95.
         cargo-installs = with pkgs; [
           cargo-component
           cargo-criterion
@@ -211,7 +213,7 @@
           cargo-flamegraph
           cargo-nextest
           cargo-outdated
-          cargo-release
+          unstable.cargo-release
           cargo-sort
           cargo-udeps
           cargo-watch
