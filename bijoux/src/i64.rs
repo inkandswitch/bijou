@@ -77,6 +77,19 @@ pub use crate::u64::{DecodeError, MAX_BYTES};
 // adds only the type-level domain distinction (see module docs).
 pub struct EncodedI64(crate::u64::EncodedU64);
 
+/// Delegates to the unsigned generator (uniform over tiers).
+///
+/// bijou64s is zigzag ∘ bijou64, and zigzag is a bijection, so every
+/// bijou64 encoding is the encoding of exactly one `i64`. Wrapping the
+/// unsigned arbitrary encoding is therefore valid and canonical by
+/// construction.
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for EncodedI64 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        <crate::u64::EncodedU64 as arbitrary::Arbitrary>::arbitrary(u).map(Self)
+    }
+}
+
 impl EncodedI64 {
     /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
     #[inline]
@@ -89,7 +102,7 @@ impl EncodedI64 {
     #[inline]
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        false
     }
 
     /// The encoded bytes as a `&[u8]` of the correct length.
@@ -489,10 +502,54 @@ mod tests {
         }
     }
 
+    /// `size_hint`: (0, Some(0)) on empty/fused, (1, Some(len)) otherwise.
+    #[test]
+    fn size_hint() {
+        assert_eq!(decode_iter(&[]).size_hint(), (0, Some(0)));
+        assert_eq!(decode_iter(&[0x42, 0x99]).size_hint(), (1, Some(2)));
+
+        // A multi-byte tag with no payload errors, then fuses.
+        let mut errored = decode_iter(&[0xF8]);
+        assert!(matches!(errored.next(), Some(Err(_))));
+        assert_eq!(errored.size_hint(), (0, Some(0)));
+    }
+
     #[cfg(feature = "bolero")]
     #[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::panic)]
     mod property {
         use super::*;
+
+        /// The slice-like surface (`is_empty`, `Borrow<[u8]>`, `&` into-iter)
+        /// all expose exactly the encoded bytes.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn slice_surface_matches_as_slice() {
+            use core::borrow::Borrow;
+
+            bolero::check!()
+                .with_arbitrary::<EncodedI64>()
+                .for_each(|enc| {
+                    assert!(!enc.is_empty());
+                    let borrowed: &[u8] = enc.borrow();
+                    assert_eq!(borrowed, enc.as_slice());
+                    let iterated: Vec<u8> = enc.into_iter().copied().collect();
+                    assert_eq!(iterated, enc.as_slice());
+                });
+        }
+
+        /// Every `Arbitrary` encoding decodes to a value that re-encodes
+        /// to the same bytes.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn arbitrary_encoded_is_canonical() {
+            bolero::check!()
+                .with_arbitrary::<EncodedI64>()
+                .for_each(|enc| {
+                    let (value, consumed) = decode(enc).unwrap();
+                    assert_eq!(consumed, enc.len());
+                    assert_eq!(encoded_bytes(value), *enc);
+                });
+        }
 
         #[test]
         #[cfg_attr(miri, ignore)]

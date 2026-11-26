@@ -80,3 +80,6 @@ mod u64;
 mod codec;
 
 pub use codec::{Decode, Encode};
+
+#[cfg(test)]
+mod test_utils;
