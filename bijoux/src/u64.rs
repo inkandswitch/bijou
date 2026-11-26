@@ -262,39 +262,22 @@ pub fn encode(value: u64, buf: &mut Vec<u8>) {
 /// let collected: Vec<u8> = enc.into_iter().collect();
 /// assert_eq!(collected, [0xF8, 0x34]);
 /// ```
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EncodedU64 {
+    /// The encoded bytes followed by zero padding: `buf[self.len()..]`
+    /// is always zero. The length isn't stored; the tag byte `buf[0]`
+    /// determines it (see [`EncodedU64::len`]).
+    ///
+    /// The derived `Eq`/`Ord` therefore compare the fixed-size array,
+    /// which is equivalent to comparing [`EncodedU64::as_slice`] (as
+    /// `Borrow<[u8]>` requires): two encodings either differ at the tag
+    /// byte, or have the same length and identical zero tails.
     buf: [u8; MAX_BYTES],
-    /// Invariant: `len <= MAX_BYTES`. Stored as `u8` because the value
-    /// is always in `1..=9`; the smaller width makes `EncodedU64`
-    /// fit in 10 bytes total and `Copy` cheaper.
-    len: u8,
 }
 
-// We implement `PartialEq`, `Eq`, `Hash`, `PartialOrd`, and `Ord` by
-// hand against the encoded byte slice (`self.as_slice()`) rather than
-// deriving them on the `(buf, len)` pair. Two reasons:
-//
-//  1. The trailing `MAX_BYTES - len` bytes of `buf` are always zero,
-//     so a derived `PartialEq` *would* compare them and give the same
-//     answer — but only because we maintain that zero-padding
-//     invariant. Comparing the live slice removes that subtle
-//     coupling.
-//
-//  2. Bijou's lex-order property (SPEC.md: "lexicographic byte order
-//     equals numeric order") is the natural ordering for these
-//     values. Making `Ord` explicitly compare `as_slice()` documents
-//     the intent at the impl site.
-
-impl PartialEq for EncodedU64 {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.as_slice() == other.as_slice()
-    }
-}
-
-impl Eq for EncodedU64 {}
-
+// `Hash` is hand-written rather than derived: hashing the whole array would
+// feed `MAX_BYTES` bytes instead of `len()`, and `Borrow<[u8]>` requires the
+// hash to match `<[u8] as Hash>`.
 impl core::hash::Hash for EncodedU64 {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
@@ -302,28 +285,29 @@ impl core::hash::Hash for EncodedU64 {
     }
 }
 
-impl PartialOrd for EncodedU64 {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for EncodedU64 {
-    #[inline]
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Bijou's lex-order property: byte-lex order = numeric order.
-        self.as_slice().cmp(other.as_slice())
+impl core::fmt::Debug for EncodedU64 {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("EncodedU64").field(&self.as_slice()).finish()
     }
 }
 
 impl EncodedU64 {
     /// Length of the encoding in bytes (always in `1..=MAX_BYTES`).
+    ///
+    /// Derived from the tag byte, not stored: single-byte values are their
+    /// own tag, and tag `TAG_THRESHOLD + t - 1` means a `t`-byte payload.
+    /// The largest tag (`0xFF`) gives exactly `MAX_BYTES`, so the result is
+    /// always in bounds for `buf`.
     #[inline]
     #[must_use]
     #[cfg_attr(not(feature = "u64"), allow(clippy::trivially_copy_pass_by_ref))]
     pub const fn len(&self) -> usize {
-        self.len as usize
+        let tag = self.buf[0];
+        if tag < TAG_THRESHOLD {
+            1
+        } else {
+            (tag - TAG_THRESHOLD) as usize + 2
+        }
     }
 
     /// Always `false`. Bijou encodings are never empty; the smallest
@@ -351,7 +335,7 @@ impl EncodedU64 {
         // const-usable in a slice index expression directly, but we
         // can hand-roll a `split_at` style call. `&buf[..n]` works in
         // const fn as of Rust 1.85+.
-        self.buf.split_at(self.len as usize).0
+        self.buf.split_at(self.len()).0
     }
 }
 
@@ -425,7 +409,6 @@ pub const fn encoded_bytes(value: u64) -> EncodedU64 {
     if value < BOUNDS[0] {
         return EncodedU64 {
             buf: [(value & 0xFF) as u8, 0, 0, 0, 0, 0, 0, 0, 0],
-            len: 1,
         };
     }
 
@@ -446,9 +429,6 @@ pub const fn encoded_bytes(value: u64) -> EncodedU64 {
 
     EncodedU64 {
         buf: [tag, pb[0], pb[1], pb[2], pb[3], pb[4], pb[5], pb[6], pb[7]],
-        // Invariant: `tier ∈ [1, 8]` and `1 <= tier + 1 <= MAX_BYTES = 9`,
-        // so the cast cannot truncate.
-        len: (tier + 1) as u8,
     }
 }
 
@@ -1597,6 +1577,20 @@ mod tests {
                 .with_arbitrary::<(EncodedU64, EncodedU64)>()
                 .for_each(|(a, b)| {
                     assert_eq!(a.partial_cmp(b), Some(a.cmp(b)));
+                });
+        }
+
+        /// The derived array `Eq`/`Ord` agree with comparing the encoded
+        /// slices. This is what makes them consistent with `Borrow<[u8]>`,
+        /// and it rests on the zero-padding invariant documented on `buf`.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn eq_and_cmp_match_slice() {
+            bolero::check!()
+                .with_arbitrary::<(EncodedU64, EncodedU64)>()
+                .for_each(|(a, b)| {
+                    assert_eq!(a.cmp(b), a.as_slice().cmp(b.as_slice()));
+                    assert_eq!(a == b, a.as_slice() == b.as_slice());
                 });
         }
 
