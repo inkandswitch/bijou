@@ -1,8 +1,6 @@
 # Signed Shootout Analysis
 
-_Captured 2026-07-22 from a single complete run of the shipped
-`bijoux::i64` module (criterion lane id `bijou64s`) against the
-published signed varint crates._
+_Captured 2026-07-22 from a single complete run of the shipped `bijoux::i64` module (criterion lane id `bijou64s`) against the published signed varint crates._
 
 ## Setup
 
@@ -14,10 +12,7 @@ published signed varint crates._
 | Profile | `bench` (`opt-level = 3`, `lto = "thin"`, `codegen-units = 1`)                                    |
 | Batch   | 4096 values per distribution, seed `0xBEEF_CAFE_DEAD_F00D`                                        |
 
-Speed values are criterion medians in **µs per 4096-value batch**;
-lower is better. **Bold = lowest in row.** Expect ~5–15 % run-to-run
-variance; treat sub-10 % gaps as ties. The `boundary` distribution
-(adversarial tier-edge alternation) is the suite's noisiest cell.
+Speed values are criterion medians in **µs per 4096-value batch**; lower is better. **Bold = lowest in row.** Expect ~5–15 % run-to-run variance; treat sub-10 % gaps as ties. The `boundary` distribution (adversarial tier-edge alternation) is the suite's noisiest cell.
 
 ## Lanes
 
@@ -28,21 +23,14 @@ variance; treat sub-10 % gaps as ties. The `boundary` distribution
 | `vu128`    | `vu128` crate's native signed API (zigzag internally)                                  |
 | `sleb128`  | `leb128` crate's native signed LEB128                                                  |
 
-Distributions: `medium ±2³¹` draws magnitudes 32 768..2³¹ with random
-sign; `medium all+` / `medium all−` fix the sign.
+Distributions: `medium ±2³¹` draws magnitudes 32 768..2³¹ with random sign; `medium all+` / `medium all−` fix the sign.
 
-The first eight distributions mirror the unsigned shootout's bands
-around zero — useful for coverage, but they overweight regions real
-signed data rarely occupies. The last three model how signed integers
-actually occur:
+The first eight distributions mirror the unsigned shootout's bands around zero — useful for coverage, but they overweight regions real signed data rarely occupies. The last three model how signed integers actually occur:
 
 - `deltas ±16` — uniform micro-deltas (cursor/clock steps)
 - `deltas geom` — two-sided geometric magnitudes (p = 0.96, mean
   |v| ≈ 24): a generic decaying-delta model
-- `hexane mix` — shaped by the hexane census (1.35M real delta values
-  from the automerge 260k-edit trace): 74 % in the 1-byte window,
-  7.3 % in the rest of |v| ≤ 256, 18.8 % in the measured bit-length
-  tail
+- `hexane mix` — shaped by the hexane census (1.35M real delta values from the automerge 260k-edit trace): 74 % in the 1-byte window, 7.3 % in the rest of |v| ≤ 256, 18.8 % in the measured bit-length tail
 
 ## Encode
 
@@ -76,9 +64,7 @@ actually occur:
 | deltas geom  |   **2.47** |    11.5 |  10.7 |    5.31 |
 | hexane mix   |   **3.18** |    15.5 |  16.4 |    11.0 |
 
-\* Transient outlier: a longer re-measure immediately after gave
-5.64 µs. The boundary distribution is adversarial for branch
-predictors.
+\* Transient outlier: a longer re-measure immediately after gave 5.64 µs. The boundary distribution is adversarial for branch predictors.
 
 ## Stream decode
 
@@ -107,8 +93,7 @@ predictors.
 | boundary     |     2.92 | **1.79** |
 | uniform      |     3.15 | **1.70** |
 
-vu64's power-of-two tiers win the length query, as in the unsigned
-shootout — format-bound; see [`OPTIMISATION.md`](../design/OPTIMISATION.md).
+vu64's power-of-two tiers win the length query, as in the unsigned shootout — format-bound; see [`OPTIMISATION.md`](../design/OPTIMISATION.md).
 
 ## Density (bytes/value)
 
@@ -130,21 +115,7 @@ Deterministic (format property, not a timing).
 
 ## Reading the results
 
-- `bijou64s` beats every external lane on every decode and
-  stream-decode cell, and every encode cell except small-vs-sleb128.
-  Decode tiny at 2.0 µs per 4096 values ≈ **2 billion values/sec**
-  (~0.5 ns/value on single-byte encodings).
-- Density is within ~1 % of the 7-bit-per-byte family on multi-byte
-  tiers and 49 % better on the single-byte window (±124 vs ±63).
-- **On the signed-realistic distributions the density question
-  resolves in bijou64s's favour**: the synthetic `small ±32k` band
-  (where bijou's byte-granular tiers cost ~10 % vs LEB's 7-bit tiers)
-  is a transit zone real data passes through, not parks in. On the
-  census-shaped `hexane mix`, bijou64s is **12 % denser** than SLEB128
-  (1.510 vs 1.718 B/val) *and* 3.5× faster to decode; on geometric
-  deltas, 6 % denser. The fat 1-byte window wins more than the
-  mid-band loses — which is why the tier geometry is not fork-worthy
-  for the signed formats.
-- Alternative in-house signed designs (a two's-complement passthrough
-  and a sign-in-tag layout) were prototyped, benchmarked, and rejected
-  during design; see [REJECTED_ALTERNATIVES.md](../design/REJECTED_ALTERNATIVES.md).
+- `bijou64s` beats every external lane on every decode and stream-decode cell, and every encode cell except small-vs-sleb128. Decode tiny at 2.0 µs per 4096 values ≈ **2 billion values/sec** (~0.5 ns/value on single-byte encodings).
+- Density is within ~1 % of the 7-bit-per-byte family on multi-byte tiers and 49 % better on the single-byte window (±124 vs ±63).
+- **On the signed-realistic distributions the density question resolves in bijou64s's favour**: the synthetic `small ±32k` band (where bijou's byte-granular tiers cost ~10 % vs LEB's 7-bit tiers) is a transit zone real data passes through, not parks in. On the census-shaped `hexane mix`, bijou64s is **12 % denser** than SLEB128 (1.510 vs 1.718 B/val) *and* 3.5× faster to decode; on geometric deltas, 6 % denser. The fat 1-byte window wins more than the mid-band loses — which is why the tier geometry is not fork-worthy for the signed formats.
+- Alternative in-house signed designs (a two's-complement passthrough and a sign-in-tag layout) were prototyped, benchmarked, and rejected during design; see [REJECTED_ALTERNATIVES.md](../design/REJECTED_ALTERNATIVES.md).

@@ -1,15 +1,10 @@
 # 💎 bijoux
 
-_Bijoux_ — bijective, length-prefixed variable-length integer
-encodings, one canonical format per integer type.
+_Bijoux_ — bijective, length-prefixed variable-length integer encodings, one canonical format per integer type.
 
-The name is a double reading: **bijouX**, with `X` ranging over the
-widths ([bijou]32, bijou64, bijou128, …), and the French plural — the
-crate that holds all of the bijous.
+The name is a double reading: **bijouX**, with `X` ranging over the widths ([bijou]32, bijou64, bijou128, …), and the French plural — the crate that holds all of the bijous.
 
-Each width is a module gated by a feature (all enabled by default), and
-the `Encode` / `Decode` traits are implemented directly on the integer
-types:
+Each width is a module gated by a feature (all enabled by default), and the `Encode` / `Decode` traits are implemented directly on the integer types:
 
 ```rust
 use bijoux::{Decode, Encode};
@@ -33,10 +28,7 @@ bijoux::u64::encode(300, &mut buf);
 | `bijoux::u64`    | bijou64     | 9         | [specs/bijou64.md](../specs/bijou64.md)   |
 | `bijoux::u128`   | bijou128    | 17        | [specs/bijou128.md](../specs/bijou128.md) |
 
-The signed format (`bijoux::i64`) is standard [zigzag] over the bijou64
-tier scheme: 1 byte for `[-124, +123]`, canonical, but byte order is
-zigzag order rather than numeric order — don't use it for memcomparable
-keys.
+The signed format (`bijoux::i64`) is standard [zigzag] over the bijou64 tier scheme: 1 byte for `[-124, +123]`, canonical, but byte order is zigzag order rather than numeric order — don't use it for memcomparable keys.
 
 [zigzag]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 
@@ -44,7 +36,6 @@ keys.
 
 ## License
 
-Code is MIT OR Apache-2.0. The encoding specifications
-([`specs/`](../specs)) are CC BY-SA 4.0.
+Code is MIT OR Apache-2.0. The encoding specifications ([`specs/`](../specs)) are CC BY-SA 4.0.
 
 [bijou]: https://github.com/inkandswitch/bijou

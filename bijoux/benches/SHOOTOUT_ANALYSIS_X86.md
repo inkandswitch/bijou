@@ -101,21 +101,15 @@ Encode to a `Vec<u8>`.
 <details open>
 <summary>Charts</summary>
 
-![Encode — Bar Chart](../charts/x86/encode_bar.svg)
-![Encode — Box Plot](../charts/x86/encode_box.svg)
-![Encode — CDF](../charts/x86/encode_cdf.svg)
+![Encode — Bar Chart](../charts/x86/encode_bar.svg) ![Encode — Box Plot](../charts/x86/encode_box.svg) ![Encode — CDF](../charts/x86/encode_cdf.svg)
 
 </details>
 
 ## Encoded Size Query (runtime)
 
-Wall-clock time to call `encoded_len(v)` across the 6 distributions.
-vu128 and leb128 are excluded: neither crate exposes a standalone
-`encoded_len(u64)` query (both compute size only as a side effect of
-encoding).
+Wall-clock time to call `encoded_len(v)` across the 6 distributions. vu128 and leb128 are excluded: neither crate exposes a standalone `encoded_len(u64)` query (both compute size only as a side effect of encoding).
 
-> For the arch-independent _format_ size comparison (how many bytes
-> each format uses), see [SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md).
+> For the arch-independent _format_ size comparison (how many bytes each format uses), see [SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md).
 
 | Distribution    | bijou64 | varu64 | vu64     | bijou64 rank | bijou64 vs other best |
 |-----------------|--------:|-------:|---------:|--------------|-----------------------|
@@ -129,18 +123,11 @@ encoding).
 <details open>
 <summary>Charts</summary>
 
-![Encoded Size — Bar Chart](../charts/x86/encoded_size_bar.svg)
-![Encoded Size — Box Plot](../charts/x86/encoded_size_box.svg)
-![Encoded Size — CDF](../charts/x86/encoded_size_cdf.svg)
+![Encoded Size — Bar Chart](../charts/x86/encoded_size_bar.svg) ![Encoded Size — Box Plot](../charts/x86/encoded_size_box.svg) ![Encoded Size — CDF](../charts/x86/encoded_size_cdf.svg)
 
 </details>
 
-vu64 wins every cell because its tier boundaries are exact powers of
-2, so `encoded_len` reduces to a single `leading_zeros` instruction
-with no correction step. bijou64's per-tier offsets force an extra
-comparison; the gap (~2.2-2.5x) is unavoidable for the
-canonicality-preserving path. See [OPTIMISATION.md](../design/OPTIMISATION.md)
-for the full analysis.
+vu64 wins every cell because its tier boundaries are exact powers of 2, so `encoded_len` reduces to a single `leading_zeros` instruction with no correction step. bijou64's per-tier offsets force an extra comparison; the gap (~2.2-2.5x) is unavoidable for the canonicality-preserving path. See [OPTIMISATION.md](../design/OPTIMISATION.md) for the full analysis.
 
 ## Decode
 
@@ -158,9 +145,7 @@ Decode from a `&[u8]` buffer.
 <details open>
 <summary>Charts</summary>
 
-![Decode — Bar Chart](../charts/x86/decode_bar.svg)
-![Decode — Box Plot](../charts/x86/decode_box.svg)
-![Decode — CDF](../charts/x86/decode_cdf.svg)
+![Decode — Bar Chart](../charts/x86/decode_bar.svg) ![Decode — Box Plot](../charts/x86/decode_box.svg) ![Decode — CDF](../charts/x86/decode_cdf.svg)
 
 </details>
 
@@ -185,8 +170,7 @@ bijou64 achieves canonicality structurally: its disjoint tier ranges make overlo
 <details open>
 <summary>Charts</summary>
 
-![Canonical Decode — Bar Chart](../charts/x86/canonical_decode_bar.svg)
-![Canonical Decode — CDF](../charts/x86/canonical_decode_cdf.svg)
+![Canonical Decode — Bar Chart](../charts/x86/canonical_decode_bar.svg) ![Canonical Decode — CDF](../charts/x86/canonical_decode_cdf.svg)
 
 </details>
 
@@ -210,8 +194,7 @@ Decode a concatenated stream of encoded values, advancing a cursor by the number
 <details open>
 <summary>Charts</summary>
 
-![Stream Decode — Bar Chart](../charts/x86/stream_decode_bar.svg)
-![Stream Decode — CDF](../charts/x86/stream_decode_cdf.svg)
+![Stream Decode — Bar Chart](../charts/x86/stream_decode_bar.svg) ![Stream Decode — CDF](../charts/x86/stream_decode_cdf.svg)
 
 </details>
 
@@ -233,10 +216,7 @@ Heatmaps provide a quick visual overview of which library performs best across a
 <details>
 <summary>Heatmaps (click to expand)</summary>
 
-![Decode Heatmap](../charts/x86/decode_heatmap.svg)
-![Canonical Decode Heatmap](../charts/x86/canonical_decode_heatmap.svg)
-![Stream Decode Heatmap](../charts/x86/stream_decode_heatmap.svg)
-![Encode Heatmap](../charts/x86/encode_heatmap.svg)
+![Decode Heatmap](../charts/x86/decode_heatmap.svg) ![Canonical Decode Heatmap](../charts/x86/canonical_decode_heatmap.svg) ![Stream Decode Heatmap](../charts/x86/stream_decode_heatmap.svg) ![Encode Heatmap](../charts/x86/encode_heatmap.svg)
 
 </details>
 
@@ -254,27 +234,13 @@ On Zen 5, bijou64 wins **23 of 30** shootout cells outright:
 | stream_decode    | 6/6  | 0    |                                                   |
 | canonical_decode | 6/6  | 0    |                                                   |
 
-bijou64 is the fastest decoder on every distribution, in every
-benchmark variant (plain decode, canonical decode, stream decode),
-by margins of roughly 1.9–4×. The narrowest margin (1.93×) is
-`stream_decode/small` vs varu64; the widest (~4×) is
-`stream_decode/large` vs vu64. Structural canonicality is free,
-making bijou64 the unambiguous choice for protocols that decode
-more than they encode and that need deterministic serialisation.
+bijou64 is the fastest decoder on every distribution, in every benchmark variant (plain decode, canonical decode, stream decode), by margins of roughly 1.9–4×. The narrowest margin (1.93×) is `stream_decode/small` vs varu64; the widest (~4×) is `stream_decode/large` vs vu64. Structural canonicality is free, making bijou64 the unambiguous choice for protocols that decode more than they encode and that need deterministic serialisation.
 
-On the encode side, bijou64 wins 5 of 6 distributions; only `small`
-goes to leb128 (1.24× faster on the 248–64k uniform range). leb128's
-tight 2-byte-write loop happens to fit Zen 5's pipeline particularly
-well for tier-2-heavy distributions.
+On the encode side, bijou64 wins 5 of 6 distributions; only `small` goes to leb128 (1.24× faster on the 248–64k uniform range). leb128's tight 2-byte-write loop happens to fit Zen 5's pipeline particularly well for tier-2-heavy distributions.
 
 The cells bijou64 loses are all format-bound:
 
-- `encoded_size` non-tiny — ~2.2–2.5× behind vu64 across all 5
-  distributions. vu64's power-of-2 boundaries let it skip the per-tier
-  correction step bijou64 must perform; for `encoded_len`'s arithmetic-
-  only path that delta is unavoidable.
+- `encoded_size` non-tiny — ~2.2–2.5× behind vu64 across all 5 distributions. vu64's power-of-2 boundaries let it skip the per-tier correction step bijou64 must perform; for `encoded_len`'s arithmetic- only path that delta is unavoidable.
 - `encoded_size/tiny` — varu64 wins (~1.9× over bijou64).
 
-These gaps are the price of bijective canonicality. For the
-canonical-decode workloads that motivate bijou64, the trade is
-overwhelmingly favourable.
+These gaps are the price of bijective canonicality. For the canonical-decode workloads that motivate bijou64, the trade is overwhelmingly favourable.

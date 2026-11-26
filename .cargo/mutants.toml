@@ -1,0 +1,37 @@
+# cargo-mutants configuration.
+# https://mutants.rs/options.html#config-files
+#
+# Single source of truth for local (`nix run .#ci-mutants`) and CI runs
+# (`ci.yml` on the PR diff, `mutants.yml` nightly over everything).
+
+# cargo-mutants already skips `#[cfg(test)]` code and `mod tests`, but not
+# integration tests, benches, or examples. Those *are* the tests we measure
+# against, not subjects under test.
+exclude_globs = [
+    "**/benches/**",
+    "**/build.rs",
+    "**/examples/**",
+    "**/tests/**",
+
+    # Wasm shim crate: thin `#[wasm_bindgen]` delegations to `bijoux`. Host
+    # tests can't exercise them, so their mutants survive by construction.
+    # Coverage comes from `bijoux` itself, `wasm-pack test`, and Playwright.
+    "bijoux_wasm/**",
+]
+
+# Mutation patterns that are never part of codec correctness.
+exclude_re = [
+    "impl .*Debug for ",
+    "impl .*Display for ",
+    "impl .*arbitrary::Arbitrary.* for ",
+]
+
+# Enable the bolero property tests: they are what kills most arithmetic
+# mutants in the tier/offset math. `bolero` implies `arbitrary`.
+features = ["bijoux/bolero"]
+
+# Shared CI runners are noisy; 2× the unmutated test time before a mutant
+# counts as a timeout, with a floor so a fast baseline doesn't kill
+# legitimate property-test runs early.
+minimum_test_timeout = 60
+timeout_multiplier = 2.0

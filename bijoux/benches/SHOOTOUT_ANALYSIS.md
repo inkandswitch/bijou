@@ -67,24 +67,8 @@ bijou64 cell-by-cell standing per architecture (5 ops × 6 distributions = 30 ce
 
 \* ARM's `stream_decode` table predates the inclusion of vu128 in the bench (added 2026-05-27 with the same per-iteration `[u8; 9]` copy as plain decode). On x86 the addition did not flip any stream_decode cell; ARM verification awaits a re-run on M2 hardware. See [SHOOTOUT_ANALYSIS_ARM.md](SHOOTOUT_ANALYSIS_ARM.md#stream-decode).
 
-bijou64 is the fastest decoder on every distribution, on both
-architectures, across all three decode variants (plain, canonical,
-stream), and the fastest encoder on 5 of 6 distributions. The sole
-encode loss on each platform is `small` going to leb128, whose tight
-2-byte-write loop fits both Zen 5's and M2's pipelines well for the
-tier-2-heavy 248–64k range.
+bijou64 is the fastest decoder on every distribution, on both architectures, across all three decode variants (plain, canonical, stream), and the fastest encoder on 5 of 6 distributions. The sole encode loss on each platform is `small` going to leb128, whose tight 2-byte-write loop fits both Zen 5's and M2's pipelines well for the tier-2-heavy 248–64k range.
 
-The cells bijou64 loses on `encoded_size` are format-bound: vu64's
-power-of-2 boundaries skip the per-tier correction step bijou64
-must perform, leaving an unavoidable arithmetic gap on
-`encoded_len`'s allocation-free path. This is a property of the
-canonical format, not the implementation — see
-[SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md) for the format-level trade-off
-table.
+The cells bijou64 loses on `encoded_size` are format-bound: vu64's power-of-2 boundaries skip the per-tier correction step bijou64 must perform, leaving an unavoidable arithmetic gap on `encoded_len`'s allocation-free path. This is a property of the canonical format, not the implementation — see [SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md) for the format-level trade-off table.
 
-For workloads that care about canonical encoding — content-addressed
-hashes, deterministic serialisation — bijou64's structural
-canonicality means the canonical decode path is identical to plain
-decode, while non-canonical formats pay ~2× more (e.g. leb128 hits
-~53 µs on Zen 5 / ~55 µs on M2 for `large/uniform` canonical decode,
-versus ~30 µs / ~35 µs without the check).
+For workloads that care about canonical encoding — content-addressed hashes, deterministic serialisation — bijou64's structural canonicality means the canonical decode path is identical to plain decode, while non-canonical formats pay ~2× more (e.g. leb128 hits ~53 µs on Zen 5 / ~55 µs on M2 for `large/uniform` canonical decode, versus ~30 µs / ~35 µs without the check).

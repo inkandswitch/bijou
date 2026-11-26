@@ -278,7 +278,7 @@ mod u32 {
     #[wasm_bindgen_test]
     fn decode_all_empty_returns_empty() {
         let result = decode_all_u32(&u8s(&[])).expect("empty input decodes to empty array");
-        assert!(result.is_empty());
+        assert_eq!(result, Vec::<u32>::new());
     }
 
     #[wasm_bindgen_test]
@@ -575,7 +575,7 @@ mod u64 {
     #[wasm_bindgen_test]
     fn decode_all_empty_returns_empty() {
         let result = decode_all_u64(&u8s(&[])).expect("empty input decodes to empty array");
-        assert!(result.is_empty());
+        assert_eq!(result, Vec::<u64>::new());
     }
 
     #[wasm_bindgen_test]

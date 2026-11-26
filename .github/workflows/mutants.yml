@@ -1,0 +1,113 @@
+name: Mutation Tests (full)
+
+# Full-workspace mutation sweep. PRs get a diff-scoped run in ci.yml; this
+# catches gaps in code nobody has touched recently. Opens (deduplicated)
+# issues instead of just going red, since nobody watches scheduled runs.
+
+on:
+  schedule:
+    # 03:17 UTC daily — offset from :00 to avoid the cron stampede.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    name: ci-mutants (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+
+      - name: ci-mutants
+        id: mutants
+        run: |
+          set +e
+          nix run .#ci-mutants
+          code=$?
+          set -e
+          missed=0
+          if [ -f mutants.out/missed.txt ]; then
+            missed=$(wc -l < mutants.out/missed.txt)
+          fi
+          # Non-zero exit with zero missed mutants is a baseline/config
+          # failure, not a coverage gap; report it differently.
+          baseline_failed=0
+          if [ "$code" -ne 0 ] && [ "$missed" -eq 0 ]; then
+            baseline_failed=1
+          fi
+          echo "missed=$missed" >> "$GITHUB_OUTPUT"
+          echo "baseline_failed=$baseline_failed" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Upload mutants report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mutants-report-full
+          path: mutants.out
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Open issue
+        if: |
+          always()
+          && github.event_name == 'schedule'
+          && (steps.mutants.outputs.missed != '0' || steps.mutants.outputs.baseline_failed == '1')
+        uses: actions/github-script@v7
+        env:
+          MISSED: ${{ steps.mutants.outputs.missed }}
+          BASELINE_FAILED: ${{ steps.mutants.outputs.baseline_failed }}
+        with:
+          script: |
+            const baseline = process.env.BASELINE_FAILED === '1';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = baseline
+              ? 'Nightly mutants: baseline failure'
+              : 'Nightly mutants: surviving mutants';
+            const body = (baseline
+              ? [
+                  'cargo-mutants failed without reporting any missed mutants: the unmutated baseline did not build or pass.',
+                  '',
+                  'Check `mutants.out/log/baseline.log` in the artifact and `.cargo/mutants.toml`.',
+                ]
+              : [
+                  `The nightly run found ${process.env.MISSED} surviving mutant(s).`,
+                  '',
+                  'See `missed.txt` in the `mutants-report-full` artifact. Add tests that kill them, or exclude them in `.cargo/mutants.toml` with a reason.',
+                ]
+            ).concat(['', `- Run: ${runUrl}`, `- Date: ${new Date().toISOString().slice(0, 10)}`]).join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'mutation-testing',
+              per_page: 100,
+            });
+            if (existing.data.some(i => i.title === title)) {
+              core.info(`Issue already open: ${title}`);
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['mutation-testing'],
+            });
