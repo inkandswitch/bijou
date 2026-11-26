@@ -1573,6 +1573,33 @@ mod tests {
     mod property {
         use super::*;
 
+        /// `Hash` feeds exactly what the borrowed `[u8]` would. This is the
+        /// `Borrow<[u8]>` contract that lets a `HashMap<EncodedU64, _>` be
+        /// queried by `&[u8]`.
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn hash_matches_borrowed_slice() {
+            bolero::check!()
+                .with_arbitrary::<EncodedU64>()
+                .for_each(|enc| {
+                    assert_eq!(
+                        crate::test_support::hash_stream(enc),
+                        crate::test_support::hash_stream(enc.as_slice())
+                    );
+                });
+        }
+
+        /// `PartialOrd` agrees with `Ord` (total: never `None`).
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn partial_cmp_matches_cmp() {
+            bolero::check!()
+                .with_arbitrary::<(EncodedU64, EncodedU64)>()
+                .for_each(|(a, b)| {
+                    assert_eq!(a.partial_cmp(b), Some(a.cmp(b)));
+                });
+        }
+
         /// Every `Arbitrary` encoding decodes, consumes exactly its own
         /// length, and re-encodes to itself (i.e. it is canonical).
         #[test]
