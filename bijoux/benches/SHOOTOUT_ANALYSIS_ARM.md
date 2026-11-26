@@ -98,9 +98,7 @@ Encode to a `Vec<u8>`.
 <details open>
 <summary>Charts</summary>
 
-![Encode — Bar Chart](../charts/arm/encode_bar.svg)
-![Encode — Box Plot](../charts/arm/encode_box.svg)
-![Encode — CDF](../charts/arm/encode_cdf.svg)
+![Encode — Bar Chart](../charts/arm/encode_bar.svg) ![Encode — Box Plot](../charts/arm/encode_box.svg) ![Encode — CDF](../charts/arm/encode_cdf.svg)
 
 </details>
 
@@ -108,13 +106,9 @@ bijou64 wins 5 of 6 encode distributions on M2 Pro. The sole loss is `small` to 
 
 ## Encoded Size Query (runtime)
 
-Wall-clock time to call `encoded_len(v)` across the 6 distributions.
-vu128 and leb128 are excluded: neither crate exposes a standalone
-`encoded_len(u64)` query (both compute size only as a side effect of
-encoding).
+Wall-clock time to call `encoded_len(v)` across the 6 distributions. vu128 and leb128 are excluded: neither crate exposes a standalone `encoded_len(u64)` query (both compute size only as a side effect of encoding).
 
-> For the arch-independent _format_ size comparison (how many bytes
-> each format uses), see [SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md).
+> For the arch-independent _format_ size comparison (how many bytes each format uses), see [SIZE_ANALYSIS.md](../design/SIZE_ANALYSIS.md).
 
 | Distribution    | bijou64  | varu64   | vu64     | bijou64 rank        | bijou64 vs other best |
 |-----------------|---------:|---------:|---------:|---------------------|-----------------------|
@@ -128,19 +122,11 @@ encoding).
 <details open>
 <summary>Charts</summary>
 
-![Encoded Size — Bar Chart](../charts/arm/encoded_size_bar.svg)
-![Encoded Size — Box Plot](../charts/arm/encoded_size_box.svg)
-![Encoded Size — CDF](../charts/arm/encoded_size_cdf.svg)
+![Encoded Size — Bar Chart](../charts/arm/encoded_size_bar.svg) ![Encoded Size — Box Plot](../charts/arm/encoded_size_box.svg) ![Encoded Size — CDF](../charts/arm/encoded_size_cdf.svg)
 
 </details>
 
-vu64 wins every cell because its tier boundaries are exact powers of
-2, so `encoded_len` reduces to a single `clz` with no correction step.
-bijou64's per-tier offsets force an extra comparison; the gap
-(~2.9-3.2x) is unavoidable for the canonicality-preserving path. On
-`tiny`, bijou64 and varu64 are a statistical tie (1.369 us vs 1.372
-us; the difference is well inside criterion's confidence interval).
-See [OPTIMISATION.md](../design/OPTIMISATION.md) for the full analysis.
+vu64 wins every cell because its tier boundaries are exact powers of 2, so `encoded_len` reduces to a single `clz` with no correction step. bijou64's per-tier offsets force an extra comparison; the gap (~2.9-3.2x) is unavoidable for the canonicality-preserving path. On `tiny`, bijou64 and varu64 are a statistical tie (1.369 us vs 1.372 us; the difference is well inside criterion's confidence interval). See [OPTIMISATION.md](../design/OPTIMISATION.md) for the full analysis.
 
 ## Decode
 
@@ -158,9 +144,7 @@ Decode from a `&[u8]` buffer.
 <details open>
 <summary>Charts</summary>
 
-![Decode — Bar Chart](../charts/arm/decode_bar.svg)
-![Decode — Box Plot](../charts/arm/decode_box.svg)
-![Decode — CDF](../charts/arm/decode_cdf.svg)
+![Decode — Bar Chart](../charts/arm/decode_bar.svg) ![Decode — Box Plot](../charts/arm/decode_box.svg) ![Decode — CDF](../charts/arm/decode_cdf.svg)
 
 </details>
 
@@ -184,8 +168,7 @@ bijou64 achieves canonicality structurally: its disjoint tier ranges make overlo
 <details open>
 <summary>Charts</summary>
 
-![Canonical Decode — Bar Chart](../charts/arm/canonical_decode_bar.svg)
-![Canonical Decode — CDF](../charts/arm/canonical_decode_cdf.svg)
+![Canonical Decode — Bar Chart](../charts/arm/canonical_decode_bar.svg) ![Canonical Decode — CDF](../charts/arm/canonical_decode_cdf.svg)
 
 </details>
 
@@ -212,8 +195,7 @@ Decode a concatenated stream of encoded values, advancing a cursor by the number
 <details open>
 <summary>Charts</summary>
 
-![Stream Decode — Bar Chart](../charts/arm/stream_decode_bar.svg)
-![Stream Decode — CDF](../charts/arm/stream_decode_cdf.svg)
+![Stream Decode — Bar Chart](../charts/arm/stream_decode_bar.svg) ![Stream Decode — CDF](../charts/arm/stream_decode_cdf.svg)
 
 </details>
 
@@ -232,10 +214,7 @@ Heatmaps provide a quick visual overview of which library performs best across a
 <details>
 <summary>Heatmaps (click to expand)</summary>
 
-![Decode Heatmap](../charts/arm/decode_heatmap.svg)
-![Canonical Decode Heatmap](../charts/arm/canonical_decode_heatmap.svg)
-![Stream Decode Heatmap](../charts/arm/stream_decode_heatmap.svg)
-![Encode Heatmap](../charts/arm/encode_heatmap.svg)
+![Decode Heatmap](../charts/arm/decode_heatmap.svg) ![Canonical Decode Heatmap](../charts/arm/canonical_decode_heatmap.svg) ![Stream Decode Heatmap](../charts/arm/stream_decode_heatmap.svg) ![Encode Heatmap](../charts/arm/encode_heatmap.svg)
 
 </details>
 
@@ -243,8 +222,7 @@ Interactive versions with hover-for-detail are in `charts/arm/*_heatmap.html`.
 
 ## Summary
 
-On M2 Pro, bijou64 wins **23 of 30** shootout cells outright, plus 1
-shared second place:
+On M2 Pro, bijou64 wins **23 of 30** shootout cells outright, plus 1 shared second place:
 
 | Operation        | Wins | Ties | Note                                                              |
 |------------------|-----:|-----:|-------------------------------------------------------------------|
