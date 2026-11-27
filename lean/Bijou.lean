@@ -3,10 +3,12 @@ module
 public import Bijou.Bytes
 public import Bijou.Canonical
 public import Bijou.Family
+public import Bijou.Instances
 public import Bijou.Length
 public import Bijou.Order
 public import Bijou.RoundTrip
 public import Bijou.Signed
+public import Bijou.SignedInstances
 public import Bijou.Spec
 
 @[expose] public section
@@ -46,4 +48,10 @@ bijection), and the lifted family theorems `decodeS_encodeS`,
 first at equal magnitude — not numeric order), plus `encodedLenS_mono` /
 `encodedLenS_eq_one_iff` / `encodedLenS_eq_succ_iff` (length grows with
 magnitude regardless of sign; the signed tier table in general).
+
+`Bijou.Instances` and `Bijou.SignedInstances` instantiate the six
+specified variants and check every test vector from the SPEC documents
+(offset tables, `maxBytes`, signed tier boundaries, error vectors) by
+kernel reduction (`decide +kernel`), so they are checked like theorems:
+no trust in compiled code.
 -/
