@@ -46,6 +46,7 @@ jobs:
             ci-no-std,
             ci-wasm,
             ci-msrv,
+            ci-lean,
           ]
         include:
           # Host tests on darwin too: catches platform-specific codegen or
@@ -68,15 +69,71 @@ jobs:
           name: inkandswitch
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
+      # ci-lean runs through elan, which downloads the toolchain named in
+      # lean/lean-toolchain (~0.5 GB); cache it per toolchain version.
+      - name: Cache Lean toolchain
+        if: matrix.check == 'ci-lean'
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('lean/lean-toolchain') }}
+
       - name: ${{ matrix.check }}
         run: nix run .#${{ matrix.check }}
 
-  # The dev shell is what contributors use; make sure it still builds
-  # (it pulls in tools the check apps don't, e.g. wasm-bodge, gungraun).
+  # Refinement proofs (lean-aeneas/): the committed Lean translation must still
+  # be the translation of the current Rust, and the proofs over it must check.
+  # Separate from the matrix for its caches: Charon comes from cachix (built
+  # once, pushed on main); the Lean toolchain and Mathlib's prebuilt build
+  # (~7 GB) are cached per lean-toolchain + lake-manifest.json.
+  aeneas:
+    name: ci-aeneas
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        with:
+          name: inkandswitch
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Cache Lean toolchain + Lake packages (Mathlib)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            lean-aeneas/.lake/packages
+          key: lean-aeneas-${{ runner.os }}-${{ hashFiles('lean-aeneas/lean-toolchain', 'lean-aeneas/lake-manifest.json') }}
+
+      - name: ci-aeneas
+        run: nix run .#ci-aeneas
+
+  # The dev shells are what contributors use; make sure they still build
+  # (they pull in tools the check apps don't, e.g. wasm-bodge, gungraun;
+  # `proofs` adds Charon + Aeneas).
   devshell:
-    name: nix develop
+    name: nix develop .#${{ matrix.shell }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [default, proofs]
     steps:
       - uses: actions/checkout@v7
 
@@ -100,7 +157,7 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build dev shell
-        run: nix develop --command true
+        run: nix develop .#${{ matrix.shell }} --command true
 
   # Mutation testing, scoped to the PR's changed code (`mutants.yml` does
   # the full sweep nightly). A missed mutant in code you touched fails the

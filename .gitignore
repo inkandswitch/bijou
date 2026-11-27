@@ -41,3 +41,4 @@ rust_out
 
 # lean / lake build artifacts
 /lean/.lake/
+/lean-aeneas/.lake/

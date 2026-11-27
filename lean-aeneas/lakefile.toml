@@ -1,0 +1,25 @@
+name = "bijouAeneas"
+defaultTargets = ["BijouAeneas"]
+
+# Refinement proofs: the real Rust (translated by Charon + Aeneas into
+# BijouAeneas/Generated/) implements the SPEC model in ../lean.
+#
+# Separate from ../lean because the Aeneas Lean library requires Mathlib,
+# and the model is deliberately Mathlib-free. Both projects pin the same
+# Lean version (lean-toolchain).
+#
+# The Aeneas rev must match the Aeneas binary that generated the code:
+# keep it in sync with `aeneas.url` / `aeneas-release` in ../flake.nix.
+
+[[require]]
+name = "aeneas"
+git = "https://github.com/AeneasVerif/aeneas"
+rev = "69280e07ed995241a4e23ef15937f3a2dea18fd2"
+subDir = "backends/lean"
+
+[[require]]
+name = "bijou"
+path = "../lean"
+
+[[lean_lib]]
+name = "BijouAeneas"

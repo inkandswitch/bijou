@@ -13,6 +13,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Charon + Aeneas: translate the Rust crate to Lean for the refinement
+    # proofs in lean-aeneas/. Charon is built from this input; the Aeneas
+    # binary comes from the matching nightly release (`aeneas-release`
+    # below). Pinned, not following our nixpkgs: Aeneas needs specific
+    # OCaml package versions. Bump together with `aeneas-release` and the
+    # Aeneas Lean library rev in lean-aeneas/lakefile.toml.
+    aeneas.url = "github:aeneasverif/aeneas/69280e07ed995241a4e23ef15937f3a2dea18fd2";
+
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -26,6 +34,7 @@
 
   outputs = {
     self,
+    aeneas,
     flake-utils,
     nixos-unstable,
     nixpkgs,
@@ -100,7 +109,7 @@
         # On macOS, symlinks break @rpath resolution, so we wrap the binary
         # with DYLD_LIBRARY_PATH pointing to the combined toolchain's lib/.
         nightly-rustfmt-unwrapped = pkgs.rust-bin.nightly.latest.minimal.override {
-          extensions = [ "rustfmt" ];
+          extensions = ["rustfmt"];
         };
 
         nightly-rustfmt = pkgs.writeShellScriptBin "rustfmt" ''
@@ -122,7 +131,7 @@
           version = "0.5.0";
           src = wasm-bodge-src;
           cargoHash = "sha256-lNgGxyLcO7yEATlMfjjVXBgmjtXI4l+lFk/yagP7lh0=";
-          nativeBuildInputs = [ unstable.cargo-auditable ];
+          nativeBuildInputs = [unstable.cargo-auditable];
           doCheck = false; # tests require npm/puppeteer infrastructure
         };
 
@@ -166,6 +175,75 @@
           };
         };
 
+        # Charon: built from source at the revision the Aeneas input pins.
+        # `charon-driver` is a rustc plugin linked against one exact nightly,
+        # which the upstream flake wires up; a prebuilt binary would need
+        # that toolchain patched in by hand.
+        charon = inputs.aeneas.packages.${system}.charon;
+
+        # Aeneas: the statically linked binary from the nightly release cut
+        # at the same revision as the `aeneas` input (so its LLBC format
+        # matches Charon). Avoids a long OCaml build. Upstream publishes
+        # these three platforms only.
+        aeneas-release = {
+          tag = "nightly-2026.11.26-69280e0";
+          assets = {
+            x86_64-linux = {
+              name = "linux-x86_64";
+              hash = "sha256-mrdupw0TnrFERNzUj2pak263nmW1EZu4EWgYScXb45U=";
+            };
+            aarch64-linux = {
+              name = "linux-aarch64";
+              hash = "sha256-J9j6qNPNVNYEZ9MEJzzSsy9B+7QjfdrFEcLzxhpZhhA=";
+            };
+            aarch64-darwin = {
+              name = "macos-aarch64";
+              hash = "sha256-0WfPzhimDNYVTAKujiW5/0CjG7gV1kPQR/7zf3IIlVA=";
+            };
+          };
+        };
+
+        # The proof outputs (packages.{aeneas,charon}, apps aeneas-translate /
+        # ci-aeneas, devShells.proofs) exist only where Aeneas publishes a binary.
+        has-aeneas = aeneas-release.assets ? ${system};
+
+        # One Aeneas revision is pinned in three places: the `aeneas` input
+        # (Charon), the release tag (the binary) and lean-aeneas/lakefile.toml
+        # (its Lean library). Likewise the Lean toolchain in lean/ and
+        # lean-aeneas/. Checked when the proof tooling is evaluated, so a
+        # partial bump fails with a clear message instead of a confusing
+        # translate or proof error.
+        lakefile-aeneas-rev =
+          (pkgs.lib.findFirst (r: r.name == "aeneas") (throw "lean-aeneas/lakefile.toml: no `aeneas` require")
+            (builtins.fromTOML (builtins.readFile ./lean-aeneas/lakefile.toml)).require).rev;
+        pins-agree = assert pkgs.lib.assertMsg
+        (pkgs.lib.hasSuffix (builtins.substring 0 7 inputs.aeneas.rev) aeneas-release.tag)
+        "aeneas-release.tag (${aeneas-release.tag}) is not cut at the aeneas input's revision (${inputs.aeneas.rev})";
+        assert pkgs.lib.assertMsg (lakefile-aeneas-rev == inputs.aeneas.rev)
+        "lean-aeneas/lakefile.toml pins Aeneas ${lakefile-aeneas-rev}, the flake's aeneas input is ${inputs.aeneas.rev}";
+        assert pkgs.lib.assertMsg
+        (builtins.readFile ./lean/lean-toolchain == builtins.readFile ./lean-aeneas/lean-toolchain)
+        "lean/lean-toolchain and lean-aeneas/lean-toolchain differ: bump both together"; true;
+
+        aeneas-bin = let
+          asset = aeneas-release.assets.${system} or (throw "No prebuilt Aeneas for ${system}");
+        in
+          assert pins-agree;
+            pkgs.stdenvNoCC.mkDerivation {
+              pname = "aeneas";
+              version = aeneas-release.tag;
+              src = pkgs.fetchurl {
+                url = "https://github.com/AeneasVerif/aeneas/releases/download/${aeneas-release.tag}/aeneas-${asset.name}.tar.gz";
+                inherit (asset) hash;
+              };
+              sourceRoot = ".";
+              dontConfigure = true;
+              dontBuild = true;
+              installPhase = ''
+                install -Dm755 aeneas $out/bin/aeneas
+              '';
+            };
+
         # Nightly toolchain for wasm-bodge's panic=unwind builds, which rebuild
         # std via -Zbuild-std (needs rust-src). Kept minimal + separate from the
         # stable dev toolchain. "latest" is pinned by the rust-overlay input in
@@ -173,7 +251,7 @@
         nightly-wasm-toolchain = pkgs.rust-bin.nightly.latest.minimal.override {
           # rust-src only: -Zbuild-std compiles std from source, so a
           # prebuilt wasm32 std component would be dead weight.
-          extensions = [ "rust-src" ];
+          extensions = ["rust-src"];
         };
 
         # wasm-bodge runs bare `wasm-opt -O4`, relying on the module's
@@ -343,6 +421,103 @@
           '';
         };
 
+        # Lean 4 model of the SPEC (lean/). elan installs the toolchain named
+        # in lean/lean-toolchain (lean-aeneas/ pins the same one; `pins-agree`
+        # checks), the way rustup reads rust-toolchain.toml.
+        # `--wfail` keeps the build warning-free, so toolchain bumps surface
+        # deprecations immediately instead of letting them pile up.
+        ci-lean = assert pins-agree;
+          pkgs.writeShellApplication {
+            name = "bijou-ci-lean";
+            runtimeInputs = [pkgs.elan pkgs.git];
+            text = ''
+              set -x
+              cd "$(git rev-parse --show-toplevel)/lean"
+              lake build --wfail
+            '';
+          };
+
+        # Translate the Rust to Lean for the refinement proofs in
+        # lean-aeneas/: Charon extracts the crate (LLBC), Aeneas emits a pure
+        # Lean model of it. Regenerate after changing the translated
+        # functions; the output is committed so proofs are reviewable.
+        aeneas-translate = pkgs.writeShellApplication {
+          name = "bijou-aeneas-translate";
+          runtimeInputs = [aeneas-bin charon pkgs.coreutils pkgs.git pkgs.stdenv.cc];
+          text = ''
+            ${link-env}
+            set -x
+            cd "$(git rev-parse --show-toplevel)"
+            tmp="$(mktemp -d)"
+            trap 'rm -rf "$tmp"' EXIT
+            export CARGO_TARGET_DIR="$PWD/target/charon"
+            # Extraction roots: Charon translates these and what they call,
+            # nothing else. The rest of the crate (DecodeIter, decode_all,
+            # the Encoded* trait impls, Arbitrary) is out of scope, and much
+            # of it Aeneas would leave opaque (trusted) or fail on.
+            roots=()
+            for width in i32 i64 i128 u32 u64 u128; do
+              for fn in decode encode encoded_bytes encoded_len; do
+                roots+=(--start-from "crate::$width::$fn")
+              done
+              ty="Encoded''${width^^}"
+              roots+=(--start-from "crate::$width::$ty::as_slice")
+            done
+            (
+              cd bijoux
+              charon cargo --preset=aeneas \
+                --dest-file "$tmp/bijoux.llbc" \
+                "''${roots[@]}" \
+                -- --lib --no-default-features --features i32,i64,i128,u32,u64,u128
+            )
+            # Generate into $tmp, then sync: the committed files are never
+            # missing mid-run (a concurrent `git add -A` would stage them as
+            # deleted). Everything Aeneas emits is copied, and generated files
+            # it no longer emits are removed, so the staleness check in
+            # ci-aeneas sees any change. FunsExternal.lean (hand-written models
+            # of the core/alloc functions Aeneas leaves opaque) is ours.
+            aeneas -backend lean -namespace BijouRust -split-files \
+              -dest "$tmp/out" -subdir BijouAeneas/Generated \
+              "$tmp/bijoux.llbc" "$@"
+            new="$tmp/out/BijouAeneas/Generated"
+            gen=lean-aeneas/BijouAeneas/Generated
+            for f in "$gen"/*.lean; do
+              b="$(basename "$f")"
+              if [ "$b" != FunsExternal.lean ] && [ ! -e "$new/$b" ]; then rm "$f"; fi
+            done
+            for f in "$new"/*.lean; do
+              if [ "$(basename "$f")" != FunsExternal.lean ]; then cp "$f" "$gen/"; fi
+            done
+          '';
+        };
+
+        # The refinement proofs in lean-aeneas/ are about the *committed*
+        # translation. Re-translate and fail if that no longer matches the
+        # current Rust, then check the proofs. Not in `ci-all`: needs Charon
+        # and a Mathlib build (~7 GB, fetched prebuilt by `lake exe cache get`).
+        ci-aeneas = pkgs.writeShellApplication {
+          name = "bijou-ci-aeneas";
+          runtimeInputs = [aeneas-translate pkgs.elan pkgs.git pkgs.python3];
+          text = ''
+            set -x
+            cd "$(git rev-parse --show-toplevel)"
+            bijou-aeneas-translate
+            gen=lean-aeneas/BijouAeneas/Generated
+            # Against the index (so staged-but-uncommitted output counts as
+            # up to date), plus any new file the translation added. Hunks that
+            # only move the `Source: '<file>', lines …` position comments are
+            # ignored, so editing Rust docs doesn't need Charon to fix CI.
+            if ! git diff --exit-code -I "Source: 'bijoux/src/" -- "$gen" ||
+              [ -n "$(git ls-files --others --exclude-standard -- "$gen")" ]; then
+              echo "$gen is stale: run 'nix run .#aeneas-translate' and commit the result" >&2
+              exit 1
+            fi
+            cd lean-aeneas
+            lake exe cache get
+            lake build --wfail
+          '';
+        };
+
         # Mutation testing (cargo-mutants; config in .cargo/mutants.toml).
         # Not in the `ci` aggregate: a full run takes far longer than the
         # rest of CI. Hosted CI scopes it to the PR's changed code with
@@ -381,17 +556,18 @@
 
         ci-all = pkgs.writeShellApplication {
           name = "bijou-ci";
-          runtimeInputs = pkgs.lib.attrValues ci-checks ++ [ci-wasm-node];
+          runtimeInputs = pkgs.lib.attrValues ci-checks ++ [ci-lean ci-wasm-node];
           text =
             pkgs.lib.concatMapStringsSep "\n"
             (check: "bijou-${check}")
-            (builtins.attrNames ci-checks ++ ["ci-wasm-node"])
+            (builtins.attrNames ci-checks ++ ["ci-lean" "ci-wasm-node"])
             + ''
 
               echo
               echo "NOT RUN here (hosted CI runs them separately):"
               echo "  test:js             # wasm-bodge package in Node + browsers (test-wasm.yml)"
               echo "  nix run .#ci-mutants  # mutation testing (CI: PR diff + nightly full)"
+              echo "  nix run .#ci-aeneas   # Rust-refines-model proofs (Charon + Mathlib)"
             '';
         };
 
@@ -427,15 +603,17 @@
           wasm-tools
         ];
 
-         # `xdg-utils` lacks `meta.mainProgram`, which makes `getExe`
-         # (used by the command-utils modules below) emit a deprecation
-         # warning. Annotate it so `getExe` resolves `xdg-open` cleanly.
-         xdg-open = pkgs.xdg-utils // {
-           meta = (pkgs.xdg-utils.meta or { }) // { mainProgram = "xdg-open"; };
-         };
+        # `xdg-utils` lacks `meta.mainProgram`, which makes `getExe`
+        # (used by the command-utils modules below) emit a deprecation
+        # warning. Annotate it so `getExe` resolves `xdg-open` cleanly.
+        xdg-open =
+          pkgs.xdg-utils
+          // {
+            meta = (pkgs.xdg-utils.meta or {}) // {mainProgram = "xdg-open";};
+          };
 
-         # Built-in command modules from nix-command-utils
-         rust = command-utils.rust.${system};
+        # Built-in command modules from nix-command-utils
+        rust = command-utils.rust.${system};
         wasm = command-utils.wasm.${system};
         cmd = command-utils.cmd.${system};
 
@@ -478,7 +656,8 @@
             ${size-charts}/bin/size-charts "$@"
           '';
 
-          "test:props" = cmd "Run property tests with 1M iterations"
+          "test:props" =
+            cmd "Run property tests with 1M iterations"
             ''exec ${ci-checks.ci-bolero}/bin/bijou-ci-bolero "$@"'';
 
           "test:props:intense" = cmd "Run property tests with 100M iterations (~10 min)" ''
@@ -488,16 +667,20 @@
             ${cargoPath} test --release --workspace --features bolero --lib tests::property -- --nocapture
           '';
 
-          "test:no_std" = cmd "Check no_std builds for every bijoux width (host + thumbv6m)"
+          "test:no_std" =
+            cmd "Check no_std builds for every bijoux width (host + thumbv6m)"
             ''exec ${ci-checks.ci-no-std}/bin/bijou-ci-no-std "$@"'';
 
-          "check:wasm" = cmd "Check the workspace builds for wasm32-unknown-unknown"
+          "check:wasm" =
+            cmd "Check the workspace builds for wasm32-unknown-unknown"
             ''exec ${ci-checks.ci-wasm}/bin/bijou-ci-wasm "$@"'';
 
-          "check:msrv" = cmd "Check bijoux builds on the MSRV (${msrv})"
+          "check:msrv" =
+            cmd "Check bijoux builds on the MSRV (${msrv})"
             ''exec ${ci-checks.ci-msrv}/bin/bijou-ci-msrv "$@"'';
 
-          "test:mutants" = cmd "Run mutation testing (slow; pass --in-diff <file> to scope)"
+          "test:mutants" =
+            cmd "Run mutation testing (slow; pass --in-diff <file> to scope)"
             ''exec ${ci-mutants}/bin/bijou-ci-mutants "$@"'';
 
           "bodge" = cmd "Build bijoux_wasm into a universal NPM package via wasm-bodge (release + /debug variants)" ''
@@ -597,7 +780,12 @@
             ${pkgs.pnpm}/bin/pnpm exec playwright show-report
           '';
 
-          "ci" = cmd "Run the full CI suite (same checks as hosted CI)"
+          "proofs" =
+            cmd "Check the Lean 4 format proofs in lean/"
+            ''exec ${ci-lean}/bin/bijou-ci-lean "$@"'';
+
+          "ci" =
+            cmd "Run the full CI suite (same checks as hosted CI)"
             ''exec ${ci-all}/bin/bijou-ci "$@"'';
 
           "ci:quick" = cmd "Run quick CI checks (fmt, clippy, test)" ''
@@ -608,86 +796,144 @@
           '';
         };
 
-        command_menu = command-utils.commands.${system} [
+        # Only in `devShells.proofs`: these close over Charon + Aeneas.
+        proofCommands = {
+          "proofs:aeneas" =
+            cmd "Check the Rust-refines-model proofs in lean-aeneas/ (re-translates; Charon + Mathlib)"
+            ''exec ${ci-aeneas}/bin/bijou-ci-aeneas "$@"'';
+
+          "aeneas:translate" =
+            cmd "Re-translate bijoux to Lean (Charon + Aeneas) into lean-aeneas/BijouAeneas/Generated/"
+            ''exec ${aeneas-translate}/bin/bijou-aeneas-translate "$@"'';
+        };
+
+        menu-modules = [
           # Rust commands
-          (rust.audit { cargo-audit = pkgs.cargo-audit; })
-          (rust.build { cargo = pkgs.cargo; })
-          (rust.test { cargo = pkgs.cargo; cargo-watch = pkgs.cargo-watch; })
-          (rust.lint { cargo = pkgs.cargo; })
-          (rust.fmt { cargo = pkgs.cargo; })
-          (rust.doc { cargo = pkgs.cargo; })
-          (rust.bench { cargo = pkgs.cargo; cargo-criterion = pkgs.cargo-criterion; inherit xdg-open; })
-          (rust.watch { cargo-watch = pkgs.cargo-watch; })
-          (rust.semver { cargo-semver-checks = pkgs.cargo-semver-checks; })
+          (rust.audit {cargo-audit = pkgs.cargo-audit;})
+          (rust.build {cargo = pkgs.cargo;})
+          (rust.test {
+            cargo = pkgs.cargo;
+            cargo-watch = pkgs.cargo-watch;
+          })
+          (rust.lint {cargo = pkgs.cargo;})
+          (rust.fmt {cargo = pkgs.cargo;})
+          (rust.doc {cargo = pkgs.cargo;})
+          (rust.bench {
+            cargo = pkgs.cargo;
+            cargo-criterion = pkgs.cargo-criterion;
+            inherit xdg-open;
+          })
+          (rust.watch {cargo-watch = pkgs.cargo-watch;})
+          (rust.semver {cargo-semver-checks = pkgs.cargo-semver-checks;})
 
           # Wasm commands need to point at a `[package]`-manifest crate
           # (the workspace root has only `[workspace]` and would make
           # wasm-pack bail out with "missing field `package`").
-          (wasm.build { wasm-pack = pkgs.wasm-pack; path = "bijoux_wasm"; })
-          (wasm.release { wasm-pack = pkgs.wasm-pack; gzip = pkgs.gzip; path = "bijoux_wasm"; })
-          (wasm.test { wasm-pack = pkgs.wasm-pack; path = "bijoux_wasm"; features = ""; })
-          (wasm.doc { cargo = pkgs.cargo; inherit xdg-open; })
+          (wasm.build {
+            wasm-pack = pkgs.wasm-pack;
+            path = "bijoux_wasm";
+          })
+          (wasm.release {
+            wasm-pack = pkgs.wasm-pack;
+            gzip = pkgs.gzip;
+            path = "bijoux_wasm";
+          })
+          (wasm.test {
+            wasm-pack = pkgs.wasm-pack;
+            path = "bijoux_wasm";
+            features = "";
+          })
+          (wasm.doc {
+            cargo = pkgs.cargo;
+            inherit xdg-open;
+          })
 
           (command-utils.asModule.${system} projectCommands)
         ];
 
+        command_menu = command-utils.commands.${system} menu-modules;
+        proofs_command_menu =
+          command-utils.commands.${system}
+          (menu-modules ++ [(command-utils.asModule.${system} proofCommands)]);
       in {
-        packages = {
-          inherit gungraun-runner wasm-bodge;
-        };
+        packages =
+          {inherit gungraun-runner wasm-bodge;}
+          // pkgs.lib.optionalAttrs has-aeneas {
+            aeneas = aeneas-bin;
+            inherit charon;
+          };
 
-        devShells.default = pkgs.mkShell {
-          name = "bijou_shell";
+        devShells = let
+          shells = rec {
+            default = pkgs.mkShell {
+              name = "bijou_shell";
 
-           nativeBuildInputs =
-             # `command_menu` is itself a list of derivations, so splice it
-             # in with `++` rather than nesting it as a single element
-             # (a nested list in `nativeBuildInputs` is deprecated).
-             command_menu
-             ++ [
-               rust-toolchain
-               nightly-rustfmt
+              nativeBuildInputs =
+                # `command_menu` is itself a list of derivations, so splice it
+                # in with `++` rather than nesting it as a single element
+                # (a nested list in `nativeBuildInputs` is deprecated).
+                command_menu
+                ++ [
+                  rust-toolchain
+                  nightly-rustfmt
 
-              pkgs.binaryen
-              pkgs.esbuild # wasm-bodge spawns esbuild as a subprocess for bundling
-              pkgs.gnuplot
-              pkgs.http-server
-              pkgs.nodejs
-              pkgs.pnpm
-              pkgs.playwright-driver
-              pkgs.playwright-driver.browsers
-              pkgs.rust-analyzer
-              pkgs.valgrind # required by gungraun
-              pkgs.wasm-pack
-              gungraun-runner
-              wasm-bodge
-            ]
-            ++ format-pkgs
-            ++ cargo-installs
-            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-              pkgs.libiconv
-            ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
-              pkgs.clang
-              pkgs.llvmPackages.libclang
-              pkgs.pkg-config
-            ];
+                  pkgs.binaryen
+                  pkgs.elan # Lean toolchains for lean/ and lean-aeneas/ (reads lean-toolchain)
+                  pkgs.esbuild # wasm-bodge spawns esbuild as a subprocess for bundling
+                  pkgs.gnuplot
+                  pkgs.http-server
+                  pkgs.nodejs
+                  pkgs.pnpm
+                  pkgs.playwright-driver
+                  pkgs.playwright-driver.browsers
+                  pkgs.rust-analyzer
+                  pkgs.valgrind # required by gungraun
+                  pkgs.wasm-pack
+                  gungraun-runner
+                  wasm-bodge
+                ]
+                ++ format-pkgs
+                ++ cargo-installs
+                ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+                  pkgs.libiconv
+                ]
+                ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+                  pkgs.clang
+                  pkgs.llvmPackages.libclang
+                  pkgs.pkg-config
+                ];
 
-          shellHook = ''
-            unset SOURCE_DATE_EPOCH
-            export WORKSPACE_ROOT="$(pwd)"
-            export RUSTFMT="${nightly-rustfmt}/bin/rustfmt"
+              shellHook = ''
+                unset SOURCE_DATE_EPOCH
+                export WORKSPACE_ROOT="$(pwd)"
+                export RUSTFMT="${nightly-rustfmt}/bin/rustfmt"
 
-            # Point Playwright at Nix-provided browsers instead of letting
-            # it download its own (which fails on NixOS due to dynamic
-            # linking, and is wasteful elsewhere).
-            export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
-            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-            export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs}/bin/node"
+                # Point Playwright at Nix-provided browsers instead of letting
+                # it download its own (which fails on NixOS due to dynamic
+                # linking, and is wasteful elsewhere).
+                export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+                export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+                export PLAYWRIGHT_NODEJS_PATH="${pkgs.nodejs}/bin/node"
 
-            menu
-          '';
-        };
+                menu
+              '';
+            };
+
+            # Default shell plus Charon + Aeneas, for working on lean-aeneas/
+            # (`nix develop .#proofs`). Kept out of the default shell: a large
+            # closure (OCaml, a pinned rustc nightly) most contributors never need.
+            proofs = default.overrideAttrs (old: {
+              name = "bijou_proofs_shell";
+              nativeBuildInputs =
+                proofs_command_menu
+                ++ [aeneas-bin charon]
+                ++ pkgs.lib.subtractLists command_menu old.nativeBuildInputs;
+            });
+          };
+        in
+          if has-aeneas
+          then shells
+          else removeAttrs shells ["proofs"];
 
         apps =
           {
@@ -708,7 +954,10 @@
           (ci-checks
             // {
               ci = ci-all;
-              inherit ci-mutants ci-wasm-node;
+              inherit ci-lean ci-mutants ci-wasm-node;
+            }
+            // pkgs.lib.optionalAttrs has-aeneas {
+              inherit aeneas-translate ci-aeneas;
             });
 
         formatter = pkgs.alejandra;
