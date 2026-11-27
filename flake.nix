@@ -512,6 +512,14 @@
               echo "$gen is stale: run 'nix run .#aeneas-translate' and commit the result" >&2
               exit 1
             fi
+            # The 32/128-bit proofs (and every width's decode_spec) are
+            # generated; they must match what the generator produces now.
+            ref=lean-aeneas/BijouAeneas/Refinement
+            python3 lean-aeneas/scripts/gen_widths.py "$ref" > /dev/null
+            if ! git diff --exit-code -- "$ref"; then
+              echo "$ref is out of date: run lean-aeneas/scripts/gen_widths.py and commit the result" >&2
+              exit 1
+            fi
             cd lean-aeneas
             lake exe cache get
             lake build --wfail
