@@ -1,4 +1,4 @@
-"""Derive the u32/u128 refinement proofs from the 64-bit ones.
+"""Derive the u32/u128 (and i32/i128) refinement proofs from the 64-bit ones.
 
 The widths' Rust (and so their Aeneas translations) differ only in constants
 and in the names Aeneas gives local variables. So:
@@ -8,7 +8,7 @@ and in the names Aeneas gives local variables. So:
   tier). `decode_spec` is generated for all three widths -- U64.lean
   included, rewritten in place -- from the template in `decode_arm` /
   `decode_block` below. Edit the template, not any `decode_spec`.
-- U32Corollaries / U128Corollaries from U64Corollaries.
+- U32Corollaries / U128Corollaries from U64Corollaries; I32* / I128* from I64*.
 
 CI (`ci-aeneas`) re-runs this script and fails if any output differs.
 
@@ -213,3 +213,19 @@ for w, P in W.items():
     s = s.replace('bijou64', f'bijou{B}').replace('U64', U).replace('u64', w)
     s = s.replace('\n-/\n\nopen Aeneas', '\n\nGenerated from `U64Corollaries.lean` by `scripts/gen_widths.py`: change that\nfile, then regenerate, rather than editing this one.\n-/\n\nopen Aeneas', 1)
     open(f'{SRC}/{U}Corollaries.lean', 'w').write(s)
+
+# Signed: I32*/I128* from I64*. Each signed width wraps the unsigned one of the
+# same size; only the bit width (and the derived buffer bound) differ.
+SIGNED = {'i32': ('u32', 32, 5), 'i128': ('u128', 128, 17)}
+SIGNED_NOTE = ("The proofs are `I64.lean`'s with the bit width substituted\n"
+               "(`scripts/gen_widths.py`). Change `I64.lean` first, then regenerate\n"
+               "this file rather than editing it by hand.\n\n")
+for name in ['I64', 'I64Corollaries']:
+    src64 = open(f'{SRC}/{name}.lean').read()
+    for w, (uw, B, maxb) in SIGNED.items():
+        s = src64.replace('bijou64', f'bijou{B}').replace('I64', w.upper()).replace('i64', w)
+        s = s.replace('U64', uw.upper()).replace('u64', uw)
+        s = s.replace('buf.length + 9', f'buf.length + {maxb}')
+        s = s.replace('63', str(B - 1)).replace('64', str(B))
+        s = s.replace('\n-/\n\nopen Aeneas', '\n\n' + SIGNED_NOTE.rstrip('\n') + '\n-/\n\nopen Aeneas', 1)
+        open(f'{SRC}/{w.upper()}{name[3:]}.lean', 'w').write(s)

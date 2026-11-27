@@ -3,6 +3,12 @@ module
 public import BijouAeneas.Generated.Funs
 public import BijouAeneas.Refinement.Bytes
 public import BijouAeneas.Refinement.CoreAlloc
+public import BijouAeneas.Refinement.I128
+public import BijouAeneas.Refinement.I128Corollaries
+public import BijouAeneas.Refinement.I32
+public import BijouAeneas.Refinement.I32Corollaries
+public import BijouAeneas.Refinement.I64
+public import BijouAeneas.Refinement.I64Corollaries
 public import BijouAeneas.Refinement.U128
 public import BijouAeneas.Refinement.U128Corollaries
 public import BijouAeneas.Refinement.U32
