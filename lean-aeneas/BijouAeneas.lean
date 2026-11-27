@@ -1,6 +1,10 @@
 module
 
 public import BijouAeneas.Generated.Funs
+public import BijouAeneas.Refinement.Bytes
+public import BijouAeneas.Refinement.CoreAlloc
+public import BijouAeneas.Refinement.U64
+public import BijouAeneas.Refinement.U64Corollaries
 
 @[expose] public section
 
