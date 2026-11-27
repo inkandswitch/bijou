@@ -88,6 +88,15 @@ cargo test --workspace --all-features
 
 The workspace targets stable Rust (see `rust-version` in `Cargo.toml`) and supports `wasm32-unknown-unknown` via the toolchain shipped in the flake.
 
+## Formal verification
+
+The format and the implementation are machine-checked in Lean 4:
+
+- [`lean/`](./lean) proves the format is sound: round-trip, canonical encodings (one encoding per value), byte order equal to numeric order, and length known from the first byte.
+- [`lean-aeneas/`](./lean-aeneas) proves the Rust code implements that format. [Aeneas](https://github.com/AeneasVerif/aeneas) translates `bijoux` into Lean, and the proofs show that `encode`, `encoded_len` and `decode` in all six modules, `bijoux::{u32, u64, u128, i32, i64, i128}`, return exactly what the model prescribes. For `decode`, this holds on every input, including malformed ones: it never panics and never accepts a non-canonical encoding.
+
+See [`lean-aeneas/README.md`](./lean-aeneas/README.md) for the full list of theorems, what the proofs trust, and how to run them.
+
 ## Other implementations
 
 The community has ported the `bijou64` wire format to several languages and ecosystems. These are independent projects, not maintained here — but they target the same `bijou64` format, so an encoder in one language interoperates with a decoder in another:

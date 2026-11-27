@@ -21,3 +21,5 @@ extend-ignore-identifiers-re = [
 [default.extend-words]
 # Project-specific words.
 bijou = "bijou"
+# Lean hypothesis name for a `≥` fact (`h` + `ge`), as in `hlt` / `hle`.
+hge = "hge"

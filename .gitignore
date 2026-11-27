@@ -38,3 +38,7 @@ rust_out
 
 # session artifacts
 .ignore/
+
+# lean / lake build artifacts
+/lean/.lake/
+/lean-aeneas/.lake/
