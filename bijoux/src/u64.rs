@@ -487,8 +487,9 @@ pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
         return Ok((tag as u64, 1));
     }
 
-    // Read big-endian payload and add tier offset. Slice-pattern matching
-    // proves to the compiler that enough bytes exist in each arm, and
+    // Read big-endian payload and add tier offset. `first_chunk::<N>()`
+    // proves to the compiler that enough bytes exist in each arm (and,
+    // unlike a `&[a, ..]` rest-pattern, translates under Aeneas), and
     // `u64::from_be_bytes` reconstructs the payload without manual shifts.
     //
     // NOTE: tried consolidating to a single tier-dispatched while-loop
@@ -497,44 +498,44 @@ pub const fn decode(buf: &[u8]) -> Result<(u64, usize), DecodeError> {
     // runtime-length memcpy whose dispatch overhead dwarfs the work.
     // See `OPTIMISATION.md`.
     let (offset, payload, consumed) = match tag {
-        0xF8 => match rest {
-            &[a, ..] => (OFFSETS[1], u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, a]), 2),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xF8 => match rest.first_chunk::<1>() {
+            Some(&[a]) => (OFFSETS[1], u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, a]), 2),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF9 => match rest {
-            &[a, b, ..] => (OFFSETS[2], u64::from_be_bytes([0, 0, 0, 0, 0, 0, a, b]), 3),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xF9 => match rest.first_chunk::<2>() {
+            Some(&[a, b]) => (OFFSETS[2], u64::from_be_bytes([0, 0, 0, 0, 0, 0, a, b]), 3),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFA => match rest {
-            &[a, b, c, ..] => (OFFSETS[3], u64::from_be_bytes([0, 0, 0, 0, 0, a, b, c]), 4),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xFA => match rest.first_chunk::<3>() {
+            Some(&[a, b, c]) => (OFFSETS[3], u64::from_be_bytes([0, 0, 0, 0, 0, a, b, c]), 4),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFB => match rest {
-            &[a, b, c, d, ..] => (OFFSETS[4], u64::from_be_bytes([0, 0, 0, 0, a, b, c, d]), 5),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xFB => match rest.first_chunk::<4>() {
+            Some(&[a, b, c, d]) => (OFFSETS[4], u64::from_be_bytes([0, 0, 0, 0, a, b, c, d]), 5),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFC => match rest {
-            &[a, b, c, d, e, ..] => (OFFSETS[5], u64::from_be_bytes([0, 0, 0, a, b, c, d, e]), 6),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xFC => match rest.first_chunk::<5>() {
+            Some(&[a, b, c, d, e]) => (OFFSETS[5], u64::from_be_bytes([0, 0, 0, a, b, c, d, e]), 6),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFD => match rest {
-            &[a, b, c, d, e, f, ..] => {
+        0xFD => match rest.first_chunk::<6>() {
+            Some(&[a, b, c, d, e, f]) => {
                 (OFFSETS[6], u64::from_be_bytes([0, 0, a, b, c, d, e, f]), 7)
             }
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFE => match rest {
-            &[a, b, c, d, e, f, g, ..] => {
+        0xFE => match rest.first_chunk::<7>() {
+            Some(&[a, b, c, d, e, f, g]) => {
                 (OFFSETS[7], u64::from_be_bytes([0, a, b, c, d, e, f, g]), 8)
             }
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
         // 0xFF — only remaining value since tag >= TAG_THRESHOLD (248)
-        _ => match rest {
-            &[a, b, c, d, e, f, g, h, ..] => {
+        _ => match rest.first_chunk::<8>() {
+            Some(&[a, b, c, d, e, f, g, h]) => {
                 (OFFSETS[8], u64::from_be_bytes([a, b, c, d, e, f, g, h]), 9)
             }
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
     };
 

@@ -476,8 +476,9 @@ pub const fn decode(buf: &[u8]) -> Result<(u32, usize), DecodeError> {
         return Ok((tag as u32, 1));
     }
 
-    // Read big-endian payload and add tier offset. Slice-pattern matching
-    // proves to the compiler that enough bytes exist in each arm, and
+    // Read big-endian payload and add tier offset. `first_chunk::<N>()`
+    // proves to the compiler that enough bytes exist in each arm (and,
+    // unlike a `&[a, ..]` rest-pattern, translates under Aeneas), and
     // `u32::from_be_bytes` reconstructs the payload without manual shifts.
     //
     // NOTE: bijou64 documents that consolidating these into a single
@@ -485,22 +486,22 @@ pub const fn decode(buf: &[u8]) -> Result<(u32, usize), DecodeError> {
     // LLVM specialises each arm here to a fixed-size copy. The same
     // expectation applies at 32 bits — keep the per-tier arms.
     let (offset, payload, consumed) = match tag {
-        0xFC => match rest {
-            &[a, ..] => (OFFSETS[1], u32::from_be_bytes([0, 0, 0, a]), 2),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xFC => match rest.first_chunk::<1>() {
+            Some(&[a]) => (OFFSETS[1], u32::from_be_bytes([0, 0, 0, a]), 2),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFD => match rest {
-            &[a, b, ..] => (OFFSETS[2], u32::from_be_bytes([0, 0, a, b]), 3),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xFD => match rest.first_chunk::<2>() {
+            Some(&[a, b]) => (OFFSETS[2], u32::from_be_bytes([0, 0, a, b]), 3),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFE => match rest {
-            &[a, b, c, ..] => (OFFSETS[3], u32::from_be_bytes([0, a, b, c]), 4),
-            _ => return Err(DecodeError::BufferTooShort),
+        0xFE => match rest.first_chunk::<3>() {
+            Some(&[a, b, c]) => (OFFSETS[3], u32::from_be_bytes([0, a, b, c]), 4),
+            None => return Err(DecodeError::BufferTooShort),
         },
         // 0xFF — only remaining value since tag >= TAG_THRESHOLD (252)
-        _ => match rest {
-            &[a, b, c, d, ..] => (OFFSETS[4], u32::from_be_bytes([a, b, c, d]), 5),
-            _ => return Err(DecodeError::BufferTooShort),
+        _ => match rest.first_chunk::<4>() {
+            Some(&[a, b, c, d]) => (OFFSETS[4], u32::from_be_bytes([a, b, c, d]), 5),
+            None => return Err(DecodeError::BufferTooShort),
         },
     };
 

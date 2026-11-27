@@ -545,8 +545,9 @@ pub const fn decode(buf: &[u8]) -> Result<(u128, usize), DecodeError> {
         return Ok((tag as u128, 1));
     }
 
-    // Read big-endian payload and add tier offset. Slice-pattern matching
-    // proves to the compiler that enough bytes exist in each arm, and
+    // Read big-endian payload and add tier offset. `first_chunk::<N>()`
+    // proves to the compiler that enough bytes exist in each arm (and,
+    // unlike a `&[a, ..]` rest-pattern, translates under Aeneas), and
     // `u128::from_be_bytes` reconstructs the payload without manual shifts.
     //
     // NOTE: bijou64 documents that consolidating these into a single
@@ -554,134 +555,134 @@ pub const fn decode(buf: &[u8]) -> Result<(u128, usize), DecodeError> {
     // LLVM specialises each arm here to a fixed-size copy. The same
     // expectation applies at 128 bits — keep the per-tier arms.
     let (offset, payload, consumed) = match tag {
-        0xF0 => match rest {
-            &[a, ..] => (
+        0xF0 => match rest.first_chunk::<1>() {
+            Some(&[a]) => (
                 OFFSETS[1],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a]),
                 2,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF1 => match rest {
-            &[a, b, ..] => (
+        0xF1 => match rest.first_chunk::<2>() {
+            Some(&[a, b]) => (
                 OFFSETS[2],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a, b]),
                 3,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF2 => match rest {
-            &[a, b, c, ..] => (
+        0xF2 => match rest.first_chunk::<3>() {
+            Some(&[a, b, c]) => (
                 OFFSETS[3],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a, b, c]),
                 4,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF3 => match rest {
-            &[a, b, c, d, ..] => (
+        0xF3 => match rest.first_chunk::<4>() {
+            Some(&[a, b, c, d]) => (
                 OFFSETS[4],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a, b, c, d]),
                 5,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF4 => match rest {
-            &[a, b, c, d, e, ..] => (
+        0xF4 => match rest.first_chunk::<5>() {
+            Some(&[a, b, c, d, e]) => (
                 OFFSETS[5],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a, b, c, d, e]),
                 6,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF5 => match rest {
-            &[a, b, c, d, e, f, ..] => (
+        0xF5 => match rest.first_chunk::<6>() {
+            Some(&[a, b, c, d, e, f]) => (
                 OFFSETS[6],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a, b, c, d, e, f]),
                 7,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF6 => match rest {
-            &[a, b, c, d, e, f, g, ..] => (
+        0xF6 => match rest.first_chunk::<7>() {
+            Some(&[a, b, c, d, e, f, g]) => (
                 OFFSETS[7],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, a, b, c, d, e, f, g]),
                 8,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF7 => match rest {
-            &[a, b, c, d, e, f, g, h, ..] => (
+        0xF7 => match rest.first_chunk::<8>() {
+            Some(&[a, b, c, d, e, f, g, h]) => (
                 OFFSETS[8],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, 0, a, b, c, d, e, f, g, h]),
                 9,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF8 => match rest {
-            &[a, b, c, d, e, f, g, h, i, ..] => (
+        0xF8 => match rest.first_chunk::<9>() {
+            Some(&[a, b, c, d, e, f, g, h, i]) => (
                 OFFSETS[9],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, 0, a, b, c, d, e, f, g, h, i]),
                 10,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xF9 => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, ..] => (
+        0xF9 => match rest.first_chunk::<10>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j]) => (
                 OFFSETS[10],
                 u128::from_be_bytes([0, 0, 0, 0, 0, 0, a, b, c, d, e, f, g, h, i, j]),
                 11,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFA => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, k, ..] => (
+        0xFA => match rest.first_chunk::<11>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j, k]) => (
                 OFFSETS[11],
                 u128::from_be_bytes([0, 0, 0, 0, 0, a, b, c, d, e, f, g, h, i, j, k]),
                 12,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFB => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, k, l, ..] => (
+        0xFB => match rest.first_chunk::<12>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j, k, l]) => (
                 OFFSETS[12],
                 u128::from_be_bytes([0, 0, 0, 0, a, b, c, d, e, f, g, h, i, j, k, l]),
                 13,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFC => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, k, l, m, ..] => (
+        0xFC => match rest.first_chunk::<13>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j, k, l, m]) => (
                 OFFSETS[13],
                 u128::from_be_bytes([0, 0, 0, a, b, c, d, e, f, g, h, i, j, k, l, m]),
                 14,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFD => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, k, l, m, n, ..] => (
+        0xFD => match rest.first_chunk::<14>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j, k, l, m, n]) => (
                 OFFSETS[14],
                 u128::from_be_bytes([0, 0, a, b, c, d, e, f, g, h, i, j, k, l, m, n]),
                 15,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
-        0xFE => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, ..] => (
+        0xFE => match rest.first_chunk::<15>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o]) => (
                 OFFSETS[15],
                 u128::from_be_bytes([0, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o]),
                 16,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
         // 0xFF — only remaining value since tag >= TAG_THRESHOLD (240)
-        _ => match rest {
-            &[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, ..] => (
+        _ => match rest.first_chunk::<16>() {
+            Some(&[a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]) => (
                 OFFSETS[16],
                 u128::from_be_bytes([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p]),
                 17,
             ),
-            _ => return Err(DecodeError::BufferTooShort),
+            None => return Err(DecodeError::BufferTooShort),
         },
     };
 
