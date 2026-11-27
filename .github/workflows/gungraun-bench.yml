@@ -46,6 +46,11 @@ jobs:
       - name: Run gungraun benchmarks
         run: cargo bench -p bijoux --bench gungraun_shootout
 
+      # `Encoded*` paths (construction, Eq/Ord, Hash) depend on struct layout
+      # and LLVM store combining; the shootout never constructs them.
+      - name: Run gungraun layout benchmarks
+        run: cargo bench -p bijoux --bench gungraun_layout
+
       - name: Upload gungraun results
         uses: actions/upload-artifact@v4
         with:

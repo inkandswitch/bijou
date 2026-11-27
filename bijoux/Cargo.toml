@@ -57,6 +57,11 @@ harness = false
 required-features = ["u64"]
 
 [[bench]]
+name = "gungraun_layout"
+harness = false
+required-features = ["u32", "u64", "u128"]
+
+[[bench]]
 name = "signed_shootout"
 harness = false
 required-features = ["i64"]
