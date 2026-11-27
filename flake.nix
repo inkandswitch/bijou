@@ -522,7 +522,13 @@
             fi
             cd lean-aeneas
             lake exe cache get
-            lake build --wfail
+            # `Bijou` too: AxiomAudit imports the whole model, not only the
+            # modules the proofs use (a cold CI cache has no Bijou.olean).
+            lake build --wfail Bijou BijouAeneas
+            # --wfail catches `sorry`; this also rejects native_decide,
+            # bv_decide and stray axioms (anything beyond propext,
+            # Classical.choice, Quot.sound) in the model and the proofs.
+            lake env lean AxiomAudit.lean
           '';
         };
 
