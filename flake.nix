@@ -470,6 +470,10 @@
             ${cargoPath} bench --package bijoux --bench gungraun_shootout
           '';
 
+          "bench:gungraun:layout" = cmd "Run the Encoded* layout gungraun instruction-count benchmark (all widths)" ''
+            ${cargoPath} bench --package bijoux --bench gungraun_layout
+          '';
+
           "bench:charts" = cmd "Generate benchmark comparison charts (requires bench results in target/criterion)" ''
             ${bench-charts}/bin/bench-charts "$@"
           '';
